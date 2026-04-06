@@ -20,9 +20,7 @@ export default function ConsultarFichas() {
       <div className="max-w-3xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <Link to="/">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            <Button variant="ghost" size="icon"><ArrowLeft className="h-5 w-5" /></Button>
           </Link>
           <h1 className="text-2xl font-bold text-foreground">Consultar Fichas</h1>
         </div>
@@ -31,9 +29,7 @@ export default function ConsultarFichas() {
           <div className="text-center py-16 space-y-3">
             <ClipboardList className="h-12 w-12 mx-auto text-muted-foreground/40" />
             <p className="text-muted-foreground">Nenhuma ficha encontrada.</p>
-            <Link to="/nova-ficha">
-              <Button>Criar Nova Ficha</Button>
-            </Link>
+            <Link to="/nova-ficha"><Button>Criar Nova Ficha</Button></Link>
           </div>
         ) : (
           <div className="space-y-3">
@@ -41,7 +37,7 @@ export default function ConsultarFichas() {
               <Card key={ficha.id} className="hover:shadow-sm transition-shadow">
                 <CardContent className="flex items-center justify-between p-4 gap-4">
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-foreground truncate">{ficha.nomeColaborador}</p>
+                    <p className="font-medium text-foreground truncate">{ficha.nomeFuncionario}</p>
                     <p className="text-sm text-muted-foreground">
                       {new Date(ficha.criadoEm).toLocaleDateString('pt-BR')} · {ficha.itens.filter(i => i.recebido).length} itens
                     </p>
@@ -52,9 +48,7 @@ export default function ConsultarFichas() {
                   </Badge>
                   <div className="flex gap-1 shrink-0">
                     <Link to={`/ficha/${ficha.id}`}>
-                      <Button variant="ghost" size="icon" title="Visualizar">
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <Button variant="ghost" size="icon" title="Visualizar"><Eye className="h-4 w-4" /></Button>
                     </Link>
                     <Button variant="ghost" size="icon" title="Baixar PDF" onClick={() => generatePDF(ficha)}>
                       <Download className="h-4 w-4" />

@@ -5,37 +5,37 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Plus, Trash2, Save, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
-import { EPIFicha, EPIItem } from '@/types/epi';
+import { EPIFicha, EPIItem, MotivoEntrega, Turno } from '@/types/epi';
 import { generateId, saveFicha } from '@/services/fichaService';
 import SignaturePad from '@/components/SignaturePad';
-
-const defaultItems: Omit<EPIItem, 'id'>[] = [
-  { nome: 'Capacete de Segurança', ca: '', quantidade: 1, dataEntrega: '', recebido: false },
-  { nome: 'Luvas de Proteção', ca: '', quantidade: 1, dataEntrega: '', recebido: false },
-  { nome: 'Óculos de Proteção', ca: '', quantidade: 1, dataEntrega: '', recebido: false },
-  { nome: 'Botina de Segurança', ca: '', quantidade: 1, dataEntrega: '', recebido: false },
-  { nome: 'Protetor Auricular', ca: '', quantidade: 1, dataEntrega: '', recebido: false },
-];
 
 export default function NovaFicha() {
   const navigate = useNavigate();
   const today = new Date().toISOString().split('T')[0];
-  
+
   const [form, setForm] = useState({
-    nomeColaborador: '',
+    nomeFuncionario: '',
+    funcao: '',
+    telefone: '',
     cpf: '',
     matricula: '',
-    cargo: '',
+    motivo: 'admissao' as MotivoEntrega,
+    turno: 'diurno' as Turno,
     setor: '',
     empresa: '',
     dataEntrega: today,
+    observacoes: '',
   });
 
-  const [itens, setItens] = useState<EPIItem[]>(
-    defaultItems.map(item => ({ ...item, id: generateId(), dataEntrega: today }))
-  );
+  const [itens, setItens] = useState<EPIItem[]>([
+    { id: generateId(), descricao: 'Gandola em Gabardine Azul', ca: '', quantidade: 2, tamanho: '', dataEntrega: today, postoServico: '', recebido: false },
+    { id: generateId(), descricao: 'Calça em Gabardine Azul', ca: '', quantidade: 2, tamanho: '', dataEntrega: today, postoServico: '', recebido: false },
+    { id: generateId(), descricao: 'Sapato Antiderrapante Spider Pro', ca: '48583', quantidade: 1, tamanho: '', dataEntrega: today, postoServico: '', recebido: false },
+  ]);
 
   const [assinaturaColaborador, setAssinaturaColaborador] = useState('');
   const [assinaturaResponsavel, setAssinaturaResponsavel] = useState('');
@@ -47,10 +47,12 @@ export default function NovaFicha() {
   const addItem = () => {
     setItens(prev => [...prev, {
       id: generateId(),
-      nome: '',
+      descricao: '',
       ca: '',
       quantidade: 1,
+      tamanho: '',
       dataEntrega: today,
+      postoServico: '',
       recebido: false,
     }]);
   };
@@ -64,8 +66,8 @@ export default function NovaFicha() {
   };
 
   const handleSave = (asSigned: boolean) => {
-    if (!form.nomeColaborador.trim()) {
-      toast.error('Informe o nome do colaborador');
+    if (!form.nomeFuncionario.trim()) {
+      toast.error('Informe o nome do funcionário');
       return;
     }
     if (!form.dataEntrega) {
@@ -73,11 +75,10 @@ export default function NovaFicha() {
       return;
     }
     const checkedItems = itens.filter(i => i.recebido);
-    if (checkedItems.length === 0) {
+    if (asSigned && checkedItems.length === 0) {
       toast.error('Marque ao menos um item de EPI');
       return;
     }
-
     if (asSigned && (!assinaturaColaborador || !assinaturaResponsavel)) {
       toast.error('É necessário ambas as assinaturas para finalizar');
       return;
@@ -99,6 +100,14 @@ export default function NovaFicha() {
     navigate(`/ficha/${ficha.id}`);
   };
 
+  const motivoLabels: Record<MotivoEntrega, string> = {
+    admissao: 'Admissão',
+    substituicao: 'Substituição',
+    perda_extravio: 'Perda/Extravio',
+    demissao: 'Demissão',
+    complemento: 'Complemento',
+  };
+
   return (
     <div className="min-h-screen p-4 pb-20">
       <div className="max-w-3xl mx-auto space-y-6">
@@ -112,12 +121,20 @@ export default function NovaFicha() {
         {/* Employee Data */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Dados do Colaborador</CardTitle>
+            <CardTitle className="text-base">Dados do Funcionário</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <Label htmlFor="nome">Nome do Colaborador *</Label>
-              <Input id="nome" value={form.nomeColaborador} onChange={e => updateField('nomeColaborador', e.target.value)} placeholder="Nome completo" />
+              <Label htmlFor="nome">Nome do Funcionário *</Label>
+              <Input id="nome" value={form.nomeFuncionario} onChange={e => updateField('nomeFuncionario', e.target.value)} placeholder="Nome completo" />
+            </div>
+            <div>
+              <Label htmlFor="funcao">Função</Label>
+              <Input id="funcao" value={form.funcao} onChange={e => updateField('funcao', e.target.value)} placeholder="Ex: ASG, Líder ASG" />
+            </div>
+            <div>
+              <Label htmlFor="telefone">Telefone</Label>
+              <Input id="telefone" value={form.telefone} onChange={e => updateField('telefone', e.target.value)} placeholder="(61) 9xxxx-xxxx" />
             </div>
             <div>
               <Label htmlFor="cpf">CPF</Label>
@@ -128,8 +145,25 @@ export default function NovaFicha() {
               <Input id="matricula" value={form.matricula} onChange={e => updateField('matricula', e.target.value)} placeholder="Nº matrícula" />
             </div>
             <div>
-              <Label htmlFor="cargo">Cargo</Label>
-              <Input id="cargo" value={form.cargo} onChange={e => updateField('cargo', e.target.value)} placeholder="Cargo" />
+              <Label>Motivo</Label>
+              <Select value={form.motivo} onValueChange={v => updateField('motivo', v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(motivoLabels).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Turno</Label>
+              <Select value={form.turno} onValueChange={v => updateField('turno', v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="diurno">Diurno</SelectItem>
+                  <SelectItem value="noturno">Noturno</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label htmlFor="setor">Setor</Label>
@@ -149,7 +183,7 @@ export default function NovaFicha() {
         {/* EPI Items */}
         <Card>
           <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-base">Itens de EPI</CardTitle>
+            <CardTitle className="text-base">Itens de Uniforme/EPI</CardTitle>
             <Button variant="outline" size="sm" onClick={addItem}>
               <Plus className="h-4 w-4 mr-1" /> Adicionar
             </Button>
@@ -162,11 +196,11 @@ export default function NovaFicha() {
                   onCheckedChange={(v) => updateItem(item.id, 'recebido', !!v)}
                   className="mt-2"
                 />
-                <div className="flex-1 grid gap-2 sm:grid-cols-4">
+                <div className="flex-1 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                   <Input
-                    placeholder="Nome do EPI"
-                    value={item.nome}
-                    onChange={e => updateItem(item.id, 'nome', e.target.value)}
+                    placeholder="Descrição do item"
+                    value={item.descricao}
+                    onChange={e => updateItem(item.id, 'descricao', e.target.value)}
                     className="sm:col-span-2"
                   />
                   <Input
@@ -181,6 +215,25 @@ export default function NovaFicha() {
                     value={item.quantidade}
                     onChange={e => updateItem(item.id, 'quantidade', parseInt(e.target.value) || 1)}
                   />
+                  <Input
+                    placeholder="Tam. / Nº"
+                    value={item.tamanho}
+                    onChange={e => updateItem(item.id, 'tamanho', e.target.value)}
+                  />
+                  <Input
+                    placeholder="Posto de Serviço"
+                    value={item.postoServico}
+                    onChange={e => updateItem(item.id, 'postoServico', e.target.value)}
+                  />
+                  <div>
+                    <Input
+                      type="date"
+                      value={item.dataValidade || ''}
+                      onChange={e => updateItem(item.id, 'dataValidade', e.target.value)}
+                      title="Data de validade"
+                    />
+                    <p className="text-xs text-muted-foreground mt-0.5">Validade</p>
+                  </div>
                 </div>
                 <Button variant="ghost" size="icon" onClick={() => removeItem(item.id)} className="text-destructive shrink-0">
                   <Trash2 className="h-4 w-4" />
@@ -188,8 +241,21 @@ export default function NovaFicha() {
               </div>
             ))}
             {itens.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">Nenhum item adicionado. Clique em "Adicionar" acima.</p>
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhum item adicionado.</p>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Observations */}
+        <Card>
+          <CardHeader><CardTitle className="text-base">Observações</CardTitle></CardHeader>
+          <CardContent>
+            <Textarea
+              value={form.observacoes}
+              onChange={e => updateField('observacoes', e.target.value)}
+              placeholder="Observações adicionais..."
+              rows={3}
+            />
           </CardContent>
         </Card>
 
@@ -199,14 +265,8 @@ export default function NovaFicha() {
             <CardTitle className="text-base">Assinaturas</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <SignaturePad
-              label="Assinatura do Colaborador"
-              onSave={setAssinaturaColaborador}
-            />
-            <SignaturePad
-              label="Assinatura do Responsável pela Entrega"
-              onSave={setAssinaturaResponsavel}
-            />
+            <SignaturePad label="Assinatura do Funcionário" onSave={setAssinaturaColaborador} />
+            <SignaturePad label="Assinatura do Responsável pela Entrega" onSave={setAssinaturaResponsavel} />
           </CardContent>
         </Card>
 

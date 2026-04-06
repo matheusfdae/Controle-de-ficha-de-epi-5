@@ -10,6 +10,11 @@ import { generatePDF } from '@/services/pdfService';
 import SignaturePad from '@/components/SignaturePad';
 import { toast } from 'sonner';
 
+const motivoLabels: Record<string, string> = {
+  admissao: 'Admissão', substituicao: 'Substituição',
+  perda_extravio: 'Perda/Extravio', demissao: 'Demissão', complemento: 'Complemento',
+};
+
 export default function VisualizarFicha() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -80,16 +85,18 @@ export default function VisualizarFicha() {
           </Badge>
         </div>
 
-        {/* Employee Info */}
         <Card>
-          <CardHeader><CardTitle className="text-base">Dados do Colaborador</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Dados do Funcionário</CardTitle></CardHeader>
           <CardContent>
             <dl className="grid gap-3 sm:grid-cols-2 text-sm">
               {[
-                ['Nome', ficha.nomeColaborador],
+                ['Nome', ficha.nomeFuncionario],
+                ['Função', ficha.funcao],
+                ['Telefone', ficha.telefone],
                 ['CPF', ficha.cpf],
                 ['Matrícula', ficha.matricula],
-                ['Cargo', ficha.cargo],
+                ['Motivo', motivoLabels[ficha.motivo] || ficha.motivo],
+                ['Turno', ficha.turno === 'diurno' ? 'Diurno' : 'Noturno'],
                 ['Setor', ficha.setor],
                 ['Empresa', ficha.empresa],
                 ['Data de Entrega', ficha.dataEntrega],
@@ -103,9 +110,8 @@ export default function VisualizarFicha() {
           </CardContent>
         </Card>
 
-        {/* Items */}
         <Card>
-          <CardHeader><CardTitle className="text-base">Itens de EPI</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Itens de Uniforme/EPI</CardTitle></CardHeader>
           <CardContent className="space-y-2">
             {ficha.itens.map(item => (
               <div key={item.id} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/20">
@@ -115,8 +121,11 @@ export default function VisualizarFicha() {
                   <Circle className="h-5 w-5 text-muted-foreground shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm text-foreground">{item.nome}</p>
-                  <p className="text-xs text-muted-foreground">CA: {item.ca || '—'} · Qtd: {item.quantidade}</p>
+                  <p className="font-medium text-sm text-foreground">{item.descricao}</p>
+                  <p className="text-xs text-muted-foreground">
+                    CA: {item.ca || '—'} · Qtd: {item.quantidade} · Tam: {item.tamanho || '—'}
+                    {item.dataValidade && ` · Val: ${item.dataValidade}`}
+                  </p>
                 </div>
                 <span className="text-xs text-muted-foreground shrink-0">{item.recebido ? 'Recebido' : 'Pendente'}</span>
               </div>
@@ -124,17 +133,16 @@ export default function VisualizarFicha() {
           </CardContent>
         </Card>
 
-        {/* Signatures */}
         <Card>
           <CardHeader><CardTitle className="text-base">Assinaturas</CardTitle></CardHeader>
           <CardContent className="space-y-6">
             {isSigned && ficha.assinaturaColaborador ? (
               <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Assinatura do Colaborador</p>
+                <p className="text-sm text-muted-foreground">Assinatura do Funcionário</p>
                 <img src={ficha.assinaturaColaborador} alt="Assinatura" className="border rounded-lg max-h-32 bg-card" />
               </div>
             ) : !isSigned ? (
-              <SignaturePad label="Assinatura do Colaborador" onSave={setAssinaturaColaborador} />
+              <SignaturePad label="Assinatura do Funcionário" onSave={setAssinaturaColaborador} />
             ) : null}
 
             {isSigned && ficha.assinaturaResponsavel ? (
@@ -154,7 +162,6 @@ export default function VisualizarFicha() {
           </CardContent>
         </Card>
 
-        {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-3">
           {!isSigned && (
             <>
