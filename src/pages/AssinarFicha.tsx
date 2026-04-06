@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CheckCircle2, Download, ShieldCheck } from 'lucide-react';
@@ -92,20 +91,18 @@ export default function AssinarFicha() {
           <p className="text-muted-foreground text-sm">Confira os itens e assine para confirmar o recebimento.</p>
         </div>
 
-        {/* Info */}
         <Card>
           <CardHeader><CardTitle className="text-base">Seus Dados</CardTitle></CardHeader>
           <CardContent>
             <dl className="grid gap-2 sm:grid-cols-2 text-sm">
-              <div><dt className="text-muted-foreground text-xs">Nome</dt><dd className="font-medium">{ficha.nomeColaborador}</dd></div>
+              <div><dt className="text-muted-foreground text-xs">Nome</dt><dd className="font-medium">{ficha.nomeFuncionario}</dd></div>
               <div><dt className="text-muted-foreground text-xs">Empresa</dt><dd className="font-medium">{ficha.empresa || '—'}</dd></div>
-              <div><dt className="text-muted-foreground text-xs">Cargo</dt><dd className="font-medium">{ficha.cargo || '—'}</dd></div>
+              <div><dt className="text-muted-foreground text-xs">Função</dt><dd className="font-medium">{ficha.funcao || '—'}</dd></div>
               <div><dt className="text-muted-foreground text-xs">Data</dt><dd className="font-medium">{ficha.dataEntrega}</dd></div>
             </dl>
           </CardContent>
         </Card>
 
-        {/* Items */}
         <Card>
           <CardHeader><CardTitle className="text-base">Itens Recebidos</CardTitle></CardHeader>
           <CardContent className="space-y-2">
@@ -116,15 +113,14 @@ export default function AssinarFicha() {
                   onCheckedChange={() => toggleItem(item.id)}
                 />
                 <div className="flex-1">
-                  <p className="font-medium text-sm text-foreground">{item.nome}</p>
-                  <p className="text-xs text-muted-foreground">CA: {item.ca || '—'} · Qtd: {item.quantidade}</p>
+                  <p className="font-medium text-sm text-foreground">{item.descricao}</p>
+                  <p className="text-xs text-muted-foreground">CA: {item.ca || '—'} · Qtd: {item.quantidade} · Tam: {item.tamanho || '—'}</p>
                 </div>
               </label>
             ))}
           </CardContent>
         </Card>
 
-        {/* Signature */}
         <Card>
           <CardHeader><CardTitle className="text-base">Sua Assinatura</CardTitle></CardHeader>
           <CardContent>
