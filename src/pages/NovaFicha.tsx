@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ArrowLeft, Plus, Trash2, Save } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { EPIFicha, EPIItem } from '@/types/epi';
 import { generateId, saveFicha } from '@/services/fichaService';
