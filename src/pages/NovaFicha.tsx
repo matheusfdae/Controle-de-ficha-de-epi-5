@@ -223,5 +223,3 @@ export default function NovaFicha() {
     </div>
   );
 }
-
-import { ShieldCheck } from 'lucide-react';
