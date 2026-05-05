@@ -326,28 +326,39 @@ export default function Integracao() {
               )}
               <div className="space-y-2">
                 {intItens.map((it, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 items-end border rounded p-2">
-                    <div className="col-span-6">
+                  <div key={idx} className={`grid grid-cols-12 gap-2 items-end border rounded p-2 ${it.incluir === false ? 'opacity-50 bg-muted/40' : ''}`}>
+                    <div className="col-span-4">
                       <Label className="text-xs">Item</Label>
                       <p className="text-sm font-medium truncate">{it.nome}</p>
                       {it.ca && <p className="text-xs text-muted-foreground">CA {it.ca}</p>}
+                    </div>
+                    <div className="col-span-3">
+                      <Label className="text-xs">Incluir?</Label>
+                      <div className="flex gap-1">
+                        <Button type="button" size="sm" variant={it.incluir === true ? 'default' : 'outline'}
+                          onClick={() => setIntItens(prev => prev.map((x, i) => i === idx ? { ...x, incluir: true } : x))}>Sim</Button>
+                        <Button type="button" size="sm" variant={it.incluir === false ? 'default' : 'outline'}
+                          onClick={() => setIntItens(prev => prev.map((x, i) => i === idx ? { ...x, incluir: false } : x))}>Não</Button>
+                      </div>
                     </div>
                     <div className="col-span-3">
                       <Label className="text-xs">Tamanho/Nº</Label>
                       <Input
                         value={it.tamanho}
                         placeholder="Ex: M, 42"
+                        disabled={it.incluir === false}
                         onChange={e => {
                           const v = e.target.value;
                           setIntItens(prev => prev.map((x, i) => i === idx ? { ...x, tamanho: v } : x));
                         }}
                       />
                     </div>
-                    <div className="col-span-3">
+                    <div className="col-span-2">
                       <Label className="text-xs">Qtd</Label>
                       <Input
                         type="number" min={1}
                         value={it.quantidade}
+                        disabled={it.incluir === false}
                         onChange={e => {
                           const v = parseInt(e.target.value) || 1;
                           setIntItens(prev => prev.map((x, i) => i === idx ? { ...x, quantidade: v } : x));
