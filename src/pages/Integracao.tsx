@@ -9,8 +9,9 @@ import { Plus, Trash2, UserPlus, Save, FileSignature, CheckCircle2 } from 'lucid
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
