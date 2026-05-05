@@ -18,6 +18,7 @@ import Configuracoes from "./pages/Configuracoes";
 import Usuarios from "./pages/Usuarios";
 import Estoque from "./pages/Estoque";
 import Funcoes from "./pages/Funcoes";
+import Integracao from "./pages/Integracao";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,6 +53,7 @@ function AppRoutes() {
         <Route path="/usuarios" element={<AdminRoute><Usuarios /></AdminRoute>} />
         <Route path="/estoque" element={<AdminRoute><Estoque /></AdminRoute>} />
         <Route path="/funcoes" element={<AdminRoute><Funcoes /></AdminRoute>} />
+        <Route path="/integracao" element={<AdminRoute><Integracao /></AdminRoute>} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

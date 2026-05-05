@@ -47,6 +47,59 @@ export type Database = {
         }
         Relationships: []
       }
+      colaboradores_integracao: {
+        Row: {
+          created_at: string
+          criado_por: string | null
+          data_admissao: string | null
+          funcao_id: string | null
+          funcao_nome: string | null
+          id: string
+          matricula: string | null
+          nome: string
+          observacoes: string | null
+          posto: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          criado_por?: string | null
+          data_admissao?: string | null
+          funcao_id?: string | null
+          funcao_nome?: string | null
+          id?: string
+          matricula?: string | null
+          nome: string
+          observacoes?: string | null
+          posto?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          criado_por?: string | null
+          data_admissao?: string | null
+          funcao_id?: string | null
+          funcao_nome?: string | null
+          id?: string
+          matricula?: string | null
+          nome?: string
+          observacoes?: string | null
+          posto?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "colaboradores_integracao_funcao_id_fkey"
+            columns: ["funcao_id"]
+            isOneToOne: false
+            referencedRelation: "funcoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       epi_tamanhos: {
         Row: {
           created_at: string
