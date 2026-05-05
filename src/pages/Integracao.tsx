@@ -39,6 +39,15 @@ export default function Integracao() {
     nome: '', matricula: '', posto: '', funcao_id: '', data_admissao: '',
   });
 
+  // Modal de integração (preenchimento de tamanhos)
+  const [intModalColab, setIntModalColab] = useState<Colab | null>(null);
+  const [intItens, setIntItens] = useState<Array<{ epi_id: string; nome: string; ca: string; quantidade: number; tamanho: string }>>([]);
+  const [intUniformes, setIntUniformes] = useState<Array<{ descricao: string; tamanho: string; quantidade: number }>>([
+    { descricao: 'Camisa', tamanho: '', quantidade: 2 },
+    { descricao: 'Calça', tamanho: '', quantidade: 2 },
+    { descricao: 'Calçado de segurança', tamanho: '', quantidade: 1 },
+  ]);
+
   const load = async () => {
     const { data, error } = await supabase
       .from('colaboradores_integracao').select('*')
