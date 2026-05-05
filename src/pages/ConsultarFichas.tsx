@@ -14,7 +14,7 @@ export default function ConsultarFichas() {
   const [fichas, setFichas] = useState<EPIFicha[]>([]);
 
   useEffect(() => {
-    setFichas(getFichas());
+    getFichas().then(setFichas);
   }, []);
 
   return (

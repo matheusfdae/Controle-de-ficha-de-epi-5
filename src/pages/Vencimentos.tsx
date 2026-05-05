@@ -19,7 +19,7 @@ export default function Vencimentos() {
   const [filtro, setFiltro] = useState<'todos' | 'vencidos' | 'proximos' | 'ok'>('todos');
 
   useEffect(() => {
-    setFichas(getFichas());
+    getFichas().then(setFichas);
   }, []);
 
   const hoje = new Date();
