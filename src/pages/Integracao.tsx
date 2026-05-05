@@ -219,8 +219,24 @@ export default function Integracao() {
                     {[c.matricula && `Matrícula: ${c.matricula}`, c.posto && `Posto: ${c.posto}`, c.funcao_nome && `Função: ${c.funcao_nome}`].filter(Boolean).join(' • ')}
                   </p>
                   {c.data_admissao && <p className="text-xs text-muted-foreground">Admissão: {new Date(c.data_admissao).toLocaleDateString('pt-BR')}</p>}
+                  {c.profile_id && c.status === 'pendente' && (
+                    <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                      <FileSignature className="h-3 w-3" /> Fichas geradas — aguardando assinaturas
+                    </p>
+                  )}
                 </div>
                 <Badge variant={statusTone(c.status) as any}>{c.status}</Badge>
+                {!c.profile_id && c.status === 'pendente' && (
+                  <Button size="sm" onClick={() => integrar(c)} disabled={integrating === c.id}>
+                    <CheckCircle2 className="h-4 w-4 mr-1" />
+                    {integrating === c.id ? 'Integrando...' : 'Integrar'}
+                  </Button>
+                )}
+                {c.profile_id && (
+                  <Button size="sm" variant="outline" onClick={() => navigate('/fichas')}>
+                    Ver fichas
+                  </Button>
+                )}
                 <Select value={c.status} onValueChange={(v) => setStatus(c.id, v)}>
                   <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
                   <SelectContent>
