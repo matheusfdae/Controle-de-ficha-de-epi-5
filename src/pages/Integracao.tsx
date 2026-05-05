@@ -178,7 +178,7 @@ export default function Integracao() {
         }).select().single();
       if (fuErr) throw fuErr;
 
-      const uniItens = intUniformes.filter(u => u.descricao.trim());
+      const uniItens = intUniformes.filter(u => u.descricao.trim() && u.incluir !== false);
       if (uniItens.length > 0) {
         await supabase.from('fichas_uniforme_itens').insert(
           uniItens.map(u => ({
