@@ -43,6 +43,40 @@ export default function NovaFicha() {
   const [assinaturaColaborador, setAssinaturaColaborador] = useState('');
   const [assinaturaResponsavel, setAssinaturaResponsavel] = useState(config.assinaturaEmpresa || '');
 
+  const [funcoes, setFuncoes] = useState<Funcao[]>([]);
+  const [epis, setEpis] = useState<EPI[]>([]);
+  const [funcaoId, setFuncaoId] = useState<string>('');
+
+  useEffect(() => {
+    listFuncoes().then(setFuncoes).catch(() => {});
+    listEpis().then(setEpis).catch(() => {});
+  }, []);
+
+  const aplicarFuncao = async (id: string) => {
+    setFuncaoId(id);
+    const f = funcoes.find(x => x.id === id);
+    if (f) updateField('funcao', f.nome);
+    if (!id) return;
+    try {
+      const vincs = await listFuncaoEpis(id);
+      const novosItens: EPIItem[] = vincs.map(v => {
+        const epi = epis.find(e => e.id === v.epi_id);
+        return {
+          id: generateId(),
+          descricao: epi?.nome || '',
+          ca: epi?.ca_numero || '',
+          quantidade: v.quantidade || 1,
+          tamanho: v.tamanho || '',
+          dataEntrega: today,
+          postoServico: '',
+          recebido: false,
+          epiId: v.epi_id,
+        };
+      });
+      if (novosItens.length) setItens(novosItens);
+    } catch { /* ignore */ }
+  };
+
   const updateField = (field: string, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
   };
