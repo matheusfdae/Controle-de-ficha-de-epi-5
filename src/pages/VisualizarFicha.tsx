@@ -3,17 +3,18 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Download, Share2, CheckCircle2, Circle } from 'lucide-react';
+import { ArrowLeft, Download, Copy, MessageCircle, Mail, CheckCircle2 } from 'lucide-react';
 import { EPIFicha } from '@/types/epi';
 import { getFichaById, saveFicha } from '@/services/fichaService';
 import { generatePDF } from '@/services/pdfService';
 import SignaturePad from '@/components/SignaturePad';
+import FichaOficialView from '@/components/FichaOficialView';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-
-const motivoLabels: Record<string, string> = {
-  admissao: 'Admissão', substituicao: 'Substituição',
-  perda_extravio: 'Perda/Extravio', demissao: 'Demissão', complemento: 'Complemento',
-};
 
 export default function VisualizarFicha() {
   const { id } = useParams<{ id: string }>();
@@ -69,9 +70,29 @@ export default function VisualizarFicha() {
     toast.success('Link copiado para a área de transferência!');
   };
 
+  const shareUrl = `${window.location.origin}/assinar/${ficha.id}`;
+  const shareMessage = `Olá ${ficha.nomeFuncionario}, segue o link para assinatura da sua ficha de EPI: ${shareUrl}`;
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(shareUrl);
+    toast.success('Link copiado!');
+  };
+  const sendWhatsApp = () => {
+    const phone = (ficha.telefone || '').replace(/\D/g, '');
+    const url = phone
+      ? `https://wa.me/55${phone}?text=${encodeURIComponent(shareMessage)}`
+      : `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
+    window.open(url, '_blank');
+  };
+  const sendEmail = () => {
+    const subject = encodeURIComponent('Assinatura de Ficha de EPI');
+    const body = encodeURIComponent(shareMessage);
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  };
+
   return (
-    <div className="min-h-screen p-4 pb-20">
-      <div className="max-w-3xl mx-auto space-y-6">
+    <div className="min-h-screen bg-muted/30 p-4 pb-20">
+      <div className="max-w-5xl mx-auto space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
@@ -85,98 +106,69 @@ export default function VisualizarFicha() {
           </Badge>
         </div>
 
-        <Card>
-          <CardHeader><CardTitle className="text-base">Dados do Funcionário</CardTitle></CardHeader>
-          <CardContent>
-            <dl className="grid gap-3 sm:grid-cols-2 text-sm">
-              {[
-                ['Nome', ficha.nomeFuncionario],
-                ['Função', ficha.funcao],
-                ['Telefone', ficha.telefone],
-                ['CPF', ficha.cpf],
-                ['Matrícula', ficha.matricula],
-                ['Motivo', motivoLabels[ficha.motivo] || ficha.motivo],
-                ['Turno', ficha.turno === 'diurno' ? 'Diurno' : 'Noturno'],
-                ['Setor', ficha.setor],
-                ['Empresa', ficha.empresa],
-                ['Data de Entrega', ficha.dataEntrega],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <dt className="text-muted-foreground text-xs">{label}</dt>
-                  <dd className="font-medium text-foreground">{value || '—'}</dd>
-                </div>
-              ))}
-            </dl>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle className="text-base">Itens de Uniforme/EPI</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            {ficha.itens.map(item => (
-              <div key={item.id} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/20">
-                {item.recebido ? (
-                  <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
-                ) : (
-                  <Circle className="h-5 w-5 text-muted-foreground shrink-0" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm text-foreground">{item.descricao}</p>
+        {/* Ações */}
+        <div className="flex flex-wrap gap-2">
+          {!isSigned && (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <MessageCircle className="h-4 w-4 mr-2" /> Enviar Link de Assinatura
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Enviar para assinatura remota</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <div>
+                    <Label>Link público</Label>
+                    <Input readOnly value={shareUrl} onClick={(e) => e.currentTarget.select()} />
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    CA: {item.ca || '—'} · Qtd: {item.quantidade} · Tam: {item.tamanho || '—'}
-                    {item.dataValidade && ` · Val: ${item.dataValidade}`}
+                    O colaborador abre o link, marca os itens recebidos e assina diretamente do celular.
                   </p>
                 </div>
-                <span className="text-xs text-muted-foreground shrink-0">{item.recebido ? 'Recebido' : 'Pendente'}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle className="text-base">Assinaturas</CardTitle></CardHeader>
-          <CardContent className="space-y-6">
-            {isSigned && ficha.assinaturaColaborador ? (
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Assinatura do Funcionário</p>
-                <img src={ficha.assinaturaColaborador} alt="Assinatura" className="border rounded-lg max-h-32 bg-card" />
-              </div>
-            ) : !isSigned ? (
-              <SignaturePad label="Assinatura do Funcionário" onSave={setAssinaturaColaborador} />
-            ) : null}
-
-            {isSigned && ficha.assinaturaResponsavel ? (
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Assinatura do Responsável</p>
-                <img src={ficha.assinaturaResponsavel} alt="Assinatura" className="border rounded-lg max-h-32 bg-card" />
-              </div>
-            ) : !isSigned ? (
-              <SignaturePad label="Assinatura do Responsável" onSave={setAssinaturaResponsavel} />
-            ) : null}
-
-            {ficha.assinadoEm && (
-              <p className="text-xs text-muted-foreground">
-                Assinado em: {new Date(ficha.assinadoEm).toLocaleString('pt-BR')}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <div className="flex flex-col sm:flex-row gap-3">
-          {!isSigned && (
-            <>
-              <Button variant="outline" className="flex-1" onClick={shareLink}>
-                <Share2 className="h-4 w-4 mr-2" /> Copiar Link para Assinatura
-              </Button>
-              <Button className="flex-1" onClick={handleSign}>
-                Assinar e Finalizar
-              </Button>
-            </>
+                <DialogFooter className="flex-wrap gap-2 sm:flex-row">
+                  <Button variant="outline" onClick={copyLink}>
+                    <Copy className="h-4 w-4 mr-2" /> Copiar
+                  </Button>
+                  <Button variant="outline" onClick={sendEmail}>
+                    <Mail className="h-4 w-4 mr-2" /> Email
+                  </Button>
+                  <Button onClick={sendWhatsApp} className="bg-[#25D366] hover:bg-[#20bd5a] text-white">
+                    <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           )}
-          <Button variant={isSigned ? 'default' : 'outline'} className="flex-1" onClick={() => generatePDF(ficha)}>
+          <Button variant={isSigned ? 'default' : 'outline'} onClick={() => generatePDF(ficha)}>
             <Download className="h-4 w-4 mr-2" /> Baixar PDF
           </Button>
         </div>
+
+        {/* Ficha oficial */}
+        <FichaOficialView ficha={ficha} />
+
+        {/* Assinatura presencial (admin) */}
+        {!isSigned && (
+          <Card>
+            <CardHeader><CardTitle className="text-base">Assinatura presencial</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <SignaturePad label="Assinatura do Funcionário" onSave={setAssinaturaColaborador} initialValue={assinaturaColaborador} />
+              <SignaturePad label="Assinatura do Responsável (Empresa)" onSave={setAssinaturaResponsavel} initialValue={assinaturaResponsavel} />
+              <Button className="w-full" onClick={handleSign}>
+                <CheckCircle2 className="h-4 w-4 mr-2" /> Assinar e Finalizar
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {ficha.assinadoEm && (
+          <p className="text-xs text-muted-foreground text-center">
+            Assinado em: {new Date(ficha.assinadoEm).toLocaleString('pt-BR')}
+          </p>
+        )}
       </div>
     </div>
   );
