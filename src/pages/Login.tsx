@@ -61,9 +61,10 @@ export default function Login() {
               <LogIn className="h-4 w-4 mr-2" /> Entrar
             </Button>
           </form>
-          <p className="text-xs text-muted-foreground text-center mt-4">
-            Demo: <strong>admin</strong> / <strong>admin123</strong>
-          </p>
+          <div className="text-xs text-muted-foreground text-center mt-4 space-y-0.5">
+            <p>Demo Admin: <strong>admin</strong> / <strong>admin123</strong></p>
+            <p>Demo Operador: <strong>operador</strong> / <strong>operador123</strong></p>
+          </div>
         </CardContent>
       </Card>
     </div>
