@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import AppLayout from "@/components/AppLayout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import NovaFicha from "./pages/NovaFicha";
@@ -11,14 +12,15 @@ import ConsultarFichas from "./pages/ConsultarFichas";
 import VisualizarFicha from "./pages/VisualizarFicha";
 import AssinarFicha from "./pages/AssinarFicha";
 import Vencimentos from "./pages/Vencimentos";
+import Configuracoes from "./pages/Configuracoes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedLayout() {
   const { isAuthenticated } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  return <>{children}</>;
+  return <AppLayout />;
 }
 
 function AppRoutes() {
@@ -26,11 +28,14 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/assinar/:id" element={<AssinarFicha />} />
-      <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/nova-ficha" element={<ProtectedRoute><NovaFicha /></ProtectedRoute>} />
-      <Route path="/consultar" element={<ProtectedRoute><ConsultarFichas /></ProtectedRoute>} />
-      <Route path="/ficha/:id" element={<ProtectedRoute><VisualizarFicha /></ProtectedRoute>} />
-      <Route path="/vencimentos" element={<ProtectedRoute><Vencimentos /></ProtectedRoute>} />
+      <Route element={<ProtectedLayout />}>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/nova-ficha" element={<NovaFicha />} />
+        <Route path="/consultar" element={<ConsultarFichas />} />
+        <Route path="/ficha/:id" element={<VisualizarFicha />} />
+        <Route path="/vencimentos" element={<Vencimentos />} />
+        <Route path="/configuracoes" element={<Configuracoes />} />
+      </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
