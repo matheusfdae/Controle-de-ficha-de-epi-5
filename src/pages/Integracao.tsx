@@ -362,7 +362,7 @@ export default function Integracao() {
             <section>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-semibold text-sm uppercase tracking-wide">Uniformes</h3>
-                <Button size="sm" variant="outline" onClick={() => setIntUniformes(p => [...p, { descricao: '', tamanho: '', quantidade: 1 }])}>
+                <Button size="sm" variant="outline" onClick={() => setIntUniformes(p => [...p, { descricao: '', tamanho: '', quantidade: 1, incluir: null }])}>
                   <Plus className="h-3 w-3 mr-1" /> Adicionar
                 </Button>
               </div>
