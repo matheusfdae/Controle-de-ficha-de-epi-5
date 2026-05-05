@@ -16,6 +16,8 @@ import AssinarFicha from "./pages/AssinarFicha";
 import Vencimentos from "./pages/Vencimentos";
 import Configuracoes from "./pages/Configuracoes";
 import Usuarios from "./pages/Usuarios";
+import Estoque from "./pages/Estoque";
+import Funcoes from "./pages/Funcoes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
