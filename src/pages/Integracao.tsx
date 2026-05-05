@@ -97,6 +97,30 @@ export default function Integracao() {
       toast.error('Defina a função antes de integrar.');
       return;
     }
+    // Carrega itens da função para o modal
+    const { data: funcaoEpis } = await supabase
+      .from('funcao_epis').select('*, epis(nome, ca_numero)')
+      .eq('funcao_id', c.funcao_id);
+
+    const itens = (funcaoEpis || []).map((fe: any) => ({
+      epi_id: fe.epi_id,
+      nome: fe.epis?.nome || '',
+      ca: fe.epis?.ca_numero || '',
+      quantidade: fe.quantidade || 1,
+      tamanho: fe.tamanho || '',
+    }));
+    setIntItens(itens);
+    setIntUniformes([
+      { descricao: 'Camisa', tamanho: '', quantidade: 2 },
+      { descricao: 'Calça', tamanho: '', quantidade: 2 },
+      { descricao: 'Calçado de segurança', tamanho: '', quantidade: 1 },
+    ]);
+    setIntModalColab(c);
+  };
+
+  const confirmarIntegracao = async () => {
+    if (!intModalColab) return;
+    const c = intModalColab;
     setIntegrating(c.id);
     try {
       let profileId = c.profile_id;
@@ -116,12 +140,7 @@ export default function Integracao() {
         profileId = newId;
       }
 
-      // 2) Busca itens da função
-      const { data: funcaoEpis } = await supabase
-        .from('funcao_epis').select('*, epis(nome, ca_numero)')
-        .eq('funcao_id', c.funcao_id);
-
-      // 3) Cria Ficha de EPI
+      // 2) Cria Ficha de EPI
       const { data: fichaEpi, error: feErr } = await supabase
         .from('fichas_epi').insert({
           colaborador_id: profileId,
@@ -135,32 +154,49 @@ export default function Integracao() {
         }).select().single();
       if (feErr) throw feErr;
 
-      if (funcaoEpis && funcaoEpis.length > 0) {
-        const itens = funcaoEpis.map((fe: any) => ({
+      if (intItens.length > 0) {
+        const itensPayload = intItens.map(it => ({
           ficha_id: fichaEpi.id,
-          epi_id: fe.epi_id,
-          descricao: fe.epis?.nome || '',
-          ca: fe.epis?.ca_numero || '',
-          quantidade: fe.quantidade || 1,
-          tamanho: fe.tamanho,
+          epi_id: it.epi_id,
+          descricao: it.nome,
+          ca: it.ca,
+          quantidade: it.quantidade || 1,
+          tamanho: it.tamanho || null,
           motivo_entrega: 'admissao' as const,
           estado: 'novo' as const,
         }));
-        await supabase.from('fichas_epi_itens').insert(itens);
+        await supabase.from('fichas_epi_itens').insert(itensPayload);
       }
 
-      // 4) Cria Ficha de Uniforme (sem itens — RH preenche)
-      await supabase.from('fichas_uniforme').insert({
-        colaborador_id: profileId,
-        status: 'pendente_assinatura',
-      });
+      // 3) Cria Ficha de Uniforme com itens
+      const { data: fichaUni, error: fuErr } = await supabase
+        .from('fichas_uniforme').insert({
+          colaborador_id: profileId,
+          status: 'pendente_assinatura',
+        }).select().single();
+      if (fuErr) throw fuErr;
 
-      // 5) Atualiza integração mantendo pendente até assinaturas
+      const uniItens = intUniformes.filter(u => u.descricao.trim());
+      if (uniItens.length > 0) {
+        await supabase.from('fichas_uniforme_itens').insert(
+          uniItens.map(u => ({
+            ficha_id: fichaUni.id,
+            descricao: u.descricao,
+            tamanho: u.tamanho || null,
+            quantidade: u.quantidade || 1,
+            motivo_entrega: 'admissao' as const,
+            estado: 'novo' as const,
+          })),
+        );
+      }
+
+      // 4) Atualiza integração mantendo pendente até assinaturas
       await supabase.from('colaboradores_integracao').update({
         profile_id: profileId,
       }).eq('id', c.id);
 
       toast.success('Fichas geradas! Status ficará pendente até as assinaturas.');
+      setIntModalColab(null);
       load();
     } catch (err: any) {
       console.error(err);
