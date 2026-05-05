@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { EPIFicha, EPIItem, MotivoEntrega, Turno } from '@/types/epi';
 import { generateId, saveFicha } from '@/services/fichaService';
 import { getConfig } from '@/services/configService';
 import SignaturePad from '@/components/SignaturePad';
+import { Funcao, EPI, listFuncoes, listEpis, listFuncaoEpis } from '@/services/estoqueService';
 
 export default function NovaFicha() {
   const navigate = useNavigate();
