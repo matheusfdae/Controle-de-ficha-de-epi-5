@@ -261,12 +261,18 @@ export function generatePDF(ficha: EPIFicha): void {
           case 2: val = item.descricao.substring(0, 45); break;
           case 3: val = item.tamanho || ''; break;
           case 4: val = item.postoServico || ''; break;
-          case 5: val = item.recebido ? '✓' : ''; break;
+          case 5:
+            if (ficha.assinaturaColaborador) {
+              try { doc.addImage(ficha.assinaturaColaborador, 'PNG', cx + 2, y + 0.5, cols[5] - 4, rowH - 1); } catch {}
+            } else if (item.recebido) {
+              val = '✓';
+            }
+            break;
           case 6: val = item.devolucao?.data || ''; break;
           case 7: val = item.devolucao?.quantidade ? String(item.devolucao.quantidade) : ''; break;
           case 8: val = item.devolucao?.recebidoPor || ''; break;
         }
-        text(val, cx + 1.5, y + 4, { size: 6 });
+        if (val) text(val, cx + 1.5, y + 4, { size: 6 });
       }
       cx += cols[c];
     }
