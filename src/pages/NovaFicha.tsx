@@ -11,11 +11,13 @@ import { ArrowLeft, Plus, Trash2, Save, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { EPIFicha, EPIItem, MotivoEntrega, Turno } from '@/types/epi';
 import { generateId, saveFicha } from '@/services/fichaService';
+import { getConfig } from '@/services/configService';
 import SignaturePad from '@/components/SignaturePad';
 
 export default function NovaFicha() {
   const navigate = useNavigate();
   const today = new Date().toISOString().split('T')[0];
+  const config = getConfig();
 
   const [form, setForm] = useState({
     nomeFuncionario: '',
@@ -26,7 +28,7 @@ export default function NovaFicha() {
     motivo: 'admissao' as MotivoEntrega,
     turno: 'diurno' as Turno,
     setor: '',
-    empresa: '',
+    empresa: config.empresaNome,
     dataEntrega: today,
     observacoes: '',
   });
@@ -38,7 +40,7 @@ export default function NovaFicha() {
   ]);
 
   const [assinaturaColaborador, setAssinaturaColaborador] = useState('');
-  const [assinaturaResponsavel, setAssinaturaResponsavel] = useState('');
+  const [assinaturaResponsavel, setAssinaturaResponsavel] = useState(config.assinaturaEmpresa || '');
 
   const updateField = (field: string, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -109,13 +111,11 @@ export default function NovaFicha() {
   };
 
   return (
-    <div className="min-h-screen p-4 pb-20">
-      <div className="max-w-3xl mx-auto space-y-6">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-2xl font-bold text-foreground">Nova Ficha de EPI</h1>
+    <div className="p-4 lg:p-8 pb-20">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">Nova Ficha de EPI</h2>
+          <p className="text-sm text-muted-foreground">Preencha os dados do colaborador e os itens entregues.</p>
         </div>
 
         {/* Employee Data */}
@@ -266,7 +266,10 @@ export default function NovaFicha() {
           </CardHeader>
           <CardContent className="space-y-6">
             <SignaturePad label="Assinatura do Funcionário" onSave={setAssinaturaColaborador} />
-            <SignaturePad label="Assinatura do Responsável pela Entrega" onSave={setAssinaturaResponsavel} />
+            <SignaturePad label="Assinatura do Responsável pela Entrega" onSave={setAssinaturaResponsavel} initialValue={assinaturaResponsavel} />
+            {assinaturaResponsavel && config.assinaturaEmpresa === assinaturaResponsavel && (
+              <p className="text-xs text-muted-foreground -mt-3">✓ Usando assinatura padrão da empresa (configurações)</p>
+            )}
           </CardContent>
         </Card>
 

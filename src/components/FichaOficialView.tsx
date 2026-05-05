@@ -1,5 +1,6 @@
 import { EPIFicha, MotivoEntrega } from '@/types/epi';
 import { ReactNode } from 'react';
+import { getConfig } from '@/services/configService';
 
 interface Props {
   ficha: EPIFicha;
@@ -26,6 +27,10 @@ const motivos: { key: MotivoEntrega; label: string }[] = [
 export default function FichaOficialView({ ficha, signMode }: Props) {
   const minRows = 9;
   const rowsToRender = Math.max(ficha.itens.length, minRows);
+  const config = getConfig();
+  const nomeParts = config.empresaNome.split(' ');
+  const linha1 = nomeParts[0] || '';
+  const linha2 = nomeParts.slice(1).join(' ') || '';
 
   return (
     <div className="bg-white text-black mx-auto shadow-lg border border-black/40 print:shadow-none print:border-0"
@@ -33,9 +38,15 @@ export default function FichaOficialView({ ficha, signMode }: Props) {
       {/* Header */}
       <div className="flex border-b border-black">
         <div className="w-40 flex flex-col items-center justify-center border-r border-black p-2 text-center">
-          <div className="font-bold text-sm leading-tight">GRUPO</div>
-          <div className="font-bold text-base leading-tight">5 ESTRELAS</div>
-          <div className="text-[8px] leading-tight">SEGURANÇA E SERVIÇOS</div>
+          {config.logoDataUrl ? (
+            <img src={config.logoDataUrl} alt="Logo" className="max-h-14 object-contain" />
+          ) : (
+            <>
+              <div className="font-bold text-sm leading-tight">{linha1}</div>
+              {linha2 && <div className="font-bold text-base leading-tight">{linha2}</div>}
+              <div className="text-[8px] leading-tight">{config.empresaSubtitulo}</div>
+            </>
+          )}
         </div>
         <div className="flex-1 flex items-center justify-center font-bold text-base px-2 py-3 text-center">
           TERMO DE RECEBIMENTO DE UNIFORME/EPI's - REV -00

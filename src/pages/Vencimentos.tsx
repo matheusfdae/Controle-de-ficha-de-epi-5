@@ -52,13 +52,11 @@ export default function Vencimentos() {
   const sorted = [...filtrados].sort((a, b) => a.diasRestantes - b.diasRestantes);
 
   return (
-    <div className="min-h-screen p-4 pb-20">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex items-center gap-3">
-          <Link to="/">
-            <Button variant="ghost" size="icon"><ArrowLeft className="h-5 w-5" /></Button>
-          </Link>
-          <h1 className="text-2xl font-bold text-foreground">Controle de Vencimentos</h1>
+    <div className="p-4 lg:p-8 pb-20">
+      <div className="max-w-5xl mx-auto space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">Controle de Vencimentos</h2>
+          <p className="text-sm text-muted-foreground">Acompanhe a validade de cada EPI entregue.</p>
         </div>
 
         {/* Summary cards */}
