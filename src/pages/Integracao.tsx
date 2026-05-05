@@ -155,8 +155,9 @@ export default function Integracao() {
         }).select().single();
       if (feErr) throw feErr;
 
-      if (intItens.length > 0) {
-        const itensPayload = intItens.map(it => ({
+      const incluirEpi = intItens.filter(it => it.incluir !== false);
+      if (incluirEpi.length > 0) {
+        const itensPayload = incluirEpi.map(it => ({
           ficha_id: fichaEpi.id,
           epi_id: it.epi_id,
           descricao: it.nome,
