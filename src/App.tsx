@@ -18,6 +18,7 @@ import Configuracoes from "./pages/Configuracoes";
 import Usuarios from "./pages/Usuarios";
 import Estoque from "./pages/Estoque";
 import Funcoes from "./pages/Funcoes";
+import Integracao from "./pages/Integracao";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
