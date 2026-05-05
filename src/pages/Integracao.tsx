@@ -41,11 +41,11 @@ export default function Integracao() {
 
   // Modal de integração (preenchimento de tamanhos)
   const [intModalColab, setIntModalColab] = useState<Colab | null>(null);
-  const [intItens, setIntItens] = useState<Array<{ epi_id: string; nome: string; ca: string; quantidade: number; tamanho: string }>>([]);
-  const [intUniformes, setIntUniformes] = useState<Array<{ descricao: string; tamanho: string; quantidade: number }>>([
-    { descricao: 'Camisa', tamanho: '', quantidade: 2 },
-    { descricao: 'Calça', tamanho: '', quantidade: 2 },
-    { descricao: 'Calçado de segurança', tamanho: '', quantidade: 1 },
+  const [intItens, setIntItens] = useState<Array<{ epi_id: string; nome: string; ca: string; quantidade: number; tamanho: string; incluir: boolean | null }>>([]);
+  const [intUniformes, setIntUniformes] = useState<Array<{ descricao: string; tamanho: string; quantidade: number; incluir: boolean | null }>>([
+    { descricao: 'Camisa', tamanho: '', quantidade: 2, incluir: null },
+    { descricao: 'Calça', tamanho: '', quantidade: 2, incluir: null },
+    { descricao: 'Calçado de segurança', tamanho: '', quantidade: 1, incluir: null },
   ]);
 
   const load = async () => {
@@ -108,12 +108,13 @@ export default function Integracao() {
       ca: fe.epis?.ca_numero || '',
       quantidade: fe.quantidade || 1,
       tamanho: fe.tamanho || '',
+      incluir: null as boolean | null,
     }));
     setIntItens(itens);
     setIntUniformes([
-      { descricao: 'Camisa', tamanho: '', quantidade: 2 },
-      { descricao: 'Calça', tamanho: '', quantidade: 2 },
-      { descricao: 'Calçado de segurança', tamanho: '', quantidade: 1 },
+      { descricao: 'Camisa', tamanho: '', quantidade: 2, incluir: null },
+      { descricao: 'Calça', tamanho: '', quantidade: 2, incluir: null },
+      { descricao: 'Calçado de segurança', tamanho: '', quantidade: 1, incluir: null },
     ]);
     setIntModalColab(c);
   };
@@ -154,8 +155,9 @@ export default function Integracao() {
         }).select().single();
       if (feErr) throw feErr;
 
-      if (intItens.length > 0) {
-        const itensPayload = intItens.map(it => ({
+      const incluirEpi = intItens.filter(it => it.incluir !== false);
+      if (incluirEpi.length > 0) {
+        const itensPayload = incluirEpi.map(it => ({
           ficha_id: fichaEpi.id,
           epi_id: it.epi_id,
           descricao: it.nome,
@@ -176,7 +178,7 @@ export default function Integracao() {
         }).select().single();
       if (fuErr) throw fuErr;
 
-      const uniItens = intUniformes.filter(u => u.descricao.trim());
+      const uniItens = intUniformes.filter(u => u.descricao.trim() && u.incluir !== false);
       if (uniItens.length > 0) {
         await supabase.from('fichas_uniforme_itens').insert(
           uniItens.map(u => ({
@@ -324,28 +326,39 @@ export default function Integracao() {
               )}
               <div className="space-y-2">
                 {intItens.map((it, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 items-end border rounded p-2">
-                    <div className="col-span-6">
+                  <div key={idx} className={`grid grid-cols-12 gap-2 items-end border rounded p-2 ${it.incluir === false ? 'opacity-50 bg-muted/40' : ''}`}>
+                    <div className="col-span-4">
                       <Label className="text-xs">Item</Label>
                       <p className="text-sm font-medium truncate">{it.nome}</p>
                       {it.ca && <p className="text-xs text-muted-foreground">CA {it.ca}</p>}
+                    </div>
+                    <div className="col-span-3">
+                      <Label className="text-xs">Incluir?</Label>
+                      <div className="flex gap-1">
+                        <Button type="button" size="sm" variant={it.incluir === true ? 'default' : 'outline'}
+                          onClick={() => setIntItens(prev => prev.map((x, i) => i === idx ? { ...x, incluir: true } : x))}>Sim</Button>
+                        <Button type="button" size="sm" variant={it.incluir === false ? 'default' : 'outline'}
+                          onClick={() => setIntItens(prev => prev.map((x, i) => i === idx ? { ...x, incluir: false } : x))}>Não</Button>
+                      </div>
                     </div>
                     <div className="col-span-3">
                       <Label className="text-xs">Tamanho/Nº</Label>
                       <Input
                         value={it.tamanho}
                         placeholder="Ex: M, 42"
+                        disabled={it.incluir === false}
                         onChange={e => {
                           const v = e.target.value;
                           setIntItens(prev => prev.map((x, i) => i === idx ? { ...x, tamanho: v } : x));
                         }}
                       />
                     </div>
-                    <div className="col-span-3">
+                    <div className="col-span-2">
                       <Label className="text-xs">Qtd</Label>
                       <Input
                         type="number" min={1}
                         value={it.quantidade}
+                        disabled={it.incluir === false}
                         onChange={e => {
                           const v = parseInt(e.target.value) || 1;
                           setIntItens(prev => prev.map((x, i) => i === idx ? { ...x, quantidade: v } : x));
@@ -361,18 +374,18 @@ export default function Integracao() {
             <section>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-semibold text-sm uppercase tracking-wide">Uniformes</h3>
-                <Button size="sm" variant="outline" onClick={() => setIntUniformes(p => [...p, { descricao: '', tamanho: '', quantidade: 1 }])}>
+                <Button size="sm" variant="outline" onClick={() => setIntUniformes(p => [...p, { descricao: '', tamanho: '', quantidade: 1, incluir: null }])}>
                   <Plus className="h-3 w-3 mr-1" /> Adicionar
                 </Button>
               </div>
               <div className="space-y-2">
                 {intUniformes.map((u, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 items-end border rounded p-2">
-                    <div className="col-span-5">
+                  <div key={idx} className={`grid grid-cols-12 gap-2 items-end border rounded p-2 ${u.incluir === false ? 'opacity-50 bg-muted/40' : ''}`}>
+                    <div className="col-span-3">
                       <Label className="text-xs">Peça</Label>
                       <Input
                         value={u.descricao}
-                        placeholder="Camisa, Calça, Calçado..."
+                        placeholder="Camisa, Calça..."
                         onChange={e => {
                           const v = e.target.value;
                           setIntUniformes(prev => prev.map((x, i) => i === idx ? { ...x, descricao: v } : x));
@@ -380,10 +393,20 @@ export default function Integracao() {
                       />
                     </div>
                     <div className="col-span-3">
+                      <Label className="text-xs">Incluir?</Label>
+                      <div className="flex gap-1">
+                        <Button type="button" size="sm" variant={u.incluir === true ? 'default' : 'outline'}
+                          onClick={() => setIntUniformes(prev => prev.map((x, i) => i === idx ? { ...x, incluir: true } : x))}>Sim</Button>
+                        <Button type="button" size="sm" variant={u.incluir === false ? 'default' : 'outline'}
+                          onClick={() => setIntUniformes(prev => prev.map((x, i) => i === idx ? { ...x, incluir: false } : x))}>Não</Button>
+                      </div>
+                    </div>
+                    <div className="col-span-2">
                       <Label className="text-xs">Tamanho/Nº</Label>
                       <Input
                         value={u.tamanho}
-                        placeholder="P, M, G, 40..."
+                        placeholder="P, M, 40..."
+                        disabled={u.incluir === false}
                         onChange={e => {
                           const v = e.target.value;
                           setIntUniformes(prev => prev.map((x, i) => i === idx ? { ...x, tamanho: v } : x));
@@ -395,6 +418,7 @@ export default function Integracao() {
                       <Input
                         type="number" min={1}
                         value={u.quantidade}
+                        disabled={u.incluir === false}
                         onChange={e => {
                           const v = parseInt(e.target.value) || 1;
                           setIntUniformes(prev => prev.map((x, i) => i === idx ? { ...x, quantidade: v } : x));
