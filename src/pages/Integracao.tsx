@@ -304,6 +304,123 @@ export default function Integracao() {
           )}
         </div>
       </div>
+
+      {/* Modal de Integração: preenchimento de tamanhos */}
+      <Dialog open={!!intModalColab} onOpenChange={(v) => !v && setIntModalColab(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Integrar — {intModalColab?.nome}</DialogTitle>
+            <DialogDescription>
+              Preencha os tamanhos/numerações. As fichas de EPI e Uniforme serão geradas com esses dados.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            {/* EPIs da função */}
+            <section>
+              <h3 className="font-semibold mb-2 text-sm uppercase tracking-wide">EPIs ({intItens.length})</h3>
+              {intItens.length === 0 && (
+                <p className="text-xs text-muted-foreground">Nenhum EPI vinculado a esta função.</p>
+              )}
+              <div className="space-y-2">
+                {intItens.map((it, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 items-end border rounded p-2">
+                    <div className="col-span-6">
+                      <Label className="text-xs">Item</Label>
+                      <p className="text-sm font-medium truncate">{it.nome}</p>
+                      {it.ca && <p className="text-xs text-muted-foreground">CA {it.ca}</p>}
+                    </div>
+                    <div className="col-span-3">
+                      <Label className="text-xs">Tamanho/Nº</Label>
+                      <Input
+                        value={it.tamanho}
+                        placeholder="Ex: M, 42"
+                        onChange={e => {
+                          const v = e.target.value;
+                          setIntItens(prev => prev.map((x, i) => i === idx ? { ...x, tamanho: v } : x));
+                        }}
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <Label className="text-xs">Qtd</Label>
+                      <Input
+                        type="number" min={1}
+                        value={it.quantidade}
+                        onChange={e => {
+                          const v = parseInt(e.target.value) || 1;
+                          setIntItens(prev => prev.map((x, i) => i === idx ? { ...x, quantidade: v } : x));
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Uniformes */}
+            <section>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold text-sm uppercase tracking-wide">Uniformes</h3>
+                <Button size="sm" variant="outline" onClick={() => setIntUniformes(p => [...p, { descricao: '', tamanho: '', quantidade: 1 }])}>
+                  <Plus className="h-3 w-3 mr-1" /> Adicionar
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {intUniformes.map((u, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 items-end border rounded p-2">
+                    <div className="col-span-5">
+                      <Label className="text-xs">Peça</Label>
+                      <Input
+                        value={u.descricao}
+                        placeholder="Camisa, Calça, Calçado..."
+                        onChange={e => {
+                          const v = e.target.value;
+                          setIntUniformes(prev => prev.map((x, i) => i === idx ? { ...x, descricao: v } : x));
+                        }}
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <Label className="text-xs">Tamanho/Nº</Label>
+                      <Input
+                        value={u.tamanho}
+                        placeholder="P, M, G, 40..."
+                        onChange={e => {
+                          const v = e.target.value;
+                          setIntUniformes(prev => prev.map((x, i) => i === idx ? { ...x, tamanho: v } : x));
+                        }}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Label className="text-xs">Qtd</Label>
+                      <Input
+                        type="number" min={1}
+                        value={u.quantidade}
+                        onChange={e => {
+                          const v = parseInt(e.target.value) || 1;
+                          setIntUniformes(prev => prev.map((x, i) => i === idx ? { ...x, quantidade: v } : x));
+                        }}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Button variant="ghost" size="icon" className="text-destructive" onClick={() => setIntUniformes(prev => prev.filter((_, i) => i !== idx))}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIntModalColab(null)}>Cancelar</Button>
+            <Button onClick={confirmarIntegracao} disabled={!!integrating}>
+              <CheckCircle2 className="h-4 w-4 mr-1" />
+              {integrating ? 'Gerando...' : 'Gerar Fichas'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
