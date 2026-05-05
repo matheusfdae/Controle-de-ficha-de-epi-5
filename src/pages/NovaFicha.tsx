@@ -111,13 +111,11 @@ export default function NovaFicha() {
   };
 
   return (
-    <div className="min-h-screen p-4 pb-20">
-      <div className="max-w-3xl mx-auto space-y-6">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-2xl font-bold text-foreground">Nova Ficha de EPI</h1>
+    <div className="p-4 lg:p-8 pb-20">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">Nova Ficha de EPI</h2>
+          <p className="text-sm text-muted-foreground">Preencha os dados do colaborador e os itens entregues.</p>
         </div>
 
         {/* Employee Data */}
