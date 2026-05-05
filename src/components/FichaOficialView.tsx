@@ -184,11 +184,9 @@ export default function FichaOficialView({ ficha, signMode }: Props) {
                         ) : ''}
                       </button>
                     ) : (
-                      checked ? (
-                        ficha.assinaturaColaborador ? (
-                          <img src={ficha.assinaturaColaborador} alt="rubrica" className="max-h-6 mx-auto object-contain" />
-                        ) : '✓'
-                      ) : ''
+                      ficha.assinaturaColaborador ? (
+                        <img src={ficha.assinaturaColaborador} alt="rubrica" className="max-h-6 mx-auto object-contain" />
+                      ) : (checked ? '✓' : '')
                     )
                   ) : ''}
                 </td>
