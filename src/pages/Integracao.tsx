@@ -41,11 +41,11 @@ export default function Integracao() {
 
   // Modal de integração (preenchimento de tamanhos)
   const [intModalColab, setIntModalColab] = useState<Colab | null>(null);
-  const [intItens, setIntItens] = useState<Array<{ epi_id: string; nome: string; ca: string; quantidade: number; tamanho: string }>>([]);
-  const [intUniformes, setIntUniformes] = useState<Array<{ descricao: string; tamanho: string; quantidade: number }>>([
-    { descricao: 'Camisa', tamanho: '', quantidade: 2 },
-    { descricao: 'Calça', tamanho: '', quantidade: 2 },
-    { descricao: 'Calçado de segurança', tamanho: '', quantidade: 1 },
+  const [intItens, setIntItens] = useState<Array<{ epi_id: string; nome: string; ca: string; quantidade: number; tamanho: string; incluir: boolean | null }>>([]);
+  const [intUniformes, setIntUniformes] = useState<Array<{ descricao: string; tamanho: string; quantidade: number; incluir: boolean | null }>>([
+    { descricao: 'Camisa', tamanho: '', quantidade: 2, incluir: null },
+    { descricao: 'Calça', tamanho: '', quantidade: 2, incluir: null },
+    { descricao: 'Calçado de segurança', tamanho: '', quantidade: 1, incluir: null },
   ]);
 
   const load = async () => {
