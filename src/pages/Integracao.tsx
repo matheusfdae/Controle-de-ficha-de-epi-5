@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Trash2, UserPlus, Save } from 'lucide-react';
+import { Plus, Trash2, UserPlus, Save, FileSignature, CheckCircle2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
@@ -24,12 +25,15 @@ interface Colab {
   funcao_nome: string | null;
   data_admissao: string | null;
   status: string;
+  profile_id: string | null;
 }
 
 export default function Integracao() {
+  const navigate = useNavigate();
   const [colabs, setColabs] = useState<Colab[]>([]);
   const [funcoes, setFuncoes] = useState<Funcao[]>([]);
   const [open, setOpen] = useState(false);
+  const [integrating, setIntegrating] = useState<string | null>(null);
   const [form, setForm] = useState({
     nome: '', matricula: '', posto: '', funcao_id: '', data_admissao: '',
   });
@@ -76,6 +80,84 @@ export default function Integracao() {
     if (!confirm('Excluir este colaborador?')) return;
     await supabase.from('colaboradores_integracao').delete().eq('id', id);
     load();
+  };
+
+  const integrar = async (c: Colab) => {
+    if (!c.funcao_id) {
+      toast.error('Defina a função antes de integrar.');
+      return;
+    }
+    setIntegrating(c.id);
+    try {
+      let profileId = c.profile_id;
+
+      // 1) Cria/recupera o profile
+      if (!profileId) {
+        const newId = crypto.randomUUID();
+        const { error: pErr } = await supabase.from('profiles').insert({
+          id: newId,
+          nome_completo: c.nome,
+          matricula: c.matricula,
+          cargo: c.funcao_nome,
+          setor: c.posto,
+          data_admissao: c.data_admissao,
+        });
+        if (pErr) throw pErr;
+        profileId = newId;
+      }
+
+      // 2) Busca itens da função
+      const { data: funcaoEpis } = await supabase
+        .from('funcao_epis').select('*, epis(nome, ca_numero)')
+        .eq('funcao_id', c.funcao_id);
+
+      // 3) Cria Ficha de EPI
+      const { data: fichaEpi, error: feErr } = await supabase
+        .from('fichas_epi').insert({
+          colaborador_id: profileId,
+          nome_funcionario: c.nome,
+          funcao: c.funcao_nome,
+          funcao_id: c.funcao_id,
+          matricula_snapshot: c.matricula,
+          setor_snapshot: c.posto,
+          motivo: 'admissao',
+          status: 'pendente_assinatura',
+        }).select().single();
+      if (feErr) throw feErr;
+
+      if (funcaoEpis && funcaoEpis.length > 0) {
+        const itens = funcaoEpis.map((fe: any) => ({
+          ficha_id: fichaEpi.id,
+          epi_id: fe.epi_id,
+          descricao: fe.epis?.nome || '',
+          ca: fe.epis?.ca_numero || '',
+          quantidade: fe.quantidade || 1,
+          tamanho: fe.tamanho,
+          motivo_entrega: 'admissao' as const,
+          estado: 'novo' as const,
+        }));
+        await supabase.from('fichas_epi_itens').insert(itens);
+      }
+
+      // 4) Cria Ficha de Uniforme (sem itens — RH preenche)
+      await supabase.from('fichas_uniforme').insert({
+        colaborador_id: profileId,
+        status: 'pendente_assinatura',
+      });
+
+      // 5) Atualiza integração mantendo pendente até assinaturas
+      await supabase.from('colaboradores_integracao').update({
+        profile_id: profileId,
+      }).eq('id', c.id);
+
+      toast.success('Fichas geradas! Status ficará pendente até as assinaturas.');
+      load();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Erro ao integrar');
+    } finally {
+      setIntegrating(null);
+    }
   };
 
   const statusTone = (s: string) =>
@@ -137,8 +219,24 @@ export default function Integracao() {
                     {[c.matricula && `Matrícula: ${c.matricula}`, c.posto && `Posto: ${c.posto}`, c.funcao_nome && `Função: ${c.funcao_nome}`].filter(Boolean).join(' • ')}
                   </p>
                   {c.data_admissao && <p className="text-xs text-muted-foreground">Admissão: {new Date(c.data_admissao).toLocaleDateString('pt-BR')}</p>}
+                  {c.profile_id && c.status === 'pendente' && (
+                    <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                      <FileSignature className="h-3 w-3" /> Fichas geradas — aguardando assinaturas
+                    </p>
+                  )}
                 </div>
                 <Badge variant={statusTone(c.status) as any}>{c.status}</Badge>
+                {!c.profile_id && c.status === 'pendente' && (
+                  <Button size="sm" onClick={() => integrar(c)} disabled={integrating === c.id}>
+                    <CheckCircle2 className="h-4 w-4 mr-1" />
+                    {integrating === c.id ? 'Integrando...' : 'Integrar'}
+                  </Button>
+                )}
+                {c.profile_id && (
+                  <Button size="sm" variant="outline" onClick={() => navigate('/fichas')}>
+                    Ver fichas
+                  </Button>
+                )}
                 <Select value={c.status} onValueChange={(v) => setStatus(c.id, v)}>
                   <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
                   <SelectContent>

@@ -59,6 +59,7 @@ export type Database = {
           nome: string
           observacoes: string | null
           posto: string | null
+          profile_id: string | null
           status: string
           updated_at: string
         }
@@ -73,6 +74,7 @@ export type Database = {
           nome: string
           observacoes?: string | null
           posto?: string | null
+          profile_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -87,6 +89,7 @@ export type Database = {
           nome?: string
           observacoes?: string | null
           posto?: string | null
+          profile_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -780,6 +783,10 @@ export type Database = {
           _itens_recebidos: string[]
         }
         Returns: Json
+      }
+      check_integracao_completa: {
+        Args: { _colaborador: string }
+        Returns: undefined
       }
       get_ficha_publica: { Args: { _ficha_id: string }; Returns: Json }
       has_role: {
