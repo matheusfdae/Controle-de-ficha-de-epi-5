@@ -96,8 +96,8 @@ export default function Dashboard() {
   const topEpis = useMemo(() => {
     const map = new Map<string, number>();
     fichas.forEach(f => f.itens.forEach(i => {
-      const key = i.descricao.substring(0, 25);
-      map.set(key, (map.get(key) || 0) + i.quantidade);
+      const key = (i.descricao || 'Sem descrição').substring(0, 25);
+      map.set(key, (map.get(key) || 0) + (i.quantidade || 0));
     }));
     return Array.from(map.entries())
       .map(([descricao, total]) => ({ descricao, total }))
