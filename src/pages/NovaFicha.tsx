@@ -67,7 +67,7 @@ export default function NovaFicha() {
     setItens(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i));
   };
 
-  const handleSave = (asSigned: boolean) => {
+  const handleSave = async (asSigned: boolean) => {
     if (!form.nomeFuncionario.trim()) {
       toast.error('Informe o nome do funcionário');
       return;
@@ -97,9 +97,13 @@ export default function NovaFicha() {
       assinadoEm: asSigned ? new Date().toISOString() : undefined,
     };
 
-    saveFicha(ficha);
-    toast.success(asSigned ? 'Ficha assinada com sucesso!' : 'Ficha salva como pendente');
-    navigate(`/ficha/${ficha.id}`);
+    try {
+      await saveFicha(ficha);
+      toast.success(asSigned ? 'Ficha assinada com sucesso!' : 'Ficha salva como pendente');
+      navigate(`/ficha/${ficha.id}`);
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao salvar a ficha');
+    }
   };
 
   const motivoLabels: Record<MotivoEntrega, string> = {

@@ -27,12 +27,13 @@ export default function VisualizarFicha() {
 
   useEffect(() => {
     if (id) {
-      const f = getFichaById(id);
-      if (f) {
-        setFicha(f);
-        setAssinaturaColaborador(f.assinaturaColaborador || '');
-        setAssinaturaResponsavel(f.assinaturaResponsavel || '');
-      }
+      getFichaById(id).then(f => {
+        if (f) {
+          setFicha(f);
+          setAssinaturaColaborador(f.assinaturaColaborador || '');
+          setAssinaturaResponsavel(f.assinaturaResponsavel || '');
+        }
+      });
     }
   }, [id]);
 
@@ -49,7 +50,7 @@ export default function VisualizarFicha() {
 
   const isSigned = ficha.status === 'assinada';
 
-  const handleSign = () => {
+  const handleSign = async () => {
     if (!assinaturaColaborador || !assinaturaResponsavel) {
       toast.error('É necessário ambas as assinaturas');
       return;
@@ -61,9 +62,13 @@ export default function VisualizarFicha() {
       status: 'assinada',
       assinadoEm: new Date().toISOString(),
     };
-    saveFicha(updated);
-    setFicha(updated);
-    toast.success('Ficha assinada com sucesso!');
+    try {
+      await saveFicha(updated);
+      setFicha(updated);
+      toast.success('Ficha assinada com sucesso!');
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao salvar');
+    }
   };
 
   const shareLink = () => {
