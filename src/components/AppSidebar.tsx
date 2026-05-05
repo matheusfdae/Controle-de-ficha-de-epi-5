@@ -19,6 +19,8 @@ const baseItems = [
 ];
 
 const adminItems = [
+  { title: 'Estoque', url: '/estoque', icon: Package, end: false },
+  { title: 'Funções', url: '/funcoes', icon: Briefcase, end: false },
   { title: 'Usuários', url: '/usuarios', icon: Users, end: false },
   { title: 'Configurações', url: '/configuracoes', icon: Settings, end: false },
 ];
