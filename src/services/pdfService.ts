@@ -3,6 +3,7 @@ import { EPIFicha } from '@/types/epi';
 import { getConfig } from '@/services/configService';
 
 export function generatePDF(ficha: EPIFicha): void {
+  const config = getConfig();
   const doc = new jsPDF('l', 'mm', 'a4'); // Landscape
   const pageW = 297;
   const pageH = 210;
@@ -38,11 +39,16 @@ export function generatePDF(ficha: EPIFicha): void {
   };
 
   // ===== HEADER =====
-  // Logo area placeholder
+  // Logo area
   rect(m, y, 40, 16);
-  text('GRUPO', m + 15, y + 6, { bold: true, size: 8, align: 'center' });
-  text('5 ESTRELAS', m + 15, y + 10, { bold: true, size: 7, align: 'center' });
-  text('SEGURANÇA E SERVIÇOS', m + 15, y + 13, { size: 4, align: 'center' });
+  if (config.logoDataUrl) {
+    try { doc.addImage(config.logoDataUrl, 'PNG', m + 2, y + 2, 36, 12); } catch {}
+  } else {
+    const parts = config.empresaNome.split(' ');
+    text(parts[0] || '', m + 20, y + 6, { bold: true, size: 8, align: 'center' });
+    text(parts.slice(1).join(' '), m + 20, y + 10, { bold: true, size: 7, align: 'center' });
+    text(config.empresaSubtitulo, m + 20, y + 13, { size: 4, align: 'center' });
+  }
 
   // Title
   rect(m + 40, y, cw - 40, 16);
