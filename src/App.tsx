@@ -50,6 +50,8 @@ function AppRoutes() {
         <Route path="/vencimentos" element={<Vencimentos />} />
         <Route path="/configuracoes" element={<AdminRoute><Configuracoes /></AdminRoute>} />
         <Route path="/usuarios" element={<AdminRoute><Usuarios /></AdminRoute>} />
+        <Route path="/estoque" element={<AdminRoute><Estoque /></AdminRoute>} />
+        <Route path="/funcoes" element={<AdminRoute><Funcoes /></AdminRoute>} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
