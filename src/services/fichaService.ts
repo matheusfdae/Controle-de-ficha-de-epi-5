@@ -14,6 +14,7 @@ function mapItemFromDB(row: any): EPIItem {
     postoServico: row.posto_servico || '',
     recebido: !!row.recebido,
     dataValidade: row.data_validade || undefined,
+    epiId: row.epi_id || undefined,
   };
 }
 
