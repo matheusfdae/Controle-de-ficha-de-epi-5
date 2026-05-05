@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import { EPIFicha } from '@/types/epi';
+import { getConfig } from '@/services/configService';
 
 export function generatePDF(ficha: EPIFicha): void {
   const doc = new jsPDF('l', 'mm', 'a4'); // Landscape
