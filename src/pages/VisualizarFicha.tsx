@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 export default function VisualizarFicha() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [ficha, setFicha] = useState<EPIFicha | null>(null);
   const [assinaturaColaborador, setAssinaturaColaborador] = useState('');
   const [assinaturaResponsavel, setAssinaturaResponsavel] = useState('');
