@@ -8,6 +8,7 @@ import { EPIFicha } from '@/types/epi';
 import { getFichaById, saveFicha } from '@/services/fichaService';
 import { generatePDF } from '@/services/pdfService';
 import SignaturePad from '@/components/SignaturePad';
+import { useAuth } from '@/contexts/AuthContext';
 import FichaOficialView from '@/components/FichaOficialView';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
