@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Trash2, UserPlus, Save } from 'lucide-react';
+import { Plus, Trash2, UserPlus, Save, FileSignature, CheckCircle2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
@@ -24,6 +25,7 @@ interface Colab {
   funcao_nome: string | null;
   data_admissao: string | null;
   status: string;
+  profile_id: string | null;
 }
 
 export default function Integracao() {
