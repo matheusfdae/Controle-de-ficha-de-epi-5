@@ -174,13 +174,21 @@ export default function FichaOficialView({ ficha, signMode }: Props) {
                       <button
                         type="button"
                         onClick={() => signMode.onToggleItem(item.id)}
-                        className="inline-flex items-center justify-center w-5 h-5 border border-black bg-white hover:bg-gray-100"
+                        className="inline-flex items-center justify-center w-full h-6 border border-black bg-white hover:bg-gray-100 overflow-hidden"
                         aria-label="Marcar como recebido"
                       >
-                        {checked ? '✓' : ''}
+                        {checked ? (
+                          ficha.assinaturaColaborador ? (
+                            <img src={ficha.assinaturaColaborador} alt="rubrica" className="max-h-6 object-contain" />
+                          ) : '✓'
+                        ) : ''}
                       </button>
                     ) : (
-                      checked ? '✓' : ''
+                      checked ? (
+                        ficha.assinaturaColaborador ? (
+                          <img src={ficha.assinaturaColaborador} alt="rubrica" className="max-h-6 mx-auto object-contain" />
+                        ) : '✓'
+                      ) : ''
                     )
                   ) : ''}
                 </td>
