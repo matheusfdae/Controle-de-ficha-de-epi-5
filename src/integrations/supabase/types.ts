@@ -440,6 +440,7 @@ export type Database = {
         Row: {
           cor: string | null
           created_at: string
+          descricao: string | null
           estado: Database["public"]["Enums"]["estado_item"]
           ficha_id: string
           id: string
@@ -447,11 +448,12 @@ export type Database = {
           observacao_item: string | null
           quantidade: number
           tamanho: string | null
-          uniforme_id: string
+          uniforme_id: string | null
         }
         Insert: {
           cor?: string | null
           created_at?: string
+          descricao?: string | null
           estado?: Database["public"]["Enums"]["estado_item"]
           ficha_id: string
           id?: string
@@ -459,11 +461,12 @@ export type Database = {
           observacao_item?: string | null
           quantidade?: number
           tamanho?: string | null
-          uniforme_id: string
+          uniforme_id?: string | null
         }
         Update: {
           cor?: string | null
           created_at?: string
+          descricao?: string | null
           estado?: Database["public"]["Enums"]["estado_item"]
           ficha_id?: string
           id?: string
@@ -471,7 +474,7 @@ export type Database = {
           observacao_item?: string | null
           quantidade?: number
           tamanho?: string | null
-          uniforme_id?: string
+          uniforme_id?: string | null
         }
         Relationships: [
           {
