@@ -108,12 +108,13 @@ export default function Integracao() {
       ca: fe.epis?.ca_numero || '',
       quantidade: fe.quantidade || 1,
       tamanho: fe.tamanho || '',
+      incluir: null as boolean | null,
     }));
     setIntItens(itens);
     setIntUniformes([
-      { descricao: 'Camisa', tamanho: '', quantidade: 2 },
-      { descricao: 'Calça', tamanho: '', quantidade: 2 },
-      { descricao: 'Calçado de segurança', tamanho: '', quantidade: 1 },
+      { descricao: 'Camisa', tamanho: '', quantidade: 2, incluir: null },
+      { descricao: 'Calça', tamanho: '', quantidade: 2, incluir: null },
+      { descricao: 'Calçado de segurança', tamanho: '', quantidade: 1, incluir: null },
     ]);
     setIntModalColab(c);
   };
