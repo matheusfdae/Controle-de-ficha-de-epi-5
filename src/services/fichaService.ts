@@ -120,6 +120,7 @@ export async function saveFicha(ficha: EPIFicha): Promise<void> {
       tamanho: i.tamanho,
       posto_servico: i.postoServico,
       data_validade: i.dataValidade || null,
+      epi_id: i.epiId || null,
       recebido: !!i.recebido,
       motivo_entrega: 'admissao' as const,
       estado: 'novo' as const,
