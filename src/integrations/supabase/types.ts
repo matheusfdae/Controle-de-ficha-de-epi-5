@@ -105,52 +105,79 @@ export type Database = {
         Row: {
           assinatura_colaborador_url: string | null
           assinatura_supervisor_url: string | null
-          colaborador_id: string
+          colaborador_id: string | null
+          cpf_snapshot: string | null
           created_at: string
           criado_por: string | null
           data_assinatura_colaborador: string | null
           data_assinatura_supervisor: string | null
           data_devolucao: string | null
           data_entrega: string
+          empresa: string | null
+          funcao: string | null
           id: string
           ip_assinatura: string | null
+          matricula_snapshot: string | null
+          motivo: string | null
+          nome_funcionario: string | null
           numero: number
           observacoes: string | null
+          setor_snapshot: string | null
           status: Database["public"]["Enums"]["ficha_status"]
+          telefone: string | null
+          turno: string | null
           updated_at: string
         }
         Insert: {
           assinatura_colaborador_url?: string | null
           assinatura_supervisor_url?: string | null
-          colaborador_id: string
+          colaborador_id?: string | null
+          cpf_snapshot?: string | null
           created_at?: string
           criado_por?: string | null
           data_assinatura_colaborador?: string | null
           data_assinatura_supervisor?: string | null
           data_devolucao?: string | null
           data_entrega?: string
+          empresa?: string | null
+          funcao?: string | null
           id?: string
           ip_assinatura?: string | null
+          matricula_snapshot?: string | null
+          motivo?: string | null
+          nome_funcionario?: string | null
           numero?: number
           observacoes?: string | null
+          setor_snapshot?: string | null
           status?: Database["public"]["Enums"]["ficha_status"]
+          telefone?: string | null
+          turno?: string | null
           updated_at?: string
         }
         Update: {
           assinatura_colaborador_url?: string | null
           assinatura_supervisor_url?: string | null
-          colaborador_id?: string
+          colaborador_id?: string | null
+          cpf_snapshot?: string | null
           created_at?: string
           criado_por?: string | null
           data_assinatura_colaborador?: string | null
           data_assinatura_supervisor?: string | null
           data_devolucao?: string | null
           data_entrega?: string
+          empresa?: string | null
+          funcao?: string | null
           id?: string
           ip_assinatura?: string | null
+          matricula_snapshot?: string | null
+          motivo?: string | null
+          nome_funcionario?: string | null
           numero?: number
           observacoes?: string | null
+          setor_snapshot?: string | null
           status?: Database["public"]["Enums"]["ficha_status"]
+          telefone?: string | null
+          turno?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -172,36 +199,51 @@ export type Database = {
       }
       fichas_epi_itens: {
         Row: {
+          ca: string | null
           created_at: string
-          epi_id: string
+          data_validade: string | null
+          descricao: string | null
+          epi_id: string | null
           estado: Database["public"]["Enums"]["estado_item"]
           ficha_id: string
           id: string
           motivo_entrega: Database["public"]["Enums"]["motivo_entrega"]
           observacao_item: string | null
+          posto_servico: string | null
           quantidade: number
+          recebido: boolean
           tamanho: string | null
         }
         Insert: {
+          ca?: string | null
           created_at?: string
-          epi_id: string
+          data_validade?: string | null
+          descricao?: string | null
+          epi_id?: string | null
           estado?: Database["public"]["Enums"]["estado_item"]
           ficha_id: string
           id?: string
           motivo_entrega?: Database["public"]["Enums"]["motivo_entrega"]
           observacao_item?: string | null
+          posto_servico?: string | null
           quantidade?: number
+          recebido?: boolean
           tamanho?: string | null
         }
         Update: {
+          ca?: string | null
           created_at?: string
-          epi_id?: string
+          data_validade?: string | null
+          descricao?: string | null
+          epi_id?: string | null
           estado?: Database["public"]["Enums"]["estado_item"]
           ficha_id?: string
           id?: string
           motivo_entrega?: Database["public"]["Enums"]["motivo_entrega"]
           observacao_item?: string | null
+          posto_servico?: string | null
           quantidade?: number
+          recebido?: boolean
           tamanho?: string | null
         }
         Relationships: [
@@ -560,6 +602,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assinar_ficha_publica: {
+        Args: {
+          _assinatura: string
+          _ficha_id: string
+          _ip?: string
+          _itens_recebidos: string[]
+        }
+        Returns: Json
+      }
+      get_ficha_publica: { Args: { _ficha_id: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
