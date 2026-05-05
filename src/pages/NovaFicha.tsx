@@ -11,11 +11,13 @@ import { ArrowLeft, Plus, Trash2, Save, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { EPIFicha, EPIItem, MotivoEntrega, Turno } from '@/types/epi';
 import { generateId, saveFicha } from '@/services/fichaService';
+import { getConfig } from '@/services/configService';
 import SignaturePad from '@/components/SignaturePad';
 
 export default function NovaFicha() {
   const navigate = useNavigate();
   const today = new Date().toISOString().split('T')[0];
+  const config = getConfig();
 
   const [form, setForm] = useState({
     nomeFuncionario: '',
@@ -26,7 +28,7 @@ export default function NovaFicha() {
     motivo: 'admissao' as MotivoEntrega,
     turno: 'diurno' as Turno,
     setor: '',
-    empresa: '',
+    empresa: config.empresaNome,
     dataEntrega: today,
     observacoes: '',
   });
@@ -38,7 +40,7 @@ export default function NovaFicha() {
   ]);
 
   const [assinaturaColaborador, setAssinaturaColaborador] = useState('');
-  const [assinaturaResponsavel, setAssinaturaResponsavel] = useState('');
+  const [assinaturaResponsavel, setAssinaturaResponsavel] = useState(config.assinaturaEmpresa || '');
 
   const updateField = (field: string, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
