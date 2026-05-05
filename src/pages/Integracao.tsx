@@ -29,9 +29,11 @@ interface Colab {
 }
 
 export default function Integracao() {
+  const navigate = useNavigate();
   const [colabs, setColabs] = useState<Colab[]>([]);
   const [funcoes, setFuncoes] = useState<Funcao[]>([]);
   const [open, setOpen] = useState(false);
+  const [integrating, setIntegrating] = useState<string | null>(null);
   const [form, setForm] = useState({
     nome: '', matricula: '', posto: '', funcao_id: '', data_admissao: '',
   });
