@@ -13,6 +13,7 @@ import VisualizarFicha from "./pages/VisualizarFicha";
 import AssinarFicha from "./pages/AssinarFicha";
 import Vencimentos from "./pages/Vencimentos";
 import Configuracoes from "./pages/Configuracoes";
+import Usuarios from "./pages/Usuarios";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +24,12 @@ function ProtectedLayout() {
   return <AppLayout />;
 }
 
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { isAdmin } = useAuth();
+  if (!isAdmin) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -30,11 +37,12 @@ function AppRoutes() {
       <Route path="/assinar/:id" element={<AssinarFicha />} />
       <Route element={<ProtectedLayout />}>
         <Route path="/" element={<Dashboard />} />
-        <Route path="/nova-ficha" element={<NovaFicha />} />
+        <Route path="/nova-ficha" element={<AdminRoute><NovaFicha /></AdminRoute>} />
         <Route path="/consultar" element={<ConsultarFichas />} />
         <Route path="/ficha/:id" element={<VisualizarFicha />} />
         <Route path="/vencimentos" element={<Vencimentos />} />
-        <Route path="/configuracoes" element={<Configuracoes />} />
+        <Route path="/configuracoes" element={<AdminRoute><Configuracoes /></AdminRoute>} />
+        <Route path="/usuarios" element={<AdminRoute><Usuarios /></AdminRoute>} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

@@ -7,8 +7,10 @@ import { ArrowLeft, Eye, Download, ClipboardList } from 'lucide-react';
 import { EPIFicha } from '@/types/epi';
 import { getFichas } from '@/services/fichaService';
 import { generatePDF } from '@/services/pdfService';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function ConsultarFichas() {
+  const { isAdmin } = useAuth();
   const [fichas, setFichas] = useState<EPIFicha[]>([]);
 
   useEffect(() => {
@@ -23,14 +25,14 @@ export default function ConsultarFichas() {
             <h2 className="text-2xl font-bold tracking-tight text-foreground">Consultar Fichas</h2>
             <p className="text-sm text-muted-foreground">Todas as fichas de EPI cadastradas no sistema.</p>
           </div>
-          <Link to="/nova-ficha"><Button size="sm">Nova Ficha</Button></Link>
+          {isAdmin && <Link to="/nova-ficha"><Button size="sm">Nova Ficha</Button></Link>}
         </div>
 
         {fichas.length === 0 ? (
           <div className="text-center py-16 space-y-3">
             <ClipboardList className="h-12 w-12 mx-auto text-muted-foreground/40" />
             <p className="text-muted-foreground">Nenhuma ficha encontrada.</p>
-            <Link to="/nova-ficha"><Button>Criar Nova Ficha</Button></Link>
+            {isAdmin && <Link to="/nova-ficha"><Button>Criar Nova Ficha</Button></Link>}
           </div>
         ) : (
           <div className="space-y-3">

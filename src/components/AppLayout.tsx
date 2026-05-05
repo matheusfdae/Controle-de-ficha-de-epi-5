@@ -9,6 +9,7 @@ const titles: Record<string, string> = {
   '/consultar': 'Consultar Fichas',
   '/vencimentos': 'Controle de Vencimentos',
   '/configuracoes': 'Configurações',
+  '/usuarios': 'Gestão de Usuários',
 };
 
 export default function AppLayout() {
