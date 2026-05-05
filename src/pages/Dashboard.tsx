@@ -57,22 +57,13 @@ export default function Dashboard() {
   const alertas = [...vencidos, ...proximosVencer].sort((a, b) => a.diasRestantes - b.diasRestantes);
 
   return (
-    <div className="min-h-screen p-4 pb-20">
-      <div className="max-w-5xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10">
-              <ShieldCheck className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-foreground">Painel de Controle</h1>
-              <p className="text-sm text-muted-foreground">Olá, {user?.nome}</p>
-            </div>
-          </div>
-          <Button variant="ghost" size="sm" onClick={logout}>
-            <LogOut className="h-4 w-4 mr-1" /> Sair
-          </Button>
+    <div className="p-4 lg:p-8 pb-20">
+      <div className="max-w-6xl mx-auto space-y-6">
+        {/* Hero header */}
+        <div className="rounded-2xl bg-gradient-to-br from-primary via-primary to-primary/80 text-primary-foreground p-6 lg:p-8 shadow-lg">
+          <p className="text-xs uppercase tracking-wider opacity-80">Bem-vindo de volta</p>
+          <h2 className="text-2xl lg:text-3xl font-bold mt-1">Olá, {user?.nome} 👋</h2>
+          <p className="text-sm opacity-90 mt-1.5">Acompanhe e gerencie todas as fichas de EPI da sua equipe.</p>
         </div>
 
         {/* Stats */}
