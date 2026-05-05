@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, FilePlus2, Search, CalendarClock, Settings, ShieldCheck, LogOut, Users,
+  LayoutDashboard, FilePlus2, Search, CalendarClock, Settings, ShieldCheck, LogOut, Users, Package, Briefcase,
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -19,6 +19,8 @@ const baseItems = [
 ];
 
 const adminItems = [
+  { title: 'Estoque', url: '/estoque', icon: Package, end: false },
+  { title: 'Funções', url: '/funcoes', icon: Briefcase, end: false },
   { title: 'Usuários', url: '/usuarios', icon: Users, end: false },
   { title: 'Configurações', url: '/configuracoes', icon: Settings, end: false },
 ];

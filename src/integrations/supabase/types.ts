@@ -47,6 +47,44 @@ export type Database = {
         }
         Relationships: []
       }
+      epi_tamanhos: {
+        Row: {
+          created_at: string
+          epi_id: string
+          estoque: number
+          estoque_minimo: number
+          id: string
+          tamanho: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          epi_id: string
+          estoque?: number
+          estoque_minimo?: number
+          id?: string
+          tamanho: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          epi_id?: string
+          estoque?: number
+          estoque_minimo?: number
+          id?: string
+          tamanho?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "epi_tamanhos_epi_id_fkey"
+            columns: ["epi_id"]
+            isOneToOne: false
+            referencedRelation: "epis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       epis: {
         Row: {
           ativo: boolean
@@ -115,6 +153,7 @@ export type Database = {
           data_entrega: string
           empresa: string | null
           funcao: string | null
+          funcao_id: string | null
           id: string
           ip_assinatura: string | null
           matricula_snapshot: string | null
@@ -141,6 +180,7 @@ export type Database = {
           data_entrega?: string
           empresa?: string | null
           funcao?: string | null
+          funcao_id?: string | null
           id?: string
           ip_assinatura?: string | null
           matricula_snapshot?: string | null
@@ -167,6 +207,7 @@ export type Database = {
           data_entrega?: string
           empresa?: string | null
           funcao?: string | null
+          funcao_id?: string | null
           id?: string
           ip_assinatura?: string | null
           matricula_snapshot?: string | null
@@ -193,6 +234,13 @@ export type Database = {
             columns: ["criado_por"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fichas_epi_funcao_id_fkey"
+            columns: ["funcao_id"]
+            isOneToOne: false
+            referencedRelation: "funcoes"
             referencedColumns: ["id"]
           },
         ]
@@ -385,6 +433,75 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      funcao_epis: {
+        Row: {
+          created_at: string
+          epi_id: string
+          funcao_id: string
+          id: string
+          quantidade: number
+          tamanho: string | null
+        }
+        Insert: {
+          created_at?: string
+          epi_id: string
+          funcao_id: string
+          id?: string
+          quantidade?: number
+          tamanho?: string | null
+        }
+        Update: {
+          created_at?: string
+          epi_id?: string
+          funcao_id?: string
+          id?: string
+          quantidade?: number
+          tamanho?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funcao_epis_epi_id_fkey"
+            columns: ["epi_id"]
+            isOneToOne: false
+            referencedRelation: "epis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funcao_epis_funcao_id_fkey"
+            columns: ["funcao_id"]
+            isOneToOne: false
+            referencedRelation: "funcoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      funcoes: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       movimentacoes_estoque: {
         Row: {

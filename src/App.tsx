@@ -16,6 +16,8 @@ import AssinarFicha from "./pages/AssinarFicha";
 import Vencimentos from "./pages/Vencimentos";
 import Configuracoes from "./pages/Configuracoes";
 import Usuarios from "./pages/Usuarios";
+import Estoque from "./pages/Estoque";
+import Funcoes from "./pages/Funcoes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,6 +50,8 @@ function AppRoutes() {
         <Route path="/vencimentos" element={<Vencimentos />} />
         <Route path="/configuracoes" element={<AdminRoute><Configuracoes /></AdminRoute>} />
         <Route path="/usuarios" element={<AdminRoute><Usuarios /></AdminRoute>} />
+        <Route path="/estoque" element={<AdminRoute><Estoque /></AdminRoute>} />
+        <Route path="/funcoes" element={<AdminRoute><Funcoes /></AdminRoute>} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

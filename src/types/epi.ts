@@ -19,6 +19,8 @@ export interface EPIItem {
   devolucao?: DevolucaoInfo;
   /** Data de validade do CA/EPI */
   dataValidade?: string;
+  /** ID do EPI no catálogo (para baixa de estoque) */
+  epiId?: string;
 }
 
 export interface EPIFicha {
