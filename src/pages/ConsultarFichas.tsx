@@ -57,6 +57,23 @@ export default function ConsultarFichas() {
                     <Button variant="ghost" size="icon" title="Baixar PDF" onClick={() => generatePDF(ficha)}>
                       <Download className="h-4 w-4" />
                     </Button>
+                    {ficha.status !== 'assinada' && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Enviar link de assinatura via WhatsApp"
+                        onClick={() => {
+                          const tel = (ficha.telefone || '').replace(/\D/g, '');
+                          if (!tel) { toast.error('Telefone do colaborador não cadastrado'); return; }
+                          const numero = tel.startsWith('55') ? tel : `55${tel}`;
+                          const url = `${window.location.origin}/assinar/${ficha.id}`;
+                          const msg = encodeURIComponent(`Olá ${ficha.nomeFuncionario}, segue o link para assinatura da sua ficha de EPI/Uniforme: ${url}`);
+                          window.open(`https://wa.me/${numero}?text=${msg}`, '_blank');
+                        }}
+                      >
+                        <MessageCircle className="h-4 w-4 text-success" />
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
