@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, Download, ShieldCheck } from 'lucide-react';
 import { EPIFicha } from '@/types/epi';
-import { getFichaById, saveFicha } from '@/services/fichaService';
+import { getFichaById, assinarFichaPublica } from '@/services/fichaService';
 import { generatePDF } from '@/services/pdfService';
 import SignaturePad from '@/components/SignaturePad';
 import FichaOficialView from '@/components/FichaOficialView';
@@ -18,13 +18,14 @@ export default function AssinarFicha() {
 
   useEffect(() => {
     if (id) {
-      const f = getFichaById(id);
-      if (f) {
-        setFicha(f);
-        const rec: Record<string, boolean> = {};
-        f.itens.forEach(i => { rec[i.id] = i.recebido; });
-        setItensRecebidos(rec);
-      }
+      getFichaById(id).then(f => {
+        if (f) {
+          setFicha(f);
+          const rec: Record<string, boolean> = {};
+          f.itens.forEach(i => { rec[i.id] = i.recebido; });
+          setItensRecebidos(rec);
+        }
+      });
     }
   }, [id]);
 
@@ -60,11 +61,16 @@ export default function AssinarFicha() {
     setItensRecebidos(prev => ({ ...prev, [itemId]: !prev[itemId] }));
   };
 
-  const handleSign = () => {
-    const checkedCount = Object.values(itensRecebidos).filter(Boolean).length;
-    if (checkedCount === 0) { toast.error('Marque ao menos um item recebido'); return; }
+  const handleSign = async () => {
+    const recebidosIds = Object.entries(itensRecebidos).filter(([,v]) => v).map(([k]) => k);
+    if (recebidosIds.length === 0) { toast.error('Marque ao menos um item recebido'); return; }
     if (!assinatura) { toast.error('Por favor, assine no campo abaixo'); return; }
 
+    const r = await assinarFichaPublica(ficha.id, assinatura, recebidosIds);
+    if (!r.ok) {
+      toast.error(r.error === 'ja_assinada' ? 'Esta ficha já foi assinada.' : (r.error || 'Erro ao assinar'));
+      return;
+    }
     const updated: EPIFicha = {
       ...ficha,
       itens: ficha.itens.map(i => ({ ...i, recebido: itensRecebidos[i.id] || false })),
@@ -72,7 +78,6 @@ export default function AssinarFicha() {
       status: 'assinada',
       assinadoEm: new Date().toISOString(),
     };
-    saveFicha(updated);
     setFicha(updated);
     toast.success('Ficha assinada com sucesso!');
   };
