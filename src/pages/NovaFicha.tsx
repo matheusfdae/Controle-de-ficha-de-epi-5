@@ -169,7 +169,16 @@ export default function NovaFicha() {
             </div>
             <div>
               <Label htmlFor="funcao">Função</Label>
-              <Input id="funcao" value={form.funcao} onChange={e => updateField('funcao', e.target.value)} placeholder="Ex: ASG, Líder ASG" />
+              {funcoes.length > 0 ? (
+                <Select value={funcaoId} onValueChange={aplicarFuncao}>
+                  <SelectTrigger><SelectValue placeholder="Selecione a função (auto-preenche EPIs)" /></SelectTrigger>
+                  <SelectContent>
+                    {funcoes.map(f => <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input id="funcao" value={form.funcao} onChange={e => updateField('funcao', e.target.value)} placeholder="Ex: ASG, Líder ASG" />
+              )}
             </div>
             <div>
               <Label htmlFor="telefone">Telefone</Label>
