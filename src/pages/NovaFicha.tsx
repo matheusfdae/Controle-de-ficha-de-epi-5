@@ -268,7 +268,10 @@ export default function NovaFicha() {
           </CardHeader>
           <CardContent className="space-y-6">
             <SignaturePad label="Assinatura do Funcionário" onSave={setAssinaturaColaborador} />
-            <SignaturePad label="Assinatura do Responsável pela Entrega" onSave={setAssinaturaResponsavel} />
+            <SignaturePad label="Assinatura do Responsável pela Entrega" onSave={setAssinaturaResponsavel} initialValue={assinaturaResponsavel} />
+            {assinaturaResponsavel && config.assinaturaEmpresa === assinaturaResponsavel && (
+              <p className="text-xs text-muted-foreground -mt-3">✓ Usando assinatura padrão da empresa (configurações)</p>
+            )}
           </CardContent>
         </Card>
 
