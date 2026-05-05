@@ -9,8 +9,9 @@ import { Plus, Trash2, UserPlus, Save, FileSignature, CheckCircle2 } from 'lucid
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
+
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -37,6 +38,15 @@ export default function Integracao() {
   const [form, setForm] = useState({
     nome: '', matricula: '', posto: '', funcao_id: '', data_admissao: '',
   });
+
+  // Modal de integração (preenchimento de tamanhos)
+  const [intModalColab, setIntModalColab] = useState<Colab | null>(null);
+  const [intItens, setIntItens] = useState<Array<{ epi_id: string; nome: string; ca: string; quantidade: number; tamanho: string }>>([]);
+  const [intUniformes, setIntUniformes] = useState<Array<{ descricao: string; tamanho: string; quantidade: number }>>([
+    { descricao: 'Camisa', tamanho: '', quantidade: 2 },
+    { descricao: 'Calça', tamanho: '', quantidade: 2 },
+    { descricao: 'Calçado de segurança', tamanho: '', quantidade: 1 },
+  ]);
 
   const load = async () => {
     const { data, error } = await supabase
@@ -87,6 +97,30 @@ export default function Integracao() {
       toast.error('Defina a função antes de integrar.');
       return;
     }
+    // Carrega itens da função para o modal
+    const { data: funcaoEpis } = await supabase
+      .from('funcao_epis').select('*, epis(nome, ca_numero)')
+      .eq('funcao_id', c.funcao_id);
+
+    const itens = (funcaoEpis || []).map((fe: any) => ({
+      epi_id: fe.epi_id,
+      nome: fe.epis?.nome || '',
+      ca: fe.epis?.ca_numero || '',
+      quantidade: fe.quantidade || 1,
+      tamanho: fe.tamanho || '',
+    }));
+    setIntItens(itens);
+    setIntUniformes([
+      { descricao: 'Camisa', tamanho: '', quantidade: 2 },
+      { descricao: 'Calça', tamanho: '', quantidade: 2 },
+      { descricao: 'Calçado de segurança', tamanho: '', quantidade: 1 },
+    ]);
+    setIntModalColab(c);
+  };
+
+  const confirmarIntegracao = async () => {
+    if (!intModalColab) return;
+    const c = intModalColab;
     setIntegrating(c.id);
     try {
       let profileId = c.profile_id;
@@ -106,12 +140,7 @@ export default function Integracao() {
         profileId = newId;
       }
 
-      // 2) Busca itens da função
-      const { data: funcaoEpis } = await supabase
-        .from('funcao_epis').select('*, epis(nome, ca_numero)')
-        .eq('funcao_id', c.funcao_id);
-
-      // 3) Cria Ficha de EPI
+      // 2) Cria Ficha de EPI
       const { data: fichaEpi, error: feErr } = await supabase
         .from('fichas_epi').insert({
           colaborador_id: profileId,
@@ -125,32 +154,49 @@ export default function Integracao() {
         }).select().single();
       if (feErr) throw feErr;
 
-      if (funcaoEpis && funcaoEpis.length > 0) {
-        const itens = funcaoEpis.map((fe: any) => ({
+      if (intItens.length > 0) {
+        const itensPayload = intItens.map(it => ({
           ficha_id: fichaEpi.id,
-          epi_id: fe.epi_id,
-          descricao: fe.epis?.nome || '',
-          ca: fe.epis?.ca_numero || '',
-          quantidade: fe.quantidade || 1,
-          tamanho: fe.tamanho,
+          epi_id: it.epi_id,
+          descricao: it.nome,
+          ca: it.ca,
+          quantidade: it.quantidade || 1,
+          tamanho: it.tamanho || null,
           motivo_entrega: 'admissao' as const,
           estado: 'novo' as const,
         }));
-        await supabase.from('fichas_epi_itens').insert(itens);
+        await supabase.from('fichas_epi_itens').insert(itensPayload);
       }
 
-      // 4) Cria Ficha de Uniforme (sem itens — RH preenche)
-      await supabase.from('fichas_uniforme').insert({
-        colaborador_id: profileId,
-        status: 'pendente_assinatura',
-      });
+      // 3) Cria Ficha de Uniforme com itens
+      const { data: fichaUni, error: fuErr } = await supabase
+        .from('fichas_uniforme').insert({
+          colaborador_id: profileId,
+          status: 'pendente_assinatura',
+        }).select().single();
+      if (fuErr) throw fuErr;
 
-      // 5) Atualiza integração mantendo pendente até assinaturas
+      const uniItens = intUniformes.filter(u => u.descricao.trim());
+      if (uniItens.length > 0) {
+        await supabase.from('fichas_uniforme_itens').insert(
+          uniItens.map(u => ({
+            ficha_id: fichaUni.id,
+            descricao: u.descricao,
+            tamanho: u.tamanho || null,
+            quantidade: u.quantidade || 1,
+            motivo_entrega: 'admissao' as const,
+            estado: 'novo' as const,
+          })),
+        );
+      }
+
+      // 4) Atualiza integração mantendo pendente até assinaturas
       await supabase.from('colaboradores_integracao').update({
         profile_id: profileId,
       }).eq('id', c.id);
 
       toast.success('Fichas geradas! Status ficará pendente até as assinaturas.');
+      setIntModalColab(null);
       load();
     } catch (err: any) {
       console.error(err);
@@ -258,6 +304,123 @@ export default function Integracao() {
           )}
         </div>
       </div>
+
+      {/* Modal de Integração: preenchimento de tamanhos */}
+      <Dialog open={!!intModalColab} onOpenChange={(v) => !v && setIntModalColab(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Integrar — {intModalColab?.nome}</DialogTitle>
+            <DialogDescription>
+              Preencha os tamanhos/numerações. As fichas de EPI e Uniforme serão geradas com esses dados.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            {/* EPIs da função */}
+            <section>
+              <h3 className="font-semibold mb-2 text-sm uppercase tracking-wide">EPIs ({intItens.length})</h3>
+              {intItens.length === 0 && (
+                <p className="text-xs text-muted-foreground">Nenhum EPI vinculado a esta função.</p>
+              )}
+              <div className="space-y-2">
+                {intItens.map((it, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 items-end border rounded p-2">
+                    <div className="col-span-6">
+                      <Label className="text-xs">Item</Label>
+                      <p className="text-sm font-medium truncate">{it.nome}</p>
+                      {it.ca && <p className="text-xs text-muted-foreground">CA {it.ca}</p>}
+                    </div>
+                    <div className="col-span-3">
+                      <Label className="text-xs">Tamanho/Nº</Label>
+                      <Input
+                        value={it.tamanho}
+                        placeholder="Ex: M, 42"
+                        onChange={e => {
+                          const v = e.target.value;
+                          setIntItens(prev => prev.map((x, i) => i === idx ? { ...x, tamanho: v } : x));
+                        }}
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <Label className="text-xs">Qtd</Label>
+                      <Input
+                        type="number" min={1}
+                        value={it.quantidade}
+                        onChange={e => {
+                          const v = parseInt(e.target.value) || 1;
+                          setIntItens(prev => prev.map((x, i) => i === idx ? { ...x, quantidade: v } : x));
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Uniformes */}
+            <section>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold text-sm uppercase tracking-wide">Uniformes</h3>
+                <Button size="sm" variant="outline" onClick={() => setIntUniformes(p => [...p, { descricao: '', tamanho: '', quantidade: 1 }])}>
+                  <Plus className="h-3 w-3 mr-1" /> Adicionar
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {intUniformes.map((u, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 items-end border rounded p-2">
+                    <div className="col-span-5">
+                      <Label className="text-xs">Peça</Label>
+                      <Input
+                        value={u.descricao}
+                        placeholder="Camisa, Calça, Calçado..."
+                        onChange={e => {
+                          const v = e.target.value;
+                          setIntUniformes(prev => prev.map((x, i) => i === idx ? { ...x, descricao: v } : x));
+                        }}
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <Label className="text-xs">Tamanho/Nº</Label>
+                      <Input
+                        value={u.tamanho}
+                        placeholder="P, M, G, 40..."
+                        onChange={e => {
+                          const v = e.target.value;
+                          setIntUniformes(prev => prev.map((x, i) => i === idx ? { ...x, tamanho: v } : x));
+                        }}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Label className="text-xs">Qtd</Label>
+                      <Input
+                        type="number" min={1}
+                        value={u.quantidade}
+                        onChange={e => {
+                          const v = parseInt(e.target.value) || 1;
+                          setIntUniformes(prev => prev.map((x, i) => i === idx ? { ...x, quantidade: v } : x));
+                        }}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Button variant="ghost" size="icon" className="text-destructive" onClick={() => setIntUniformes(prev => prev.filter((_, i) => i !== idx))}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIntModalColab(null)}>Cancelar</Button>
+            <Button onClick={confirmarIntegracao} disabled={!!integrating}>
+              <CheckCircle2 className="h-4 w-4 mr-1" />
+              {integrating ? 'Gerando...' : 'Gerar Fichas'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
