@@ -3,17 +3,18 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Download, Share2, CheckCircle2, Circle } from 'lucide-react';
+import { ArrowLeft, Download, Copy, MessageCircle, Mail, CheckCircle2 } from 'lucide-react';
 import { EPIFicha } from '@/types/epi';
 import { getFichaById, saveFicha } from '@/services/fichaService';
 import { generatePDF } from '@/services/pdfService';
 import SignaturePad from '@/components/SignaturePad';
+import FichaOficialView from '@/components/FichaOficialView';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-
-const motivoLabels: Record<string, string> = {
-  admissao: 'Admissão', substituicao: 'Substituição',
-  perda_extravio: 'Perda/Extravio', demissao: 'Demissão', complemento: 'Complemento',
-};
 
 export default function VisualizarFicha() {
   const { id } = useParams<{ id: string }>();
