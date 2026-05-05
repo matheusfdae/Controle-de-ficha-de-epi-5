@@ -108,7 +108,7 @@ export default function VisualizarFicha() {
 
         {/* Ações */}
         <div className="flex flex-wrap gap-2">
-          {!isSigned && (
+          {!isSigned && isAdmin && (
             <Dialog>
               <DialogTrigger asChild>
                 <Button variant="outline">
@@ -151,7 +151,7 @@ export default function VisualizarFicha() {
         <FichaOficialView ficha={ficha} />
 
         {/* Assinatura presencial (admin) */}
-        {!isSigned && (
+        {!isSigned && isAdmin && (
           <Card>
             <CardHeader><CardTitle className="text-base">Assinatura presencial</CardTitle></CardHeader>
             <CardContent className="space-y-4">
