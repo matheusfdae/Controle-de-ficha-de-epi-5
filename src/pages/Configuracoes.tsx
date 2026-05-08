@@ -18,12 +18,35 @@ export default function Configuracoes() {
   const [novaAssinatura, setNovaAssinatura] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
+  const [empresaDialog, setEmpresaDialog] = useState(false);
+  const [empresaEdit, setEmpresaEdit] = useState<Partial<Empresa>>({});
+
+  const reloadEmpresas = () => setEmpresas(listEmpresas());
+
   useEffect(() => {
     setConfig(getConfig());
+    reloadEmpresas();
   }, []);
 
   const update = <K extends keyof AppConfig>(key: K, value: AppConfig[K]) => {
     setConfig(prev => ({ ...prev, [key]: value }));
+  };
+
+  const openNewEmpresa = () => { setEmpresaEdit({}); setEmpresaDialog(true); };
+  const openEditEmpresa = (e: Empresa) => { setEmpresaEdit(e); setEmpresaDialog(true); };
+  const handleSaveEmpresa = () => {
+    if (!empresaEdit.nome?.trim()) { toast.error('Informe o nome da empresa'); return; }
+    saveEmpresa(empresaEdit as any);
+    reloadEmpresas();
+    setEmpresaDialog(false);
+    toast.success('Empresa salva');
+  };
+  const handleDeleteEmpresa = (id: string) => {
+    if (!confirm('Excluir esta empresa?')) return;
+    deleteEmpresa(id);
+    reloadEmpresas();
+    toast.success('Empresa removida');
   };
 
   const handleSave = () => {
