@@ -17,6 +17,7 @@ import { generateId, saveFicha } from '@/services/fichaService';
 import { getConfig } from '@/services/configService';
 import SignaturePad from '@/components/SignaturePad';
 import { Funcao, EPI, listFuncoes, listEpis, listFuncaoEpis } from '@/services/estoqueService';
+import { Empresa, listEmpresas } from '@/services/empresasService';
 
 export default function NovaFicha() {
   const navigate = useNavigate();
@@ -49,10 +50,12 @@ export default function NovaFicha() {
   const [funcoes, setFuncoes] = useState<Funcao[]>([]);
   const [epis, setEpis] = useState<EPI[]>([]);
   const [funcaoId, setFuncaoId] = useState<string>('');
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
 
   useEffect(() => {
     listFuncoes().then(setFuncoes).catch(() => {});
     listEpis().then(setEpis).catch(() => {});
+    setEmpresas(listEmpresas());
   }, []);
 
   const aplicarFuncao = async (id: string) => {
@@ -268,7 +271,16 @@ export default function NovaFicha() {
             </div>
             <div>
               <Label htmlFor="empresa">Empresa</Label>
-              <Input id="empresa" value={form.empresa} onChange={e => updateField('empresa', e.target.value)} placeholder="Nome da empresa" />
+              {empresas.length > 0 ? (
+                <Select value={form.empresa} onValueChange={v => updateField('empresa', v)}>
+                  <SelectTrigger><SelectValue placeholder="Selecione a empresa" /></SelectTrigger>
+                  <SelectContent>
+                    {empresas.map(e => <SelectItem key={e.id} value={e.nome}>{e.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input id="empresa" value={form.empresa} onChange={e => updateField('empresa', e.target.value)} placeholder="Nome da empresa" />
+              )}
             </div>
             <div>
               <Label htmlFor="data">Data de Entrega *</Label>
