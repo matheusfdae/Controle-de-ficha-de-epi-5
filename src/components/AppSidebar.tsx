@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, FilePlus2, Search, CalendarClock, Settings, ShieldCheck, LogOut, Users, Package, Briefcase, UserPlus,
+  LayoutDashboard, FilePlus2, Search, CalendarClock, Settings, ShieldCheck, LogOut, Users, Package, Briefcase, UserPlus, ClipboardSignature,
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 const baseItems = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard, end: true, adminOnly: false },
   { title: 'Nova Ficha', url: '/nova-ficha', icon: FilePlus2, end: false, adminOnly: true },
+  { title: 'Assinar (Tablet)', url: '/pendentes', icon: ClipboardSignature, end: false, adminOnly: false },
   { title: 'Consultar Fichas', url: '/consultar', icon: Search, end: false, adminOnly: false },
   { title: 'Vencimentos', url: '/vencimentos', icon: CalendarClock, end: false, adminOnly: false },
 ];

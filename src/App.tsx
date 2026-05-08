@@ -13,6 +13,7 @@ import NovaFicha from "./pages/NovaFicha";
 import ConsultarFichas from "./pages/ConsultarFichas";
 import VisualizarFicha from "./pages/VisualizarFicha";
 import AssinarFicha from "./pages/AssinarFicha";
+import AssinaturasPendentes from "./pages/AssinaturasPendentes";
 import Vencimentos from "./pages/Vencimentos";
 import Configuracoes from "./pages/Configuracoes";
 import Usuarios from "./pages/Usuarios";
@@ -49,6 +50,7 @@ function AppRoutes() {
         <Route path="/consultar" element={<ConsultarFichas />} />
         <Route path="/ficha/:id" element={<VisualizarFicha />} />
         <Route path="/vencimentos" element={<Vencimentos />} />
+        <Route path="/pendentes" element={<AssinaturasPendentes />} />
         <Route path="/configuracoes" element={<AdminRoute><Configuracoes /></AdminRoute>} />
         <Route path="/usuarios" element={<AdminRoute><Usuarios /></AdminRoute>} />
         <Route path="/estoque" element={<AdminRoute><Estoque /></AdminRoute>} />
