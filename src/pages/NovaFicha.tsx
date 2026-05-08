@@ -7,7 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Plus, Trash2, Save, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, ShieldCheck, Tablet, Monitor, MessageCircle } from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { EPIFicha, EPIItem, MotivoEntrega, Turno } from '@/types/epi';
 import { generateId, saveFicha } from '@/services/fichaService';
@@ -102,42 +105,88 @@ export default function NovaFicha() {
     setItens(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i));
   };
 
+  const [finalizeOpen, setFinalizeOpen] = useState(false);
+
+  const buildFicha = (asSigned: boolean): EPIFicha => ({
+    id: generateId(),
+    ...form,
+    itens,
+    assinaturaColaborador: assinaturaColaborador || undefined,
+    assinaturaResponsavel: assinaturaResponsavel || undefined,
+    status: asSigned ? 'assinada' : 'pendente',
+    criadoEm: new Date().toISOString(),
+    assinadoEm: asSigned ? new Date().toISOString() : undefined,
+  });
+
+  const validateBasics = () => {
+    if (!form.nomeFuncionario.trim()) { toast.error('Informe o nome do funcionário'); return false; }
+    if (!form.dataEntrega) { toast.error('Informe a data de entrega'); return false; }
+    if (itens.length === 0) { toast.error('Adicione ao menos um item'); return false; }
+    return true;
+  };
+
   const handleSave = async (asSigned: boolean) => {
-    if (!form.nomeFuncionario.trim()) {
-      toast.error('Informe o nome do funcionário');
-      return;
+    if (!validateBasics()) return;
+    if (asSigned) {
+      const checkedItems = itens.filter(i => i.recebido);
+      if (checkedItems.length === 0) { toast.error('Marque ao menos um item de EPI'); return; }
+      if (!assinaturaColaborador || !assinaturaResponsavel) {
+        toast.error('É necessário ambas as assinaturas para finalizar');
+        return;
+      }
     }
-    if (!form.dataEntrega) {
-      toast.error('Informe a data de entrega');
-      return;
-    }
-    const checkedItems = itens.filter(i => i.recebido);
-    if (asSigned && checkedItems.length === 0) {
-      toast.error('Marque ao menos um item de EPI');
-      return;
-    }
-    if (asSigned && (!assinaturaColaborador || !assinaturaResponsavel)) {
-      toast.error('É necessário ambas as assinaturas para finalizar');
-      return;
-    }
-
-    const ficha: EPIFicha = {
-      id: generateId(),
-      ...form,
-      itens,
-      assinaturaColaborador: assinaturaColaborador || undefined,
-      assinaturaResponsavel: assinaturaResponsavel || undefined,
-      status: asSigned ? 'assinada' : 'pendente',
-      criadoEm: new Date().toISOString(),
-      assinadoEm: asSigned ? new Date().toISOString() : undefined,
-    };
-
+    const ficha = buildFicha(asSigned);
     try {
       await saveFicha(ficha);
       toast.success(asSigned ? 'Ficha assinada com sucesso!' : 'Ficha salva como pendente');
       navigate(`/ficha/${ficha.id}`);
     } catch (e: any) {
       toast.error(e.message || 'Erro ao salvar a ficha');
+    }
+  };
+
+  const handleFinalize = () => {
+    if (!validateBasics()) return;
+    setFinalizeOpen(true);
+  };
+
+  const finalizarTablet = async () => {
+    const ficha = buildFicha(false);
+    try {
+      await saveFicha(ficha);
+      setFinalizeOpen(false);
+      toast.success('Ficha enviada para o tablet. Acesse "Assinar (Tablet)" no dispositivo logado.');
+      navigate('/pendentes');
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao salvar');
+    }
+  };
+
+  const finalizarDesktop = () => {
+    setFinalizeOpen(false);
+    if (!assinaturaColaborador || !assinaturaResponsavel) {
+      toast.info('Capture as assinaturas abaixo e clique em "Confirmar Assinatura"');
+      document.getElementById('assinaturas-card')?.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+    handleSave(true);
+  };
+
+  const finalizarWhatsApp = async () => {
+    const phone = (form.telefone || '').replace(/\D/g, '');
+    if (!phone) { toast.error('Informe o telefone do funcionário para enviar via WhatsApp'); return; }
+    const ficha = buildFicha(false);
+    try {
+      await saveFicha(ficha);
+      const link = `${window.location.origin}/assinar/${ficha.id}`;
+      const msg = `Olá ${form.nomeFuncionario}, segue o link para assinatura da sua ficha de EPI: ${link}`;
+      const waNumber = phone.length <= 11 ? `55${phone}` : phone;
+      window.open(`https://web.whatsapp.com/send?phone=${waNumber}&text=${encodeURIComponent(msg)}`, '_blank');
+      setFinalizeOpen(false);
+      toast.success('Link gerado e WhatsApp Web aberto');
+      navigate(`/ficha/${ficha.id}`);
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao salvar');
     }
   };
 
@@ -321,15 +370,66 @@ export default function NovaFicha() {
           </CardContent>
         </Card>
 
+        {/* Signatures */}
+        <Card id="assinaturas-card">
+          <CardHeader>
+            <CardTitle className="text-base">Assinaturas (apenas para finalização no Desktop)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <SignaturePad label="Assinatura do Funcionário" onSave={setAssinaturaColaborador} />
+            <SignaturePad label="Assinatura do Responsável pela Entrega" onSave={setAssinaturaResponsavel} initialValue={assinaturaResponsavel} />
+            {assinaturaResponsavel && config.assinaturaEmpresa === assinaturaResponsavel && (
+              <p className="text-xs text-muted-foreground -mt-3">✓ Usando assinatura padrão da empresa (configurações)</p>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-3">
           <Button variant="outline" className="flex-1" onClick={() => handleSave(false)}>
             <Save className="h-4 w-4 mr-2" /> Salvar como Pendente
           </Button>
-          <Button className="flex-1" onClick={() => handleSave(true)}>
-            <ShieldCheck className="h-4 w-4 mr-2" /> Assinar e Finalizar
+          <Button className="flex-1" onClick={handleFinalize}>
+            <ShieldCheck className="h-4 w-4 mr-2" /> Finalizar Ficha
           </Button>
         </div>
+
+        <Dialog open={finalizeOpen} onOpenChange={setFinalizeOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Como deseja coletar a assinatura?</DialogTitle>
+              <DialogDescription>
+                Escolha o tipo de assinatura para esta ficha.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <button
+                onClick={finalizarTablet}
+                className="group flex flex-col items-center gap-2 p-4 rounded-lg border bg-card hover:border-primary hover:bg-primary/5 transition-colors text-center"
+              >
+                <Tablet className="h-8 w-8 text-primary" />
+                <span className="font-semibold text-sm">Tablet</span>
+                <span className="text-[11px] text-muted-foreground">Aparece em "Assinar (Tablet)" no dispositivo logado</span>
+              </button>
+              <button
+                onClick={finalizarDesktop}
+                className="group flex flex-col items-center gap-2 p-4 rounded-lg border bg-card hover:border-primary hover:bg-primary/5 transition-colors text-center"
+              >
+                <Monitor className="h-8 w-8 text-primary" />
+                <span className="font-semibold text-sm">Desktop</span>
+                <span className="text-[11px] text-muted-foreground">Assinar agora neste computador</span>
+              </button>
+              <button
+                onClick={finalizarWhatsApp}
+                className="group flex flex-col items-center gap-2 p-4 rounded-lg border bg-card hover:border-[#25D366] hover:bg-[#25D366]/5 transition-colors text-center"
+              >
+                <MessageCircle className="h-8 w-8 text-[#25D366]" />
+                <span className="font-semibold text-sm">Link via WhatsApp</span>
+                <span className="text-[11px] text-muted-foreground">Envia o link para o telefone cadastrado</span>
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
