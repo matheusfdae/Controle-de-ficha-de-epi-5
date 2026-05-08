@@ -103,8 +103,9 @@ export default function Configuracoes() {
         </div>
 
         <Tabs defaultValue="empresa" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+          <TabsList className="grid w-full grid-cols-5 max-w-3xl">
             <TabsTrigger value="empresa"><Building2 className="h-4 w-4 mr-1.5" />Empresa</TabsTrigger>
+            <TabsTrigger value="empresas"><Building className="h-4 w-4 mr-1.5" />Empresas</TabsTrigger>
             <TabsTrigger value="logo"><ImageIcon className="h-4 w-4 mr-1.5" />Logo</TabsTrigger>
             <TabsTrigger value="assinatura"><PenTool className="h-4 w-4 mr-1.5" />Assinatura</TabsTrigger>
             <TabsTrigger value="alertas"><Bell className="h-4 w-4 mr-1.5" />Alertas</TabsTrigger>
@@ -149,7 +150,88 @@ export default function Configuracoes() {
             </Card>
           </TabsContent>
 
-          {/* LOGO */}
+          {/* EMPRESAS (múltiplas) */}
+          <TabsContent value="empresas">
+            <Card>
+              <CardHeader className="flex-row items-center justify-between space-y-0">
+                <div>
+                  <CardTitle className="text-base">Empresas Cadastradas</CardTitle>
+                  <CardDescription>Cadastre várias empresas para escolher ao criar uma ficha.</CardDescription>
+                </div>
+                <Button size="sm" onClick={openNewEmpresa}>
+                  <Plus className="h-4 w-4 mr-1.5" /> Nova Empresa
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {empresas.length === 0 ? (
+                  <div className="text-center py-10 text-muted-foreground">
+                    <Building className="h-10 w-10 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">Nenhuma empresa cadastrada ainda.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {empresas.map(e => (
+                      <div key={e.id} className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm text-foreground truncate">{e.nome}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {[e.cnpj, e.subtitulo, e.responsavelNome].filter(Boolean).join(' · ') || 'Sem dados adicionais'}
+                          </p>
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          <Button variant="ghost" size="icon" onClick={() => openEditEmpresa(e)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteEmpresa(e.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Dialog open={empresaDialog} onOpenChange={setEmpresaDialog}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{empresaEdit.id ? 'Editar Empresa' : 'Nova Empresa'}</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <Label>Nome *</Label>
+                    <Input value={empresaEdit.nome || ''} onChange={e => setEmpresaEdit(p => ({ ...p, nome: e.target.value }))} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label>Subtítulo / Segmento</Label>
+                    <Input value={empresaEdit.subtitulo || ''} onChange={e => setEmpresaEdit(p => ({ ...p, subtitulo: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>CNPJ</Label>
+                    <Input value={empresaEdit.cnpj || ''} onChange={e => setEmpresaEdit(p => ({ ...p, cnpj: e.target.value }))} placeholder="00.000.000/0000-00" />
+                  </div>
+                  <div>
+                    <Label>Responsável</Label>
+                    <Input value={empresaEdit.responsavelNome || ''} onChange={e => setEmpresaEdit(p => ({ ...p, responsavelNome: e.target.value }))} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label>Endereço</Label>
+                    <Input value={empresaEdit.endereco || ''} onChange={e => setEmpresaEdit(p => ({ ...p, endereco: e.target.value }))} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label>Cargo do Responsável</Label>
+                    <Input value={empresaEdit.responsavelCargo || ''} onChange={e => setEmpresaEdit(p => ({ ...p, responsavelCargo: e.target.value }))} />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setEmpresaDialog(false)}>Cancelar</Button>
+                  <Button onClick={handleSaveEmpresa}><Save className="h-4 w-4 mr-2" />Salvar</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </TabsContent>
+
           <TabsContent value="logo">
             <Card>
               <CardHeader>
