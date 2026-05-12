@@ -30,7 +30,22 @@ export default function Estoque() {
   const load = async () => {
     try { setEpis(await listEpis()); } catch (e: any) { toast.error(e.message); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const channel = supabase
+      .channel('estoque-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'epis' }, () => {
+        load();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'epi_tamanhos' }, (payload: any) => {
+        load();
+        const epiId = (payload.new?.epi_id) || (payload.old?.epi_id);
+        if (editing && epiId === editing.id) loadTamanhos(editing.id);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing?.id]);
 
   const loadTamanhos = async (epiId: string) => {
     setTamanhos(await listTamanhos(epiId));
