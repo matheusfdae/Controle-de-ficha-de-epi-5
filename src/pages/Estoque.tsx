@@ -13,6 +13,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from '@/components/ui/dialog';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Estoque() {
   const [epis, setEpis] = useState<EPI[]>([]);
