@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth, UserRole } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,23 +10,45 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { ShieldAlert, ShieldCheck, UserPlus, Trash2, Pencil, Lock } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, UserPlus, Pencil, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
+interface Row {
+  id: string;
+  email: string;
+  nome: string;
+  role: UserRole;
+}
+
 export default function Usuarios() {
-  const { user, isAdmin, listUsers, addUser, updateUser, deleteUser } = useAuth();
-  const [refresh, setRefresh] = useState(0);
-  const users = listUsers();
+  const { user, isAdmin } = useAuth();
+  const [users, setUsers] = useState<Row[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ username: '', nome: '', password: '', role: 'operador' as UserRole });
+  const [form, setForm] = useState({ email: '', nome: '', password: '', role: 'colaborador' as UserRole });
 
-  const [editing, setEditing] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ nome: '', role: 'operador' as UserRole, password: '' });
+  const [editing, setEditing] = useState<Row | null>(null);
+  const [editForm, setEditForm] = useState({ nome: '', role: 'colaborador' as UserRole });
+
+  const load = async () => {
+    setLoading(true);
+    const { data: profiles } = await supabase.from('profiles').select('id, email, nome_completo');
+    const { data: roles } = await supabase.from('user_roles').select('user_id, role');
+    const rows: Row[] = (profiles || []).map((p: any) => {
+      const userRoles = (roles || []).filter((r: any) => r.user_id === p.id).map((r: any) => r.role);
+      const role: UserRole =
+        userRoles.includes('admin') ? 'admin'
+        : userRoles.includes('rh') ? 'rh'
+        : userRoles.includes('supervisor') ? 'supervisor'
+        : 'colaborador';
+      return { id: p.id, email: p.email, nome: p.nome_completo || p.email, role };
+    });
+    setUsers(rows);
+    setLoading(false);
+  };
+
+  useEffect(() => { if (isAdmin) load(); }, [isAdmin]);
 
   if (!isAdmin) {
     return (
@@ -41,49 +64,63 @@ export default function Usuarios() {
     );
   }
 
-  const handleAdd = () => {
-    if (!form.username.trim() || !form.password.trim() || !form.nome.trim()) {
+  const handleAdd = async () => {
+    if (!form.email.trim() || !form.password.trim() || !form.nome.trim()) {
       toast.error('Preencha todos os campos');
       return;
     }
-    const res = addUser({ ...form, username: form.username.trim().toLowerCase() });
-    if (!res.ok) {
-      toast.error(res.error || 'Erro ao adicionar');
+    if (form.password.length < 6) {
+      toast.error('A senha deve ter no mínimo 6 caracteres');
       return;
+    }
+    const { data, error } = await supabase.auth.signUp({
+      email: form.email.trim().toLowerCase(),
+      password: form.password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/`,
+        data: { nome_completo: form.nome },
+      },
+    });
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    const newId = data.user?.id;
+    if (newId && form.role !== 'colaborador') {
+      // trigger já adicionou colaborador. Adiciona o role escolhido.
+      await supabase.from('user_roles').insert({ user_id: newId, role: form.role });
     }
     toast.success('Usuário criado!');
-    setForm({ username: '', nome: '', password: '', role: 'operador' });
+    setForm({ email: '', nome: '', password: '', role: 'colaborador' });
     setOpen(false);
-    setRefresh(r => r + 1);
+    setTimeout(load, 500);
   };
 
-  const startEdit = (username: string, nome: string, role: UserRole) => {
-    setEditing(username);
-    setEditForm({ nome, role, password: '' });
+  const startEdit = (row: Row) => {
+    setEditing(row);
+    setEditForm({ nome: row.nome, role: row.role });
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editing) return;
-    const patch: any = { nome: editForm.nome, role: editForm.role };
-    if (editForm.password) patch.password = editForm.password;
-    updateUser(editing, patch);
+    await supabase.from('profiles').update({ nome_completo: editForm.nome }).eq('id', editing.id);
+    if (editForm.role !== editing.role) {
+      // remove o antigo, adiciona o novo (mantém colaborador como base)
+      await supabase.from('user_roles').delete().eq('user_id', editing.id).eq('role', editing.role);
+      if (editForm.role !== 'colaborador') {
+        await supabase.from('user_roles').insert({ user_id: editing.id, role: editForm.role });
+      }
+    }
     toast.success('Usuário atualizado!');
     setEditing(null);
-    setRefresh(r => r + 1);
+    load();
   };
 
-  const handleDelete = (username: string) => {
-    if (username === user?.username) {
-      toast.error('Você não pode excluir o próprio usuário');
-      return;
-    }
-    deleteUser(username);
-    toast.success('Usuário removido');
-    setRefresh(r => r + 1);
-  };
+  const roleLabel = (r: UserRole) =>
+    r === 'admin' ? 'Administrador' : r === 'rh' ? 'RH' : r === 'supervisor' ? 'Supervisor' : 'Colaborador';
 
   return (
-    <div className="p-4 lg:p-8 pb-20" key={refresh}>
+    <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
@@ -107,20 +144,22 @@ export default function Usuarios() {
                   <Input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} />
                 </div>
                 <div>
-                  <Label>Usuário (login)</Label>
-                  <Input value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} placeholder="ex: joao.silva" />
+                  <Label>E-mail (login)</Label>
+                  <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="usuario@empresa.com" />
                 </div>
                 <div>
                   <Label>Senha</Label>
-                  <Input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
+                  <Input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Mínimo 6 caracteres" />
                 </div>
                 <div>
                   <Label>Perfil</Label>
                   <Select value={form.role} onValueChange={(v: UserRole) => setForm({ ...form, role: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="admin">Administrador (acesso total)</SelectItem>
-                      <SelectItem value="operador">Operador (somente leitura)</SelectItem>
+                      <SelectItem value="admin">Administrador</SelectItem>
+                      <SelectItem value="rh">RH</SelectItem>
+                      <SelectItem value="supervisor">Supervisor</SelectItem>
+                      <SelectItem value="colaborador">Colaborador</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -137,13 +176,16 @@ export default function Usuarios() {
           <CardHeader>
             <CardTitle className="text-base">Usuários cadastrados</CardTitle>
             <CardDescription>
-              <strong>Administrador</strong> pode criar, editar e excluir fichas e configurações.
-              <strong> Operador</strong> apenas visualiza informações.
+              Gerencie nome e perfil dos usuários do sistema.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
+            {loading && <p className="text-sm text-muted-foreground">Carregando...</p>}
+            {!loading && users.length === 0 && (
+              <p className="text-sm text-muted-foreground">Nenhum usuário encontrado.</p>
+            )}
             {users.map(u => (
-              <div key={u.username} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/30 transition">
+              <div key={u.id} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/30 transition">
                 <div className={`p-2 rounded-lg ${u.role === 'admin' ? 'bg-primary/10' : 'bg-muted'}`}>
                   {u.role === 'admin'
                     ? <ShieldCheck className="h-4 w-4 text-primary" />
@@ -151,37 +193,16 @@ export default function Usuarios() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm text-foreground truncate">
-                    {u.nome} {u.username === user?.username && <span className="text-xs text-muted-foreground">(você)</span>}
+                    {u.nome} {u.id === user?.id && <span className="text-xs text-muted-foreground">(você)</span>}
                   </p>
-                  <p className="text-xs text-muted-foreground truncate">@{u.username}</p>
+                  <p className="text-xs text-muted-foreground truncate">{u.email}</p>
                 </div>
                 <Badge variant={u.role === 'admin' ? 'default' : 'secondary'}>
-                  {u.role === 'admin' ? 'Administrador' : 'Operador'}
+                  {roleLabel(u.role)}
                 </Badge>
-                <Button variant="ghost" size="icon" onClick={() => startEdit(u.username, u.nome, u.role)}>
+                <Button variant="ghost" size="icon" onClick={() => startEdit(u)}>
                   <Pencil className="h-4 w-4" />
                 </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="text-destructive" disabled={u.username === user?.username}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Esta ação não pode ser desfeita. O usuário <strong>{u.nome}</strong> perderá o acesso ao sistema.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => handleDelete(u.username)} className="bg-destructive">
-                        Excluir
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
               </div>
             ))}
           </CardContent>
@@ -203,13 +224,11 @@ export default function Usuarios() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">Administrador</SelectItem>
-                    <SelectItem value="operador">Operador</SelectItem>
+                    <SelectItem value="rh">RH</SelectItem>
+                    <SelectItem value="supervisor">Supervisor</SelectItem>
+                    <SelectItem value="colaborador">Colaborador</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <div>
-                <Label>Nova senha (opcional)</Label>
-                <Input type="password" value={editForm.password} onChange={e => setEditForm({ ...editForm, password: e.target.value })} placeholder="Deixe em branco para manter" />
               </div>
             </div>
             <DialogFooter>
