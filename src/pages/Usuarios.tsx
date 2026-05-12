@@ -88,7 +88,7 @@ export default function Usuarios() {
     const newId = data.user?.id;
     if (newId && form.role !== 'colaborador') {
       // trigger já adicionou colaborador. Adiciona o role escolhido.
-      await supabase.from('user_roles').insert({ user_id: newId, role: form.role });
+      await supabase.from('user_roles').insert({ user_id: newId, role: form.role as any });
     }
     toast.success('Usuário criado!');
     setForm({ email: '', nome: '', password: '', role: 'colaborador' });
@@ -106,9 +106,9 @@ export default function Usuarios() {
     await supabase.from('profiles').update({ nome_completo: editForm.nome }).eq('id', editing.id);
     if (editForm.role !== editing.role) {
       // remove o antigo, adiciona o novo (mantém colaborador como base)
-      await supabase.from('user_roles').delete().eq('user_id', editing.id).eq('role', editing.role);
+      await supabase.from('user_roles').delete().eq('user_id', editing.id).eq('role', editing.role as any);
       if (editForm.role !== 'colaborador') {
-        await supabase.from('user_roles').insert({ user_id: editing.id, role: editForm.role });
+        await supabase.from('user_roles').insert({ user_id: editing.id, role: editForm.role as any });
       }
     }
     toast.success('Usuário atualizado!');
