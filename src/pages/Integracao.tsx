@@ -281,7 +281,7 @@ export default function Integracao() {
                   </Button>
                 )}
                 {c.profile_id && (
-                  <Button size="sm" variant="outline" onClick={() => navigate('/fichas')}>
+                  <Button size="sm" variant="outline" onClick={() => navigate('/consultar')}>
                     Ver fichas
                   </Button>
                 )}
