@@ -1,32 +1,72 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Eye, Download, ClipboardList, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Eye, Download, ClipboardList, MessageCircle, Upload, FileSpreadsheet } from 'lucide-react';
 import { toast } from 'sonner';
 import { EPIFicha } from '@/types/epi';
 import { getFichas } from '@/services/fichaService';
 import { generatePDF } from '@/services/pdfService';
 import { useAuth } from '@/contexts/AuthContext';
+import { importFichasFromExcel, downloadTemplateExcel } from '@/services/importFichasService';
 
 export default function ConsultarFichas() {
   const { isAdmin } = useAuth();
   const [fichas, setFichas] = useState<EPIFicha[]>([]);
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const reload = () => getFichas().then(setFichas);
 
   useEffect(() => {
-    getFichas().then(setFichas);
+    reload();
   }, []);
+
+  const handleFile = async (file: File) => {
+    setImporting(true);
+    const tid = toast.loading('Importando fichas...');
+    try {
+      const r = await importFichasFromExcel(file);
+      toast.dismiss(tid);
+      if (r.sucesso > 0) toast.success(`${r.sucesso} ficha(s) importada(s)`);
+      if (r.erros.length) toast.error(`${r.erros.length} erro(s). Ex: linha ${r.erros[0].linha}: ${r.erros[0].motivo}`);
+      reload();
+    } catch (err: any) {
+      toast.dismiss(tid);
+      toast.error(err.message || 'Falha ao importar');
+    } finally {
+      setImporting(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
 
   return (
     <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-foreground">Consultar Fichas</h2>
             <p className="text-sm text-muted-foreground">Todas as fichas de EPI cadastradas no sistema.</p>
           </div>
-          {isAdmin && <Link to="/nova-ficha"><Button size="sm">Nova Ficha</Button></Link>}
+          {isAdmin && (
+            <div className="flex gap-2 flex-wrap">
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+              />
+              <Button size="sm" variant="outline" onClick={() => downloadTemplateExcel()}>
+                <FileSpreadsheet className="h-4 w-4 mr-1" /> Modelo Excel
+              </Button>
+              <Button size="sm" variant="outline" disabled={importing} onClick={() => fileRef.current?.click()}>
+                <Upload className="h-4 w-4 mr-1" /> {importing ? 'Importando...' : 'Importar Excel'}
+              </Button>
+              <Link to="/nova-ficha"><Button size="sm">Nova Ficha</Button></Link>
+            </div>
+          )}
         </div>
 
         {fichas.length === 0 ? (
