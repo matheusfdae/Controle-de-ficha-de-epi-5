@@ -23,18 +23,29 @@ export default function ConsultarFichas() {
     reload();
   }, []);
 
-  const handleFile = async (file: File) => {
+  const handleFiles = async (files: FileList) => {
     setImporting(true);
-    const tid = toast.loading('Importando fichas...');
+    const list = Array.from(files);
+    const tid = toast.loading(`Importando ${list.length} arquivo(s)...`);
+    let totalOk = 0;
+    let totalErr = 0;
+    const falhas: string[] = [];
     try {
-      const r = await importFichasFromExcel(file);
+      for (const file of list) {
+        try {
+          const r = await importFichasFromExcel(file);
+          totalOk += r.sucesso;
+          totalErr += r.erros.length;
+          if (r.erros.length) falhas.push(`${file.name}: ${r.erros.length} erro(s)`);
+        } catch (err: any) {
+          totalErr++;
+          falhas.push(`${file.name}: ${err.message || 'falha'}`);
+        }
+      }
       toast.dismiss(tid);
-      if (r.sucesso > 0) toast.success(`${r.sucesso} ficha(s) importada(s)`);
-      if (r.erros.length) toast.error(`${r.erros.length} erro(s). Ex: linha ${r.erros[0].linha}: ${r.erros[0].motivo}`);
+      if (totalOk > 0) toast.success(`${totalOk} ficha(s) importada(s) de ${list.length} arquivo(s)`);
+      if (totalErr > 0) toast.error(`${totalErr} erro(s). ${falhas[0] || ''}`);
       reload();
-    } catch (err: any) {
-      toast.dismiss(tid);
-      toast.error(err.message || 'Falha ao importar');
     } finally {
       setImporting(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -55,14 +66,15 @@ export default function ConsultarFichas() {
                 ref={fileRef}
                 type="file"
                 accept=".xlsx,.xls"
+                multiple
                 className="hidden"
-                onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+                onChange={(e) => e.target.files?.length && handleFiles(e.target.files)}
               />
               <Button size="sm" variant="outline" onClick={() => downloadTemplateExcel()}>
                 <FileSpreadsheet className="h-4 w-4 mr-1" /> Modelo Excel
               </Button>
               <Button size="sm" variant="outline" disabled={importing} onClick={() => fileRef.current?.click()}>
-                <Upload className="h-4 w-4 mr-1" /> {importing ? 'Importando...' : 'Importar Excel'}
+                <Upload className="h-4 w-4 mr-1" /> {importing ? 'Importando...' : 'Importar Excel (lote)'}
               </Button>
               <Link to="/nova-ficha"><Button size="sm">Nova Ficha</Button></Link>
             </div>
