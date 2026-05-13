@@ -118,6 +118,8 @@ export default function Estoque() {
           </Dialog>
         </div>
 
+        <EstoqueChart />
+
         <Input placeholder="Buscar EPI..." value={search} onChange={e => setSearch(e.target.value)} className="max-w-sm" />
 
         <div className="grid gap-4 md:grid-cols-2">
