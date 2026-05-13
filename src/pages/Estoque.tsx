@@ -14,6 +14,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
+import EstoqueChart from '@/components/EstoqueChart';
 
 export default function Estoque() {
   const [epis, setEpis] = useState<EPI[]>([]);
