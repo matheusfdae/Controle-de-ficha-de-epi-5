@@ -14,6 +14,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
+import EstoqueChart from '@/components/EstoqueChart';
 
 export default function Estoque() {
   const [epis, setEpis] = useState<EPI[]>([]);
@@ -116,6 +117,8 @@ export default function Estoque() {
             </DialogContent>
           </Dialog>
         </div>
+
+        <EstoqueChart />
 
         <Input placeholder="Buscar EPI..." value={search} onChange={e => setSearch(e.target.value)} className="max-w-sm" />
 

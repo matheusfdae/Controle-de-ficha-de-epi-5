@@ -126,3 +126,42 @@ export async function removeFuncaoEpi(id: string) {
   const { error } = await supabase.from('funcao_epis').delete().eq('id', id);
   if (error) throw error;
 }
+
+// ===== Movimentações de estoque (gráfico) =====
+export interface MovimentacaoDia {
+  data: string; // YYYY-MM-DD
+  entradas: number;
+  saidas: number;
+}
+
+export async function listMovimentacoes(diasAtras: number): Promise<MovimentacaoDia[]> {
+  const desde = new Date();
+  desde.setDate(desde.getDate() - diasAtras);
+  desde.setHours(0, 0, 0, 0);
+
+  const { data, error } = await supabase
+    .from('movimentacoes_estoque')
+    .select('tipo_mov, quantidade, data_mov')
+    .gte('data_mov', desde.toISOString())
+    .order('data_mov', { ascending: true });
+  if (error) { console.error(error); return []; }
+
+  const map = new Map<string, MovimentacaoDia>();
+  // pré-popula com zeros para todos os dias do período
+  for (let i = 0; i <= diasAtras; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - (diasAtras - i));
+    const k = d.toISOString().split('T')[0];
+    map.set(k, { data: k, entradas: 0, saidas: 0 });
+  }
+
+  (data || []).forEach((m: any) => {
+    const k = (m.data_mov as string).split('T')[0];
+    const cur = map.get(k) || { data: k, entradas: 0, saidas: 0 };
+    if (m.tipo_mov === 'entrada') cur.entradas += m.quantidade || 0;
+    else if (m.tipo_mov === 'saida') cur.saidas += m.quantidade || 0;
+    map.set(k, cur);
+  });
+
+  return Array.from(map.values()).sort((a, b) => a.data.localeCompare(b.data));
+}

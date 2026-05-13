@@ -123,7 +123,7 @@ export default function FichaOficialView({ ficha, signMode }: Props) {
           <div className="w-full border-t border-black mt-1 pt-1 text-center text-[10px] font-bold">
             NOME COMPLETO (FUNCIONÁRIO)
           </div>
-          <div className="text-[10px]">{ficha.nomeFuncionario}</div>
+          <div className="text-[10px]">{ficha.nomeFuncionario || <span className="text-muted-foreground italic">Nome do colaborador</span>}</div>
         </div>
         <div className="w-1/2 p-3 flex flex-col items-center justify-end" style={{ minHeight: 80 }}>
           {ficha.assinaturaResponsavel ? (
