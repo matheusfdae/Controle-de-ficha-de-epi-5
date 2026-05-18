@@ -117,13 +117,11 @@ export default function FichaOficialView({ ficha, signMode }: Props) {
       {/* Assinaturas (linhas) */}
       <div className="flex border-b border-black">
         <div className="w-1/2 border-r border-black p-3 flex flex-col items-center justify-end" style={{ minHeight: 80 }}>
-          {ficha.assinaturaColaborador ? (
-            <img src={ficha.assinaturaColaborador} alt="Assinatura funcionário" className="max-h-14 object-contain" />
-          ) : <div className="flex-1" />}
+          <div className="flex-1" />
           <div className="w-full border-t border-black mt-1 pt-1 text-center text-[10px] font-bold">
             NOME COMPLETO (FUNCIONÁRIO)
           </div>
-          <div className="text-[10px]">{ficha.nomeFuncionario || <span className="text-muted-foreground italic">Nome do colaborador</span>}</div>
+          <div className="text-[10px] uppercase">{ficha.nomeFuncionario || <span className="text-muted-foreground italic">Nome do colaborador</span>}</div>
         </div>
         <div className="w-1/2 p-3 flex flex-col items-center justify-end" style={{ minHeight: 80 }}>
           {ficha.assinaturaResponsavel ? (
