@@ -11,6 +11,8 @@ import {
 } from 'recharts';
 import { EPIFicha, EPIItem } from '@/types/epi';
 import { getFichas, seedDemoData } from '@/services/fichaService';
+import { getConfig } from '@/services/configService';
+import { getItemValidade } from '@/lib/validade';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface VencimentoItem {
