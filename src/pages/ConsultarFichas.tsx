@@ -130,6 +130,38 @@ export default function ConsultarFichas() {
                         <MessageCircle className="h-4 w-4 text-success" />
                       </Button>
                     )}
+                    {isAdmin && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" title="Excluir ficha">
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir ficha?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta ação não pode ser desfeita. A ficha de <strong>{ficha.nomeFuncionario}</strong> e seus itens serão removidos permanentemente. O estoque dos itens será devolvido automaticamente.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={async () => {
+                                try {
+                                  await deleteFicha(ficha.id);
+                                  toast.success('Ficha excluída com sucesso!');
+                                  reload();
+                                } catch (e: any) {
+                                  toast.error(e.message || 'Erro ao excluir ficha');
+                                }
+                              }}
+                            >Excluir</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </div>
                 </CardContent>
               </Card>
