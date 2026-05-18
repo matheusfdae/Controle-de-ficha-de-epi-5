@@ -6,11 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
-import { ShieldAlert, ShieldCheck, UserPlus, Pencil, Lock } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { ShieldAlert, ShieldCheck, UserPlus, Pencil, Lock, Eye, EyeOff, Trash2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Row {
@@ -18,6 +23,20 @@ interface Row {
   email: string;
   nome: string;
   role: UserRole;
+  ativo: boolean;
+}
+
+const LOGIN_DOMAIN = 'sistema.local';
+
+// "João da Silva" → "joao.silva"
+function gerarLoginDeNome(nome: string): string {
+  const limpo = nome
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z\s]/g, '').trim();
+  const partes = limpo.split(/\s+/).filter(p => p.length > 1 && !['da', 'de', 'do', 'das', 'dos', 'e'].includes(p));
+  if (partes.length === 0) return '';
+  if (partes.length === 1) return partes[0];
+  return `${partes[0]}.${partes[partes.length - 1]}`;
 }
 
 export default function Usuarios() {
@@ -26,14 +45,15 @@ export default function Usuarios() {
   const [loading, setLoading] = useState(true);
 
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ email: '', nome: '', password: '', role: 'colaborador' as UserRole });
+  const [form, setForm] = useState({ nome: '', email: '', emailEditado: false, password: '', isAdmin: false });
+  const [showPwd, setShowPwd] = useState(false);
 
   const [editing, setEditing] = useState<Row | null>(null);
-  const [editForm, setEditForm] = useState({ nome: '', role: 'colaborador' as UserRole });
+  const [editForm, setEditForm] = useState({ nome: '', role: 'colaborador' as UserRole, isAdmin: false });
 
   const load = async () => {
     setLoading(true);
-    const { data: profiles } = await supabase.from('profiles').select('id, email, nome_completo');
+    const { data: profiles } = await supabase.from('profiles').select('id, email, nome_completo, ativo');
     const { data: roles } = await supabase.from('user_roles').select('user_id, role');
     const rows: Row[] = (profiles || []).map((p: any) => {
       const userRoles = (roles || []).filter((r: any) => r.user_id === p.id).map((r: any) => r.role);
@@ -42,13 +62,20 @@ export default function Usuarios() {
         : userRoles.includes('rh') ? 'rh'
         : userRoles.includes('supervisor') ? 'supervisor'
         : 'colaborador';
-      return { id: p.id, email: p.email, nome: p.nome_completo || p.email, role };
+      return { id: p.id, email: p.email, nome: p.nome_completo || p.email, role, ativo: p.ativo !== false };
     });
     setUsers(rows);
     setLoading(false);
   };
 
   useEffect(() => { if (isAdmin) load(); }, [isAdmin]);
+
+  // Auto-preenche email quando digita o nome (até o usuário editar manualmente)
+  useEffect(() => {
+    if (form.emailEditado) return;
+    const login = gerarLoginDeNome(form.nome);
+    setForm(f => ({ ...f, email: login ? `${login}@${LOGIN_DOMAIN}` : '' }));
+  }, [form.nome, form.emailEditado]);
 
   if (!isAdmin) {
     return (
@@ -64,8 +91,16 @@ export default function Usuarios() {
     );
   }
 
+  const gerarSenha = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    let s = '';
+    for (let i = 0; i < 10; i++) s += chars[Math.floor(Math.random() * chars.length)];
+    setForm(f => ({ ...f, password: s }));
+    setShowPwd(true);
+  };
+
   const handleAdd = async () => {
-    if (!form.email.trim() || !form.password.trim() || !form.nome.trim()) {
+    if (!form.nome.trim() || !form.email.trim() || !form.password.trim()) {
       toast.error('Preencha todos os campos');
       return;
     }
@@ -86,33 +121,46 @@ export default function Usuarios() {
       return;
     }
     const newId = data.user?.id;
-    if (newId && form.role !== 'colaborador') {
-      // trigger já adicionou colaborador. Adiciona o role escolhido.
-      await supabase.from('user_roles').insert({ user_id: newId, role: form.role as any });
+    if (newId && form.isAdmin) {
+      await supabase.from('user_roles').insert({ user_id: newId, role: 'admin' as any });
     }
-    toast.success('Usuário criado!');
-    setForm({ email: '', nome: '', password: '', role: 'colaborador' });
+    toast.success(`Usuário criado com sucesso! Login: ${form.email}`);
+    setForm({ nome: '', email: '', emailEditado: false, password: '', isAdmin: false });
+    setShowPwd(false);
     setOpen(false);
     setTimeout(load, 500);
   };
 
   const startEdit = (row: Row) => {
     setEditing(row);
-    setEditForm({ nome: row.nome, role: row.role });
+    setEditForm({ nome: row.nome, role: row.role, isAdmin: row.role === 'admin' });
   };
 
   const saveEdit = async () => {
     if (!editing) return;
     await supabase.from('profiles').update({ nome_completo: editForm.nome }).eq('id', editing.id);
-    if (editForm.role !== editing.role) {
-      // remove o antigo, adiciona o novo (mantém colaborador como base)
-      await supabase.from('user_roles').delete().eq('user_id', editing.id).eq('role', editing.role as any);
-      if (editForm.role !== 'colaborador') {
-        await supabase.from('user_roles').insert({ user_id: editing.id, role: editForm.role as any });
+    const novoRole: UserRole = editForm.isAdmin ? 'admin' : (editForm.role === 'admin' ? 'colaborador' : editForm.role);
+    if (novoRole !== editing.role) {
+      if (editing.role !== 'colaborador') {
+        await supabase.from('user_roles').delete().eq('user_id', editing.id).eq('role', editing.role as any);
+      }
+      if (novoRole !== 'colaborador') {
+        await supabase.from('user_roles').insert({ user_id: editing.id, role: novoRole as any });
       }
     }
     toast.success('Usuário atualizado!');
     setEditing(null);
+    load();
+  };
+
+  const handleDelete = async (row: Row) => {
+    // Soft delete: inativa o profile (não temos service_role no client para excluir auth.users)
+    const { error } = await supabase
+      .from('profiles')
+      .update({ ativo: false, inativado_em: new Date().toISOString() })
+      .eq('id', row.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Usuário inativado com sucesso!');
     load();
   };
 
@@ -129,39 +177,65 @@ export default function Usuarios() {
               Administre quem pode acessar e modificar o sistema.
             </p>
           </div>
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setShowPwd(false); setForm({ nome: '', email: '', emailEditado: false, password: '', isAdmin: false }); } }}>
             <DialogTrigger asChild>
               <Button><UserPlus className="h-4 w-4 mr-2" /> Novo Usuário</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Novo Usuário</DialogTitle>
-                <DialogDescription>Crie credenciais para um novo membro da equipe.</DialogDescription>
+                <DialogDescription>O login é gerado automaticamente a partir do nome.</DialogDescription>
               </DialogHeader>
               <div className="space-y-3">
                 <div>
                   <Label>Nome completo</Label>
-                  <Input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} />
+                  <Input
+                    value={form.nome}
+                    onChange={e => setForm({ ...form, nome: e.target.value })}
+                    placeholder="Ex: João da Silva"
+                  />
                 </div>
                 <div>
-                  <Label>E-mail (login)</Label>
-                  <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="usuario@empresa.com" />
+                  <Label>Login (e-mail)</Label>
+                  <Input
+                    type="email"
+                    value={form.email}
+                    onChange={e => setForm({ ...form, email: e.target.value, emailEditado: true })}
+                    placeholder="joao.silva@sistema.local"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Gerado automaticamente como nome.sobrenome — edite se quiser.</p>
                 </div>
                 <div>
                   <Label>Senha</Label>
-                  <Input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Mínimo 6 caracteres" />
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type={showPwd ? 'text' : 'password'}
+                        value={form.password}
+                        onChange={e => setForm({ ...form, password: e.target.value })}
+                        placeholder="Mínimo 6 caracteres"
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPwd(s => !s)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        tabIndex={-1}
+                      >
+                        {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    <Button type="button" variant="outline" size="icon" onClick={gerarSenha} title="Gerar senha">
+                      <RefreshCw className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div>
-                  <Label>Perfil</Label>
-                  <Select value={form.role} onValueChange={(v: UserRole) => setForm({ ...form, role: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="admin">Administrador</SelectItem>
-                      <SelectItem value="rh">RH</SelectItem>
-                      <SelectItem value="supervisor">Supervisor</SelectItem>
-                      <SelectItem value="colaborador">Colaborador</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                  <div>
+                    <Label className="cursor-pointer">Administrador</Label>
+                    <p className="text-xs text-muted-foreground">Acesso total ao sistema</p>
+                  </div>
+                  <Switch checked={form.isAdmin} onCheckedChange={(c) => setForm({ ...form, isAdmin: c })} />
                 </div>
               </div>
               <DialogFooter>
@@ -176,7 +250,7 @@ export default function Usuarios() {
           <CardHeader>
             <CardTitle className="text-base">Usuários cadastrados</CardTitle>
             <CardDescription>
-              Gerencie nome e perfil dos usuários do sistema.
+              Gerencie nome, perfil e acesso dos usuários do sistema.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -185,7 +259,7 @@ export default function Usuarios() {
               <p className="text-sm text-muted-foreground">Nenhum usuário encontrado.</p>
             )}
             {users.map(u => (
-              <div key={u.id} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/30 transition">
+              <div key={u.id} className={`flex items-center gap-3 p-3 rounded-lg border transition ${!u.ativo ? 'opacity-50' : 'hover:bg-muted/30'}`}>
                 <div className={`p-2 rounded-lg ${u.role === 'admin' ? 'bg-primary/10' : 'bg-muted'}`}>
                   {u.role === 'admin'
                     ? <ShieldCheck className="h-4 w-4 text-primary" />
@@ -194,15 +268,40 @@ export default function Usuarios() {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm text-foreground truncate">
                     {u.nome} {u.id === user?.id && <span className="text-xs text-muted-foreground">(você)</span>}
+                    {!u.ativo && <span className="text-xs text-destructive ml-1">(inativo)</span>}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">{u.email}</p>
                 </div>
                 <Badge variant={u.role === 'admin' ? 'default' : 'secondary'}>
                   {roleLabel(u.role)}
                 </Badge>
-                <Button variant="ghost" size="icon" onClick={() => startEdit(u)}>
+                <Button variant="ghost" size="icon" onClick={() => startEdit(u)} title="Editar">
                   <Pencil className="h-4 w-4" />
                 </Button>
+                {u.id !== user?.id && u.ativo && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" title="Excluir usuário">
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          O usuário <strong>{u.nome}</strong> será inativado e perderá o acesso ao sistema. Esta ação pode ser revertida pelo suporte.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={() => handleDelete(u)}
+                        >Excluir</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
               </div>
             ))}
           </CardContent>
@@ -219,16 +318,29 @@ export default function Usuarios() {
                 <Input value={editForm.nome} onChange={e => setEditForm({ ...editForm, nome: e.target.value })} />
               </div>
               <div>
-                <Label>Perfil</Label>
-                <Select value={editForm.role} onValueChange={(v: UserRole) => setEditForm({ ...editForm, role: v })}>
+                <Label>Perfil base</Label>
+                <Select
+                  value={editForm.isAdmin ? 'admin' : editForm.role === 'admin' ? 'colaborador' : editForm.role}
+                  onValueChange={(v: UserRole) => setEditForm({ ...editForm, role: v, isAdmin: v === 'admin' })}
+                  disabled={editForm.isAdmin}
+                >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Administrador</SelectItem>
                     <SelectItem value="rh">RH</SelectItem>
                     <SelectItem value="supervisor">Supervisor</SelectItem>
                     <SelectItem value="colaborador">Colaborador</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                <div>
+                  <Label className="cursor-pointer">Administrador</Label>
+                  <p className="text-xs text-muted-foreground">Acesso total ao sistema</p>
+                </div>
+                <Switch
+                  checked={editForm.isAdmin}
+                  onCheckedChange={(c) => setEditForm({ ...editForm, isAdmin: c })}
+                />
               </div>
             </div>
             <DialogFooter>
