@@ -3,13 +3,17 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Eye, Download, ClipboardList, MessageCircle, Upload, FileSpreadsheet } from 'lucide-react';
+import { Eye, Download, ClipboardList, MessageCircle, Upload, FileSpreadsheet, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { EPIFicha } from '@/types/epi';
-import { getFichas } from '@/services/fichaService';
+import { getFichas, deleteFicha } from '@/services/fichaService';
 import { generatePDF } from '@/services/pdfService';
 import { useAuth } from '@/contexts/AuthContext';
 import { importFichasFromExcel, downloadTemplateExcel } from '@/services/importFichasService';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 export default function ConsultarFichas() {
   const { isAdmin } = useAuth();
