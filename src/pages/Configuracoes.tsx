@@ -313,7 +313,7 @@ export default function Configuracoes() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="max-w-xs">
-                  <Label>Dias de antecedência</Label>
+                  <Label>Dias de antecedência para alerta</Label>
                   <Input
                     type="number"
                     min={1}
@@ -321,6 +321,22 @@ export default function Configuracoes() {
                     value={config.diasAlertaVencimento}
                     onChange={e => update('diasAlertaVencimento', parseInt(e.target.value) || 30)}
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Quantos dias antes do vencimento o EPI deve ser sinalizado.
+                  </p>
+                </div>
+                <div className="max-w-xs">
+                  <Label>Validade do EPI (em dias)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={3650}
+                    value={config.diasValidadeEpi}
+                    onChange={e => update('diasValidadeEpi', parseInt(e.target.value) || 180)}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Quantos dias após a assinatura da ficha o EPI será considerado vencido. Ex.: 180 = 6 meses.
+                  </p>
                 </div>
                 <div className="flex justify-end">
                   <Button onClick={handleSave}><Save className="h-4 w-4 mr-2" /> Salvar</Button>

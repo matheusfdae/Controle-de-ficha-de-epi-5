@@ -271,16 +271,13 @@ export default function NovaFicha() {
             </div>
             <div>
               <Label htmlFor="empresa">Empresa</Label>
-              {empresas.length > 0 ? (
-                <Select value={form.empresa} onValueChange={v => updateField('empresa', v)}>
-                  <SelectTrigger><SelectValue placeholder="Selecione a empresa" /></SelectTrigger>
-                  <SelectContent>
-                    {empresas.map(e => <SelectItem key={e.id} value={e.nome}>{e.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input id="empresa" value={form.empresa} onChange={e => updateField('empresa', e.target.value)} placeholder="Nome da empresa" />
-              )}
+              <Select value={form.empresa} onValueChange={v => updateField('empresa', v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione a empresa" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MATRIZ">MATRIZ</SelectItem>
+                  <SelectItem value="APOIO">APOIO</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label htmlFor="data">Data de Entrega *</Label>
@@ -334,14 +331,8 @@ export default function NovaFicha() {
                     value={item.postoServico}
                     onChange={e => updateItem(item.id, 'postoServico', e.target.value)}
                   />
-                  <div>
-                    <Input
-                      type="date"
-                      value={item.dataValidade || ''}
-                      onChange={e => updateItem(item.id, 'dataValidade', e.target.value)}
-                      title="Data de validade"
-                    />
-                    <p className="text-xs text-muted-foreground mt-0.5">Validade</p>
+                  <div className="rounded-md border border-dashed bg-background px-3 py-2 text-xs text-muted-foreground flex items-center">
+                    Validade: calculada a partir da assinatura (+{config.diasValidadeEpi} dias)
                   </div>
                 </div>
                 <Button variant="ghost" size="icon" onClick={() => removeItem(item.id)} className="text-destructive shrink-0">

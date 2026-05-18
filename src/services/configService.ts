@@ -10,6 +10,7 @@ export interface AppConfig {
   logoDataUrl: string; // base64 image
   assinaturaEmpresa: string; // base64 PNG da assinatura padrão
   diasAlertaVencimento: number;
+  diasValidadeEpi: number;
 }
 
 const DEFAULTS: AppConfig = {
@@ -22,6 +23,7 @@ const DEFAULTS: AppConfig = {
   logoDataUrl: '',
   assinaturaEmpresa: '',
   diasAlertaVencimento: 30,
+  diasValidadeEpi: 180,
 };
 
 export function getConfig(): AppConfig {
