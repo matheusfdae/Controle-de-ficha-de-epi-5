@@ -43,13 +43,15 @@ export default function Dashboard() {
   const colaboradoresUnicos = new Set(fichas.map(f => f.nomeFuncionario)).size;
 
   const hoje = new Date();
+  const cfg = getConfig();
   const vencimentos: VencimentoItem[] = [];
   fichas.forEach(ficha => {
     ficha.itens.forEach(item => {
-      if (item.dataValidade) {
-        const validade = new Date(item.dataValidade);
+      const validadeStr = getItemValidade(item, ficha, cfg.diasValidadeEpi);
+      if (validadeStr) {
+        const validade = new Date(validadeStr);
         const diff = Math.ceil((validade.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
-        vencimentos.push({ fichaId: ficha.id, nomeFuncionario: ficha.nomeFuncionario, item, diasRestantes: diff });
+        vencimentos.push({ fichaId: ficha.id, nomeFuncionario: ficha.nomeFuncionario, item: { ...item, dataValidade: validadeStr }, diasRestantes: diff });
       }
     });
   });

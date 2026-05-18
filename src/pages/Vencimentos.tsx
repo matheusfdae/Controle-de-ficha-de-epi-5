@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, AlertTriangle, Clock, CheckCircle2 } from 'lucide-react';
 import { EPIFicha, EPIItem } from '@/types/epi';
 import { getFichas } from '@/services/fichaService';
+import { getConfig } from '@/services/configService';
+import { getItemValidade } from '@/lib/validade';
 
 interface VencimentoItem {
   fichaId: string;
@@ -23,17 +25,19 @@ export default function Vencimentos() {
   }, []);
 
   const hoje = new Date();
+  const cfg = getConfig();
   const vencimentos: VencimentoItem[] = [];
 
   fichas.forEach(ficha => {
     ficha.itens.forEach(item => {
-      if (item.dataValidade) {
-        const validade = new Date(item.dataValidade);
+      const validadeStr = getItemValidade(item, ficha, cfg.diasValidadeEpi);
+      if (validadeStr) {
+        const validade = new Date(validadeStr);
         const diff = Math.ceil((validade.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
         vencimentos.push({
           fichaId: ficha.id,
           nomeFuncionario: ficha.nomeFuncionario,
-          item,
+          item: { ...item, dataValidade: validadeStr },
           diasRestantes: diff,
         });
       }
