@@ -84,6 +84,33 @@ export async function deleteTamanho(id: string) {
   if (error) throw error;
 }
 
+/** Zera o estoque de todos os tamanhos do EPI e registra movimentação. */
+export async function resetarEstoqueEpi(epiId: string) {
+  const { data: tams } = await supabase.from('epi_tamanhos').select('*').eq('epi_id', epiId);
+  const total = (tams || []).reduce((s: number, t: any) => s + (t.estoque || 0), 0);
+  if (tams && tams.length) {
+    await supabase.from('epi_tamanhos').update({ estoque: 0 }).eq('epi_id', epiId);
+  }
+  await supabase.from('epis').update({ estoque_atual: 0 }).eq('id', epiId);
+  if (total > 0) {
+    await supabase.from('movimentacoes_estoque').insert({
+      tipo_item: 'epi', item_id: epiId, tipo_mov: 'saida', quantidade: total, motivo: 'Reset de estoque',
+    });
+  }
+}
+
+/** Ajusta o estoque de um tamanho específico e registra movimentação. */
+export async function ajustarEstoqueTamanho(t: EPITamanho, novoEstoque: number) {
+  const delta = novoEstoque - (t.estoque || 0);
+  await supabase.from('epi_tamanhos').update({ estoque: novoEstoque }).eq('id', t.id);
+  if (delta !== 0) {
+    await supabase.from('movimentacoes_estoque').insert({
+      tipo_item: 'epi', item_id: t.epi_id, tipo_mov: delta > 0 ? 'entrada' : 'saida',
+      quantidade: Math.abs(delta), motivo: `Ajuste manual (${t.tamanho})`,
+    });
+  }
+}
+
 // Funções
 export async function listFuncoes(): Promise<Funcao[]> {
   const { data, error } = await supabase.from('funcoes').select('*').order('nome');
