@@ -15,7 +15,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ShieldAlert, ShieldCheck, UserPlus, Pencil, Lock, Eye, EyeOff, Trash2, RefreshCw } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, UserPlus, Pencil, Lock, Eye, EyeOff, Trash2, RefreshCw, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Row {
