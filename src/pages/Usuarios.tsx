@@ -15,7 +15,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ShieldAlert, ShieldCheck, UserPlus, Pencil, Lock, Eye, EyeOff, Trash2, RefreshCw } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, UserPlus, Pencil, Lock, Eye, EyeOff, Trash2, RefreshCw, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Row {
@@ -164,6 +164,14 @@ export default function Usuarios() {
     load();
   };
 
+  const handleResetPassword = async (row: Row) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(row.email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Link de redefinição enviado para ${row.email}`);
+  };
+
   const roleLabel = (r: UserRole) =>
     r === 'admin' ? 'Administrador' : r === 'rh' ? 'RH' : r === 'supervisor' ? 'Supervisor' : 'Colaborador';
 
@@ -278,6 +286,27 @@ export default function Usuarios() {
                 <Button variant="ghost" size="icon" onClick={() => startEdit(u)} title="Editar">
                   <Pencil className="h-4 w-4" />
                 </Button>
+                {u.ativo && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" title="Redefinir senha">
+                        <KeyRound className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Redefinir senha?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Será enviado um link de redefinição de senha para <strong>{u.email}</strong>.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleResetPassword(u)}>Enviar link</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
                 {u.id !== user?.id && u.ativo && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
