@@ -164,6 +164,14 @@ export default function Usuarios() {
     load();
   };
 
+  const handleResetPassword = async (row: Row) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(row.email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Link de redefinição enviado para ${row.email}`);
+  };
+
   const roleLabel = (r: UserRole) =>
     r === 'admin' ? 'Administrador' : r === 'rh' ? 'RH' : r === 'supervisor' ? 'Supervisor' : 'Colaborador';
 
