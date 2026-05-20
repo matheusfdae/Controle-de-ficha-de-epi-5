@@ -286,6 +286,27 @@ export default function Usuarios() {
                 <Button variant="ghost" size="icon" onClick={() => startEdit(u)} title="Editar">
                   <Pencil className="h-4 w-4" />
                 </Button>
+                {u.ativo && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" title="Redefinir senha">
+                        <KeyRound className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Redefinir senha?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Será enviado um link de redefinição de senha para <strong>{u.email}</strong>.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleResetPassword(u)}>Enviar link</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
                 {u.id !== user?.id && u.ativo && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
