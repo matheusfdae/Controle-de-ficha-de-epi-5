@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -5,28 +6,43 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
-import Login from "./pages/Login";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import Dashboard from "./pages/Dashboard";
-import NovaFicha from "./pages/NovaFicha";
-import ConsultarFichas from "./pages/ConsultarFichas";
-import VisualizarFicha from "./pages/VisualizarFicha";
-import AssinarFicha from "./pages/AssinarFicha";
-import AssinaturasPendentes from "./pages/AssinaturasPendentes";
-import Vencimentos from "./pages/Vencimentos";
-import Configuracoes from "./pages/Configuracoes";
-import Usuarios from "./pages/Usuarios";
-import Estoque from "./pages/Estoque";
-import Funcoes from "./pages/Funcoes";
-import Integracao from "./pages/Integracao";
-import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+// Páginas carregadas sob demanda (code splitting)
+const Login               = lazy(() => import('./pages/Login'));
+const ForgotPassword      = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword       = lazy(() => import('./pages/ResetPassword'));
+const Dashboard           = lazy(() => import('./pages/Dashboard'));
+const NovaFicha           = lazy(() => import('./pages/NovaFicha'));
+const ConsultarFichas     = lazy(() => import('./pages/ConsultarFichas'));
+const VisualizarFicha     = lazy(() => import('./pages/VisualizarFicha'));
+const AssinarFicha        = lazy(() => import('./pages/AssinarFicha'));
+const AssinaturasPendentes = lazy(() => import('./pages/AssinaturasPendentes'));
+const Vencimentos         = lazy(() => import('./pages/Vencimentos'));
+const Configuracoes       = lazy(() => import('./pages/Configuracoes'));
+const Usuarios            = lazy(() => import('./pages/Usuarios'));
+const Estoque             = lazy(() => import('./pages/Estoque'));
+const Funcoes             = lazy(() => import('./pages/Funcoes'));
+const Integracao          = lazy(() => import('./pages/Integracao'));
+const NotFound            = lazy(() => import('./pages/NotFound'));
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000, // 1 min — evita refetches desnecessários ao alternar abas
+      retry: 1,
+    },
+  },
+});
+
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">
+    Carregando…
+  </div>
+);
 
 function ProtectedLayout() {
   const { isAuthenticated, loading } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">Carregando…</div>;
+  if (loading) return <PageLoader />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <AppLayout />;
 }
@@ -39,26 +55,28 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 
 function AppRoutes() {
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/assinar/:id" element={<AssinarFicha />} />
-      <Route element={<ProtectedLayout />}>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/nova-ficha" element={<AdminRoute><NovaFicha /></AdminRoute>} />
-        <Route path="/consultar" element={<ConsultarFichas />} />
-        <Route path="/ficha/:id" element={<VisualizarFicha />} />
-        <Route path="/vencimentos" element={<Vencimentos />} />
-        <Route path="/pendentes" element={<AssinaturasPendentes />} />
-        <Route path="/configuracoes" element={<AdminRoute><Configuracoes /></AdminRoute>} />
-        <Route path="/usuarios" element={<AdminRoute><Usuarios /></AdminRoute>} />
-        <Route path="/estoque" element={<AdminRoute><Estoque /></AdminRoute>} />
-        <Route path="/funcoes" element={<AdminRoute><Funcoes /></AdminRoute>} />
-        <Route path="/integracao" element={<AdminRoute><Integracao /></AdminRoute>} />
-      </Route>
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        <Route path="/login"           element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password"  element={<ResetPassword />} />
+        <Route path="/assinar/:id"     element={<AssinarFicha />} />
+        <Route element={<ProtectedLayout />}>
+          <Route path="/"             element={<Dashboard />} />
+          <Route path="/nova-ficha"   element={<AdminRoute><NovaFicha /></AdminRoute>} />
+          <Route path="/consultar"    element={<ConsultarFichas />} />
+          <Route path="/ficha/:id"    element={<VisualizarFicha />} />
+          <Route path="/vencimentos"  element={<Vencimentos />} />
+          <Route path="/pendentes"    element={<AssinaturasPendentes />} />
+          <Route path="/configuracoes" element={<AdminRoute><Configuracoes /></AdminRoute>} />
+          <Route path="/usuarios"     element={<AdminRoute><Usuarios /></AdminRoute>} />
+          <Route path="/estoque"      element={<AdminRoute><Estoque /></AdminRoute>} />
+          <Route path="/funcoes"      element={<AdminRoute><Funcoes /></AdminRoute>} />
+          <Route path="/integracao"   element={<AdminRoute><Integracao /></AdminRoute>} />
+        </Route>
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
   );
 }
 

@@ -1,43 +1,62 @@
-import { EPIFicha, EPIItem } from '@/types/epi';
+import { EPIFicha, EPIItem, MotivoEntrega, Turno } from '@/types/epi';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
+
+type FichaRow = Database['public']['Tables']['fichas_epi']['Row'];
+type ItemRow  = Database['public']['Tables']['fichas_epi_itens']['Row'];
+type FichaInsert = Database['public']['Tables']['fichas_epi']['Insert'];
+type ItemInsert  = Database['public']['Tables']['fichas_epi_itens']['Insert'];
+
+// ===== Validação de enums do domínio =====
+
+const VALID_MOTIVOS: MotivoEntrega[] = ['admissao', 'substituicao', 'perda_extravio', 'demissao', 'complemento'];
+const VALID_TURNOS: Turno[] = ['diurno', 'noturno'];
+
+function toMotivo(raw: string | null): MotivoEntrega {
+  return VALID_MOTIVOS.includes(raw as MotivoEntrega) ? (raw as MotivoEntrega) : 'admissao';
+}
+
+function toTurno(raw: string | null): Turno {
+  return VALID_TURNOS.includes(raw as Turno) ? (raw as Turno) : 'diurno';
+}
 
 // ===== Mapeamento DB <-> domínio =====
 
-function mapItemFromDB(row: any): EPIItem {
+function mapItemFromDB(row: ItemRow): EPIItem {
   return {
     id: row.id,
-    descricao: row.descricao || '',
-    ca: row.ca || '',
-    quantidade: row.quantidade || 1,
-    tamanho: row.tamanho || '',
-    dataEntrega: row.created_at?.split('T')[0] || '',
-    postoServico: row.posto_servico || '',
-    recebido: !!row.recebido,
-    dataValidade: row.data_validade || undefined,
-    epiId: row.epi_id || undefined,
+    descricao: row.descricao ?? '',
+    ca: row.ca ?? '',
+    quantidade: row.quantidade ?? 1,
+    tamanho: row.tamanho ?? '',
+    dataEntrega: row.created_at.split('T')[0],
+    postoServico: row.posto_servico ?? '',
+    recebido: row.recebido,
+    dataValidade: row.data_validade ?? undefined,
+    epiId: row.epi_id ?? undefined,
   };
 }
 
-function mapFichaFromDB(ficha: any, itens: any[]): EPIFicha {
+function mapFichaFromDB(ficha: FichaRow, itens: ItemRow[]): EPIFicha {
   return {
     id: ficha.id,
-    nomeFuncionario: ficha.nome_funcionario || '',
-    funcao: ficha.funcao || '',
-    telefone: ficha.telefone || '',
-    cpf: ficha.cpf_snapshot || '',
-    matricula: ficha.matricula_snapshot || '',
-    motivo: (ficha.motivo as any) || 'admissao',
-    turno: (ficha.turno as any) || 'diurno',
-    setor: ficha.setor_snapshot || '',
-    empresa: ficha.empresa || '',
+    nomeFuncionario: ficha.nome_funcionario ?? '',
+    funcao: ficha.funcao ?? '',
+    telefone: ficha.telefone ?? '',
+    cpf: ficha.cpf_snapshot ?? '',
+    matricula: ficha.matricula_snapshot ?? '',
+    motivo: toMotivo(ficha.motivo),
+    turno: toTurno(ficha.turno),
+    setor: ficha.setor_snapshot ?? '',
+    empresa: ficha.empresa ?? '',
     dataEntrega: ficha.data_entrega,
-    itens: (itens || []).map(mapItemFromDB),
-    assinaturaColaborador: ficha.assinatura_colaborador_url || undefined,
-    assinaturaResponsavel: ficha.assinatura_supervisor_url || undefined,
+    itens: itens.map(mapItemFromDB),
+    assinaturaColaborador: ficha.assinatura_colaborador_url ?? undefined,
+    assinaturaResponsavel: ficha.assinatura_supervisor_url ?? undefined,
     status: ficha.status === 'assinada' ? 'assinada' : 'pendente',
     criadoEm: ficha.created_at,
-    assinadoEm: ficha.data_assinatura_colaborador || undefined,
-    observacoes: ficha.observacoes || undefined,
+    assinadoEm: ficha.data_assinatura_colaborador ?? undefined,
+    observacoes: ficha.observacoes ?? undefined,
   };
 }
 
@@ -61,7 +80,7 @@ export async function getFichas(): Promise<EPIFicha[]> {
     .select('*')
     .in('ficha_id', ids);
 
-  return fichas.map(f => mapFichaFromDB(f, (itens || []).filter(i => i.ficha_id === f.id)));
+  return fichas.map(f => mapFichaFromDB(f, (itens ?? []).filter(i => i.ficha_id === f.id)));
 }
 
 export async function getFichaById(id: string): Promise<EPIFicha | undefined> {
@@ -72,18 +91,18 @@ export async function getFichaById(id: string): Promise<EPIFicha | undefined> {
   if (ficha) {
     const { data: itens } = await supabase
       .from('fichas_epi_itens').select('*').eq('ficha_id', id);
-    return mapFichaFromDB(ficha, itens || []);
+    return mapFichaFromDB(ficha, itens ?? []);
   }
 
   // Fallback público (RPC SECURITY DEFINER)
   const { data: pub } = await supabase.rpc('get_ficha_publica', { _ficha_id: id });
   if (!pub) return undefined;
-  const payload = pub as any;
-  return mapFichaFromDB(payload.ficha, payload.itens || []);
+  const payload = pub as { ficha: FichaRow; itens: ItemRow[] };
+  return mapFichaFromDB(payload.ficha, payload.itens ?? []);
 }
 
 export async function saveFicha(ficha: EPIFicha): Promise<void> {
-  const fichaPayload = {
+  const fichaPayload: FichaInsert = {
     id: ficha.id,
     nome_funcionario: ficha.nomeFuncionario,
     funcao: ficha.funcao,
@@ -95,38 +114,45 @@ export async function saveFicha(ficha: EPIFicha): Promise<void> {
     motivo: ficha.motivo,
     turno: ficha.turno,
     data_entrega: ficha.dataEntrega,
-    observacoes: ficha.observacoes,
+    observacoes: ficha.observacoes ?? null,
     status: ficha.status === 'assinada' ? 'assinada' : 'pendente_assinatura',
-    assinatura_colaborador_url: ficha.assinaturaColaborador,
-    assinatura_supervisor_url: ficha.assinaturaResponsavel,
+    assinatura_colaborador_url: ficha.assinaturaColaborador ?? null,
+    assinatura_supervisor_url: ficha.assinaturaResponsavel ?? null,
     data_assinatura_colaborador: ficha.assinaturaColaborador && ficha.status === 'assinada'
-      ? (ficha.assinadoEm || new Date().toISOString()) : null,
-  } as any;
+      ? (ficha.assinadoEm ?? new Date().toISOString()) : null,
+  };
 
-  const { error: upErr } = await supabase
-    .from('fichas_epi')
-    .upsert(fichaPayload);
+  const { error: upErr } = await supabase.from('fichas_epi').upsert(fichaPayload);
   if (upErr) { console.error(upErr); throw upErr; }
 
-  // Reescreve itens (delete + insert)
-  await supabase.from('fichas_epi_itens').delete().eq('ficha_id', ficha.id);
   if (ficha.itens?.length) {
-    const itensPayload = ficha.itens.map(i => ({
+    const itensPayload: ItemInsert[] = ficha.itens.map(i => ({
       id: i.id,
       ficha_id: ficha.id,
       descricao: i.descricao,
       ca: i.ca,
-      quantidade: i.quantidade || 1,
+      quantidade: i.quantidade ?? 1,
       tamanho: i.tamanho,
       posto_servico: i.postoServico,
-      data_validade: i.dataValidade || null,
-      epi_id: i.epiId || null,
-      recebido: !!i.recebido,
+      data_validade: i.dataValidade ?? null,
+      epi_id: i.epiId ?? null,
+      recebido: i.recebido,
       motivo_entrega: 'admissao' as const,
       estado: 'novo' as const,
     }));
-    const { error: itErr } = await supabase.from('fichas_epi_itens').insert(itensPayload);
+
+    // Upsert itens primeiro (dados preservados), depois remove os removidos
+    const { error: itErr } = await supabase.from('fichas_epi_itens').upsert(itensPayload);
     if (itErr) { console.error(itErr); throw itErr; }
+
+    const currentIds = ficha.itens.map(i => i.id);
+    await supabase
+      .from('fichas_epi_itens')
+      .delete()
+      .eq('ficha_id', ficha.id)
+      .not('id', 'in', `(${currentIds.join(',')})`);
+  } else {
+    await supabase.from('fichas_epi_itens').delete().eq('ficha_id', ficha.id);
   }
 }
 
@@ -144,7 +170,7 @@ export async function assinarFichaPublica(
   let ip: string | null = null;
   try {
     const r = await fetch('https://api.ipify.org?format=json');
-    if (r.ok) ip = (await r.json()).ip;
+    if (r.ok) ip = (await r.json() as { ip: string }).ip;
   } catch { /* ignore */ }
 
   const { data, error } = await supabase.rpc('assinar_ficha_publica', {
@@ -154,8 +180,8 @@ export async function assinarFichaPublica(
     _ip: ip,
   });
   if (error) return { ok: false, error: error.message };
-  const res = data as any;
-  if (!res?.ok) return { ok: false, error: res?.error || 'erro' };
+  const res = data as { ok: boolean; error?: string } | null;
+  if (!res?.ok) return { ok: false, error: res?.error ?? 'erro' };
   return { ok: true };
 }
 

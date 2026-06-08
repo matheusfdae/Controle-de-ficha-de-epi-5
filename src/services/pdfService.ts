@@ -1,313 +1,314 @@
 import jsPDF from 'jspdf';
 import { EPIFicha } from '@/types/epi';
-import { getConfig } from '@/services/configService';
+import { getConfig, AppConfig } from '@/services/configService';
 
-export function generatePDF(ficha: EPIFicha): void {
-  const config = getConfig();
-  const doc = new jsPDF('l', 'mm', 'a4'); // Landscape
-  const pageW = 297;
-  const pageH = 210;
-  const m = 8; // margin
-  const cw = pageW - m * 2; // content width
-  let y = m;
+// ===== Constantes de layout =====
 
-  const line = (x1: number, y1: number, x2: number, y2: number) => {
-    doc.setDrawColor(0);
-    doc.setLineWidth(0.3);
-    doc.line(x1, y1, x2, y2);
-  };
+const M = 8;           // margin
+const PAGE_W = 297;    // A4 landscape width  (mm)
+const PAGE_H = 210;    // A4 landscape height (mm)
+const CW = PAGE_W - M * 2; // content width
 
-  const rect = (x: number, yp: number, w: number, h: number, fill?: string) => {
-    if (fill) {
-      doc.setFillColor(fill === 'header' ? 180 : fill === 'light' ? 230 : 245, fill === 'header' ? 180 : fill === 'light' ? 235 : 245, fill === 'header' ? 180 : fill === 'light' ? 240 : 250);
-      doc.rect(x, yp, w, h, 'F');
-    }
-    doc.setDrawColor(0);
-    doc.setLineWidth(0.3);
-    doc.rect(x, yp, w, h);
-  };
+const MIN_TABLE_ROWS = 8;
+const DOC_TITLE = "TERMO DE RECEBIMENTO DE UNIFORME/EPI's - REV -00";
 
-  const text = (txt: string, x: number, yp: number, opts?: { bold?: boolean; size?: number; italic?: boolean; align?: 'center' | 'right' }) => {
-    doc.setFontSize(opts?.size || 7);
-    doc.setFont('helvetica', opts?.bold ? (opts?.italic ? 'bolditalic' : 'bold') : (opts?.italic ? 'italic' : 'normal'));
-    doc.setTextColor(0);
-    if (opts?.align) {
-      doc.text(txt, x, yp, { align: opts.align });
-    } else {
-      doc.text(txt, x, yp);
-    }
-  };
+type FillStyle = 'header' | 'light' | 'alt';
 
-  // ===== HEADER =====
-  // Logo area
-  rect(m, y, 40, 16);
+const FILL_COLORS: Record<FillStyle, [number, number, number]> = {
+  header: [180, 180, 180],
+  light:  [230, 235, 240],
+  alt:    [245, 245, 250],
+};
+
+// Larguras das 9 colunas da tabela (soma = CW = 281)
+const COL_W = [22, 14, 75, 18, 45, 42, 22, 16, 27] as const;
+const COL_H1 = ['DATA', 'QUANT.', 'DESCRIÇÃO', 'TAM. / Nº', 'POSTO DE SERVIÇO', 'ASSINATURA DO', '', 'DEVOLUÇÃO', ''];
+const COL_H2 = ['ENTREGA', '', '', '', '', 'FUNCIONÁRIO', 'DATA', 'QUANT', 'RECEBIDO POR'];
+
+// ===== Helpers de desenho =====
+
+interface TextOpts {
+  bold?: boolean;
+  italic?: boolean;
+  size?: number;
+  align?: 'center' | 'right';
+}
+
+function line(doc: jsPDF, x1: number, y1: number, x2: number, y2: number) {
+  doc.setDrawColor(0);
+  doc.setLineWidth(0.3);
+  doc.line(x1, y1, x2, y2);
+}
+
+function rect(doc: jsPDF, x: number, y: number, w: number, h: number, fill?: FillStyle) {
+  if (fill) {
+    const [r, g, b] = FILL_COLORS[fill];
+    doc.setFillColor(r, g, b);
+    doc.rect(x, y, w, h, 'F');
+  }
+  doc.setDrawColor(0);
+  doc.setLineWidth(0.3);
+  doc.rect(x, y, w, h);
+}
+
+function text(doc: jsPDF, txt: string, x: number, y: number, opts: TextOpts = {}) {
+  doc.setFontSize(opts.size ?? 7);
+  const style = opts.bold && opts.italic ? 'bolditalic'
+              : opts.bold               ? 'bold'
+              : opts.italic             ? 'italic'
+              : 'normal';
+  doc.setFont('helvetica', style);
+  doc.setTextColor(0);
+  opts.align ? doc.text(txt, x, y, { align: opts.align }) : doc.text(txt, x, y);
+}
+
+// ===== Seções do PDF =====
+
+function renderHeader(doc: jsPDF, y: number, config: AppConfig): number {
+  rect(doc, M, y, 40, 16);
   if (config.logoDataUrl) {
-    try { doc.addImage(config.logoDataUrl, 'PNG', m + 2, y + 2, 36, 12); } catch {}
+    try { doc.addImage(config.logoDataUrl, 'PNG', M + 2, y + 2, 36, 12); } catch {}
   } else {
     const parts = config.empresaNome.split(' ');
-    text(parts[0] || '', m + 20, y + 6, { bold: true, size: 8, align: 'center' });
-    text(parts.slice(1).join(' '), m + 20, y + 10, { bold: true, size: 7, align: 'center' });
-    text(config.empresaSubtitulo, m + 20, y + 13, { size: 4, align: 'center' });
+    text(doc, parts[0] ?? '', M + 20, y + 6,  { bold: true, size: 8, align: 'center' });
+    text(doc, parts.slice(1).join(' '), M + 20, y + 10, { bold: true, size: 7, align: 'center' });
+    text(doc, config.empresaSubtitulo, M + 20, y + 13, { size: 4, align: 'center' });
   }
 
-  // Title
-  rect(m + 40, y, cw - 40, 16);
-  text('TERMO DE RECEBIMENTO DE UNIFORME/EPI\'s - REV -00', m + 40 + (cw - 40) / 2, y + 9, { bold: true, size: 12, align: 'center' });
-  y += 16;
+  rect(doc, M + 40, y, CW - 40, 16);
+  text(doc, DOC_TITLE, M + 40 + (CW - 40) / 2, y + 9, { bold: true, size: 12, align: 'center' });
+  return y + 16;
+}
 
-  // ===== ROW: NOME DO FUNCIONÁRIO + MOTIVOS + TURNO =====
-  const row1H = 7;
-  rect(m, y, cw, row1H);
+function renderEmployeeRows(doc: jsPDF, y: number, ficha: EPIFicha): number {
+  const ROW_H = 7;
 
-  // Nome
-  text('NOME DO FUNCIONÁRIO:', m + 1, y + 4.5, { bold: true, size: 7 });
-  text(ficha.nomeFuncionario, m + 42, y + 4.5, { size: 8 });
+  // Linha 1: Nome + Motivos + Turno
+  rect(doc, M, y, CW, ROW_H);
+  text(doc, 'NOME DO FUNCIONÁRIO:', M + 1, y + 4.5, { bold: true, size: 7 });
+  text(doc, ficha.nomeFuncionario, M + 42, y + 4.5, { size: 8 });
 
-  // Motivo checkboxes
   const motivoItems = [
-    { key: 'admissao', label: 'ADMISSÃO' },
-    { key: 'substituicao', label: 'SUBSTITUIÇÃO' },
+    { key: 'admissao',       label: 'ADMISSÃO' },
+    { key: 'substituicao',   label: 'SUBSTITUIÇÃO' },
     { key: 'perda_extravio', label: 'PERDA/EXTRAVIO' },
-    { key: 'demissao', label: 'DEMISSÃO' },
-    { key: 'complemento', label: 'COMPLEMENTO' },
+    { key: 'demissao',       label: 'DEMISSÃO' },
+    { key: 'complemento',    label: 'COMPLEMENTO' },
   ];
-
-  let mx = m + cw * 0.48;
-  motivoItems.forEach(mi => {
-    const checked = ficha.motivo === mi.key;
-    // checkbox
+  let mx = M + CW * 0.48;
+  for (const mi of motivoItems) {
     doc.setDrawColor(0);
     doc.rect(mx, y + 1.5, 3, 3);
-    if (checked) {
-      text('X', mx + 0.6, y + 4, { bold: true, size: 7 });
-    }
-    text(mi.label, mx + 4, y + 4, { size: 6 });
+    if (ficha.motivo === mi.key) text(doc, 'X', mx + 0.6, y + 4, { bold: true, size: 7 });
+    text(doc, mi.label, mx + 4, y + 4, { size: 6 });
     mx += mi.label.length * 1.5 + 9;
-  });
+  }
 
-  // Turno
-  const turnoX = m + cw - 28;
-  line(turnoX - 1, y, turnoX - 1, y + row1H);
-  text(ficha.turno === 'diurno' ? '☒' : '☐', turnoX, y + 3.5, { size: 7 });
-  text('DIURNO', turnoX + 5, y + 3.5, { bold: true, size: 6 });
-  text(ficha.turno === 'noturno' ? '☒' : '☐', turnoX, y + 6.5, { size: 7 });
-  text('NOTURNO', turnoX + 5, y + 6.5, { bold: true, size: 6 });
+  const turnoX = M + CW - 28;
+  line(doc, turnoX - 1, y, turnoX - 1, y + ROW_H);
+  text(doc, ficha.turno === 'diurno' ? '☒' : '☐', turnoX,     y + 3.5, { size: 7 });
+  text(doc, 'DIURNO',                              turnoX + 5, y + 3.5, { bold: true, size: 6 });
+  text(doc, ficha.turno === 'noturno' ? '☒' : '☐', turnoX,    y + 6.5, { size: 7 });
+  text(doc, 'NOTURNO',                             turnoX + 5, y + 6.5, { bold: true, size: 6 });
+  y += ROW_H;
 
-  y += row1H;
+  // Linha 2: Função + Fone
+  rect(doc, M, y, CW, ROW_H);
+  text(doc, 'FUNÇÃO:', M + 1, y + 4.5, { bold: true, size: 7 });
+  text(doc, ficha.funcao, M + 20, y + 4.5, { size: 8 });
+  const foneX = M + CW * 0.4;
+  line(doc, foneX, y, foneX, y + ROW_H);
+  text(doc, 'FONE:', foneX + 2, y + 4.5, { bold: true, size: 7 });
+  text(doc, ficha.telefone, foneX + 15, y + 4.5, { size: 8 });
+  y += ROW_H;
 
-  // ===== ROW: FUNÇÃO + FONE =====
-  const row2H = 7;
-  rect(m, y, cw, row2H);
-  text('FUNÇÃO:', m + 1, y + 4.5, { bold: true, size: 7 });
-  text(ficha.funcao, m + 20, y + 4.5, { size: 8 });
+  return y;
+}
 
-  const foneX = m + cw * 0.4;
-  line(foneX, y, foneX, y + row2H);
-  text('FONE:', foneX + 2, y + 4.5, { bold: true, size: 7 });
-  text(ficha.telefone, foneX + 15, y + 4.5, { size: 8 });
-  y += row2H;
-
-  // ===== TERMO DE RESPONSABILIDADE HEADER =====
-  rect(m, y, cw, 6, 'header');
-  text('TERMO DE RESPONSABILIDADE', m + cw / 2, y + 4, { bold: true, size: 8, align: 'center' });
+function renderTermsSection(doc: jsPDF, y: number): number {
+  rect(doc, M, y, CW, 6, 'header');
+  text(doc, 'TERMO DE RESPONSABILIDADE', M + CW / 2, y + 4, { bold: true, size: 8, align: 'center' });
   y += 6;
 
-  // ===== TERMO TEXT (left) + BASE LEGAL (right) =====
-  const termoH = 52;
-  const splitX = m + cw * 0.52;
-  rect(m, y, cw, termoH);
-  line(splitX, y, splitX, y + termoH);
+  const TERMS_H = 52;
+  const splitX = M + CW * 0.52;
+  rect(doc, M, y, CW, TERMS_H);
+  line(doc, splitX, y, splitX, y + TERMS_H);
 
-  // Left: Termo text
+  // Coluna esquerda: texto do termo
+  const termoText = "Declaro que recebi gratuitamente nesta data os EPI'S (Equipamentos de Proteção Individual) e UNIFORMES discriminado(s) neste T.R (Termo de Responsabilidade), para uso obrigatório e sistemático no trabalho enquanto for colaborador desta empresa. Estou ciente ainda que a guarda e conservação destes equipamentos fiquem sob minha responsabilidade. Tenho conhecimento ainda do texto do Art. 158 Parágrafo Único, Lei 6.514, 22/12/77 que diz: \"Constitui o ato faltoso do empregado, a recusa injustificada ao uso dos EPI's fornecidos pela empresa\". Sendo assim me comprometo a comunicar imediatamente a empresa, quaisquer danos causados nestes equipamentos. Em caso de perda ou extravio ou inutilização proposital, comprometo-me a ressarcir a empresa conforme previsto no Parágrafo 1º do Art. 462 da CLT, inclusive no que couber a título de indenização por rescisão de contrato de trabalho a importância correspondente ao valor do material.";
   doc.setFontSize(6.5);
   doc.setFont('helvetica', 'normal');
-  const termoText = 'Declaro que recebi gratuitamente nesta data os EPI\'S (Equipamentos de Proteção Individual) e UNIFORMES discriminado(s) neste T.R (Termo de Responsabilidade), para uso obrigatório e sistemático no trabalho enquanto for colaborador desta empresa. Estou ciente ainda que a guarda e conservação destes equipamentos fiquem sob minha responsabilidade. Tenho conhecimento ainda do texto do Art. 158 Parágrafo Único, Lei 6.514, 22/12/77 que diz: "Constitui o ato faltoso do empregado, a recusa injustificada ao uso dos EPI\'s fornecidos pela empresa". Sendo assim me comprometo a comunicar imediatamente a empresa, quaisquer danos causados nestes equipamentos. Em caso de perda ou extravio ou inutilização proposital, comprometo-me a ressarcir a empresa conforme previsto no Parágrafo 1º do Art. 462 da CLT, inclusive no que couber a título de indenização por rescisão de contrato de trabalho a importância correspondente ao valor do material.';
-  const termoLines = doc.splitTextToSize(termoText, splitX - m - 3);
-  doc.text(termoLines, m + 2, y + 4);
+  doc.text(doc.splitTextToSize(termoText, splitX - M - 3), M + 2, y + 4);
 
-  // Right: Base Legal
+  // Coluna direita: Base Legal
   const bx = splitX + 2;
-  text('BASE LEGAL: NR1 Item 1.8 (Cabe ao Empregado)', bx, y + 4, { bold: true, size: 6 });
+  text(doc, 'BASE LEGAL: NR1 Item 1.8 (Cabe ao Empregado)', bx, y + 4, { bold: true, size: 6 });
 
-  doc.setFontSize(5.5);
-  doc.setFont('helvetica', 'italic');
-  const baseLegalLines = [
-    'a) Cumprir as disposições legais e regulamentares sobre segurança e saúde do trabalho,',
-    'inclusive as ordens de serviço expedidas pelo empregador; (Alterado pela portaria SIT 84/2009).',
-    '',
-    '1.8.1 - Constitui ato faltoso a recusa injustificada do empregado ao cumprimento',
-    'do disposto no item anterior.',
-    '',
-    'NR6 Item 6.7 (Cabe ao Empregado)',
-    '6.7.1 - Cabe ao empregado quanto aos EPI\'s:',
-    'a) Usar, utilizando-o apenas para a finalidade a que se destina;',
-    'b) Responsabilizar-se pela guarda e conservação;',
-    'c) Comunicar ao empregador qualquer alteração que o torne impróprio para uso;',
-    'd) Cumprir as determinações do empregador sobre o uso adequado;',
+  const baseLegal: { t: string; bold?: boolean; italic?: boolean }[] = [
+    { t: 'a) Cumprir as disposições legais e regulamentares sobre segurança e saúde do trabalho,', italic: true },
+    { t: 'inclusive as ordens de serviço expedidas pelo empregador; (Alterado pela portaria SIT 84/2009).', italic: true },
+    { t: '' },
+    { t: '1.8.1 - Constitui ato faltoso a recusa injustificada do empregado ao cumprimento', bold: true },
+    { t: 'do disposto no item anterior.', italic: true },
+    { t: '' },
+    { t: "NR6 Item 6.7 (Cabe ao Empregado)", bold: true },
+    { t: "6.7.1 - Cabe ao empregado quanto aos EPI's:", bold: true },
+    { t: 'a) Usar, utilizando-o apenas para a finalidade a que se destina;', italic: true },
+    { t: 'b) Responsabilizar-se pela guarda e conservação;', italic: true },
+    { t: 'c) Comunicar ao empregador qualquer alteração que o torne impróprio para uso;', italic: true },
+    { t: 'd) Cumprir as determinações do empregador sobre o uso adequado;', italic: true },
   ];
-  doc.setFont('helvetica', 'normal');
-  baseLegalLines.forEach((l, i) => {
-    if (l.startsWith('NR6') || l.startsWith('1.8.1') || l.startsWith('BASE')) {
-      doc.setFont('helvetica', 'bold');
-    } else {
-      doc.setFont('helvetica', 'italic');
-    }
+
+  baseLegal.forEach((item, i) => {
+    if (!item.t) return;
+    doc.setFont('helvetica', item.bold ? 'bold' : 'italic');
     doc.setFontSize(5.5);
-    doc.text(l, bx, y + 8 + i * 3.5);
+    doc.text(item.t, bx, y + 8 + i * 3.5);
   });
   doc.setFont('helvetica', 'normal');
 
-  y += termoH;
+  return y + TERMS_H;
+}
 
-  // ===== DECLARO section =====
+function renderDeclaroSection(doc: jsPDF, y: number): number {
   const declText = 'DECLARO para os devidos fins que experimentei o material fornecido pela empresa, e que estes ficaram adequados conforme o padrão necessário para execução dos meus serviços. Acrescento ainda que estou ciente que: quaisquer ajustes feitos neste material que possam impedir prejudicar limitar ou ainda causar algum dano ao meu serviço ou material são de MINHA responsabilidade.';
   doc.setFontSize(6);
-  const declLines = doc.splitTextToSize(declText, cw - 4);
-  const declH = declLines.length * 3 + 4;
-  rect(m, y, cw, declH);
+  const lines = doc.splitTextToSize(declText, CW - 4);
+  const declH = lines.length * 3 + 4;
+  rect(doc, M, y, CW, declH);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6);
+  doc.text(lines, M + 2, y + 3.5);
+  return y + declH;
+}
 
-  // Bold "DECLARO" and italic parts
-  const declParts = declText.split('DECLARO');
-  text('DECLARO', m + 2, y + 3.5, { bold: true, size: 6 });
-  doc.setFontSize(6);
-  doc.setFont('helvetica', 'normal');
-  const restText = declParts[1];
-  const fullDeclLines = doc.splitTextToSize('DECLARO' + restText, cw - 4);
-  doc.text(fullDeclLines, m + 2, y + 3.5);
-  y += declH;
+function renderSignatureRow(doc: jsPDF, y: number, ficha: EPIFicha): number {
+  const SIG_H = 16;
+  rect(doc, M,          y, CW / 2, SIG_H);
+  rect(doc, M + CW / 2, y, CW / 2, SIG_H);
 
-  // ===== SIGNATURE LINES: Nome Completo + Empresa =====
-  const sigLineH = 16;
-  rect(m, y, cw / 2, sigLineH);
-  rect(m + cw / 2, y, cw / 2, sigLineH);
-
-  // Signature images if available
   if (ficha.assinaturaColaborador) {
-    try {
-      doc.addImage(ficha.assinaturaColaborador, 'PNG', m + 5, y + 1, 55, 9);
-    } catch {}
+    try { doc.addImage(ficha.assinaturaColaborador, 'PNG', M + 5, y + 1, 55, 9); } catch {}
   }
-
-  line(m + 10, y + sigLineH - 5, m + cw / 2 - 10, y + sigLineH - 5);
-  text('NOME COMPLETO (FUNCIONÁRIO)', m + cw / 4, y + sigLineH - 1, { size: 6, align: 'center' });
-  text(ficha.nomeFuncionario, m + cw / 4, y + sigLineH - 3, { size: 7, align: 'center' });
+  line(doc, M + 10, y + SIG_H - 5, M + CW / 2 - 10, y + SIG_H - 5);
+  text(doc, 'NOME COMPLETO (FUNCIONÁRIO)', M + CW / 4,    y + SIG_H - 1, { size: 6, align: 'center' });
+  text(doc, ficha.nomeFuncionario,          M + CW / 4,    y + SIG_H - 3, { size: 7, align: 'center' });
 
   if (ficha.assinaturaResponsavel) {
-    try {
-      doc.addImage(ficha.assinaturaResponsavel, 'PNG', m + cw / 2 + 5, y + 1, 55, 9);
-    } catch {}
+    try { doc.addImage(ficha.assinaturaResponsavel, 'PNG', M + CW / 2 + 5, y + 1, 55, 9); } catch {}
   }
+  line(doc, M + CW / 2 + 10, y + SIG_H - 5, M + CW - 10, y + SIG_H - 5);
+  text(doc, 'EMPRESA',        M + CW * 0.75, y + SIG_H - 1, { size: 6, align: 'center' });
+  text(doc, ficha.empresa,    M + CW * 0.75, y + SIG_H - 3, { size: 7, align: 'center' });
 
-  line(m + cw / 2 + 10, y + sigLineH - 5, m + cw - 10, y + sigLineH - 5);
-  text('EMPRESA', m + cw * 0.75, y + sigLineH - 1, { size: 6, align: 'center' });
-  text(ficha.empresa, m + cw * 0.75, y + sigLineH - 3, { size: 7, align: 'center' });
-  y += sigLineH;
+  return y + SIG_H;
+}
 
-  // ===== ITEMS TABLE =====
-  // Column widths (must sum to cw)
-  const cols = [22, 14, 75, 18, 45, 42, 22, 16, 27];
-  // DATA ENTREGA | QUANT. | DESCRIÇÃO | TAM./Nº | POSTO DE SERVIÇO | ASSINATURA DO FUNCIONÁRIO | DATA | QUANT | RECEBIDO POR
-  const colHeaders1 = ['DATA', 'QUANT.', 'DESCRIÇÃO', 'TAM. / Nº', 'POSTO DE SERVIÇO', 'ASSINATURA DO', '', 'DEVOLUÇÃO', ''];
-  const colHeaders2 = ['ENTREGA', '', '', '', '', 'FUNCIONÁRIO', 'DATA', 'QUANT', 'RECEBIDO POR'];
+function renderItemsTable(doc: jsPDF, y: number, ficha: EPIFicha): number {
+  const ROW_H    = 6;
+  const HEADER_H = 9;
 
-  // Header row
-  const headerH = 9;
-  rect(m, y, cw, headerH, 'light');
-
-  // Draw header with merged DEVOLUÇÃO
-  let cx = m;
-  // First 6 columns header
+  // Cabeçalho da tabela
+  rect(doc, M, y, CW, HEADER_H, 'light');
+  let cx = M;
   for (let i = 0; i < 6; i++) {
-    rect(cx, y, cols[i], headerH);
-    text(colHeaders1[i], cx + cols[i] / 2, y + 3.5, { bold: true, size: 5.5, align: 'center' });
-    text(colHeaders2[i], cx + cols[i] / 2, y + 6.5, { bold: true, size: 5.5, align: 'center' });
-    cx += cols[i];
+    rect(doc, cx, y, COL_W[i], HEADER_H);
+    text(doc, COL_H1[i], cx + COL_W[i] / 2, y + 3.5, { bold: true, size: 5.5, align: 'center' });
+    text(doc, COL_H2[i], cx + COL_W[i] / 2, y + 6.5, { bold: true, size: 5.5, align: 'center' });
+    cx += COL_W[i];
   }
-  // DEVOLUÇÃO merged header
-  const devW = cols[6] + cols[7] + cols[8];
-  rect(cx, y, devW, 4.5);
-  text('DEVOLUÇÃO', cx + devW / 2, y + 3.5, { bold: true, size: 5.5, align: 'center' });
-  // Sub-headers
+
+  // Cabeçalho mesclado DEVOLUÇÃO (colunas 6-8)
+  const devW = COL_W[6] + COL_W[7] + COL_W[8];
+  rect(doc, cx, y, devW, 4.5);
+  text(doc, 'DEVOLUÇÃO', cx + devW / 2, y + 3.5, { bold: true, size: 5.5, align: 'center' });
   let dcx = cx;
   for (let i = 6; i < 9; i++) {
-    rect(dcx, y + 4.5, cols[i], headerH - 4.5);
-    text(colHeaders2[i], dcx + cols[i] / 2, y + 7.5, { bold: true, size: 5.5, align: 'center' });
-    dcx += cols[i];
+    rect(doc, dcx, y + 4.5, COL_W[i], HEADER_H - 4.5);
+    text(doc, COL_H2[i], dcx + COL_W[i] / 2, y + 7.5, { bold: true, size: 5.5, align: 'center' });
+    dcx += COL_W[i];
   }
+  y += HEADER_H;
 
-  y += headerH;
-
-  // Data rows
-  const rowH = 6;
-  const maxRows = Math.max(ficha.itens.length, 8);
-  for (let r = 0; r < maxRows; r++) {
-    if (y + rowH > pageH - 15) {
+  // Linhas de dados
+  const totalRows = Math.max(ficha.itens.length, MIN_TABLE_ROWS);
+  for (let r = 0; r < totalRows; r++) {
+    if (y + ROW_H > PAGE_H - 15) {
       doc.addPage('a4', 'landscape');
-      y = m;
+      y = M;
     }
-
+    cx = M;
     const item = ficha.itens[r];
-    cx = m;
-
     for (let c = 0; c < 9; c++) {
-      rect(cx, y, cols[c], rowH);
+      rect(doc, cx, y, COL_W[c], ROW_H);
       if (item) {
         let val = '';
         switch (c) {
-          case 0: val = item.dataEntrega || ''; break;
+          case 0: val = item.dataEntrega ?? ''; break;
           case 1: val = String(item.quantidade); break;
           case 2: val = item.descricao.substring(0, 45); break;
-          case 3: val = item.tamanho || ''; break;
-          case 4: val = item.postoServico || ''; break;
+          case 3: val = item.tamanho ?? ''; break;
+          case 4: val = item.postoServico ?? ''; break;
           case 5:
             if (ficha.assinaturaColaborador) {
-              try { doc.addImage(ficha.assinaturaColaborador, 'PNG', cx + 2, y + 0.5, cols[5] - 4, rowH - 1); } catch {}
+              try { doc.addImage(ficha.assinaturaColaborador, 'PNG', cx + 2, y + 0.5, COL_W[5] - 4, ROW_H - 1); } catch {}
             } else if (item.recebido) {
               val = '✓';
             }
             break;
-          case 6: val = item.devolucao?.data || ''; break;
+          case 6: val = item.devolucao?.data ?? ''; break;
           case 7: val = item.devolucao?.quantidade ? String(item.devolucao.quantidade) : ''; break;
-          case 8: val = item.devolucao?.recebidoPor || ''; break;
+          case 8: val = item.devolucao?.recebidoPor ?? ''; break;
         }
-        if (val) text(val, cx + 1.5, y + 4, { size: 6 });
+        if (val) text(doc, val, cx + 1.5, y + 4, { size: 6 });
       }
-      cx += cols[c];
+      cx += COL_W[c];
     }
-    y += rowH;
+    y += ROW_H;
   }
 
-  // ===== OBSERVAÇÕES =====
-  const obsH = 8;
-  rect(m, y, cw, obsH);
-  text('OBSERVAÇÕES:', m + 1.5, y + 4, { bold: true, size: 7 });
-  text(ficha.observacoes || '', m + 30, y + 4, { size: 6 });
-  y += obsH;
+  return y;
+}
 
-  // ===== STATUS + DATE =====
-  y += 3;
+function renderFooter(doc: jsPDF, y: number, ficha: EPIFicha): void {
+  const OBS_H = 8;
+  rect(doc, M, y, CW, OBS_H);
+  text(doc, 'OBSERVAÇÕES:', M + 1.5, y + 4, { bold: true, size: 7 });
+  text(doc, ficha.observacoes ?? '', M + 30, y + 4, { size: 6 });
+  y += OBS_H + 3;
+
   if (ficha.assinadoEm) {
-    text(`Assinado em: ${new Date(ficha.assinadoEm).toLocaleString('pt-BR')}`, m, y, { size: 6 });
+    text(doc, `Assinado em: ${new Date(ficha.assinadoEm).toLocaleString('pt-BR')}`, M, y, { size: 6 });
   }
 
   const statusText = ficha.status === 'assinada' ? 'FICHA ASSINADA' : 'FICHA PENDENTE';
-  if (ficha.status === 'assinada') {
-    doc.setTextColor(39, 174, 96);
-  } else {
-    doc.setTextColor(200, 150, 0);
-  }
+  const [sr, sg, sb] = ficha.status === 'assinada' ? [39, 174, 96] : [200, 150, 0];
+  doc.setTextColor(sr, sg, sb);
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
-  doc.text(statusText, pageW / 2, y, { align: 'center' });
+  doc.text(statusText, PAGE_W / 2, y, { align: 'center' });
   doc.setTextColor(0);
 
-  // Footer
   doc.setFontSize(5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(150);
-  doc.text(`Documento gerado em ${new Date().toLocaleString('pt-BR')}`, pageW / 2, pageH - 4, { align: 'center' });
+  doc.text(`Documento gerado em ${new Date().toLocaleString('pt-BR')}`, PAGE_W / 2, PAGE_H - 4, { align: 'center' });
+}
+
+// ===== Entry point =====
+
+export function generatePDF(ficha: EPIFicha): void {
+  const config = getConfig();
+  const doc = new jsPDF('l', 'mm', 'a4');
+
+  let y = M;
+  y = renderHeader(doc, y, config);
+  y = renderEmployeeRows(doc, y, ficha);
+  y = renderTermsSection(doc, y);
+  y = renderDeclaroSection(doc, y);
+  y = renderSignatureRow(doc, y, ficha);
+  y = renderItemsTable(doc, y, ficha);
+  renderFooter(doc, y, ficha);
 
   doc.save(`ficha-epi-${ficha.nomeFuncionario.replace(/\s+/g, '-').toLowerCase()}.pdf`);
 }

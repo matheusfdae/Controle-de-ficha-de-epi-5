@@ -30,11 +30,24 @@ interface AuthContextType {
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   isAdmin: boolean; // admin OR rh (mantém gating atual)
-  // legacy stubs (telas antigas de Usuários ainda chamam)
+  // Legacy stubs — telas antigas ainda chamam estas funções
   listUsers: () => StoredUser[];
   addUser: (u: StoredUser) => { ok: boolean; error?: string };
   updateUser: (username: string, patch: Partial<StoredUser>) => void;
   deleteUser: (username: string) => void;
+}
+
+// Roles com acesso de administrador
+const ADMIN_ROLES: UserRole[] = ['admin', 'rh'];
+
+// Ordem de precedência: o primeiro role encontrado na lista do usuário vence
+const ROLE_HIERARCHY: UserRole[] = ['admin', 'rh', 'supervisor', 'colaborador'];
+
+function resolveRole(roles: string[]): UserRole {
+  for (const role of ROLE_HIERARCHY) {
+    if (roles.includes(role)) return role;
+  }
+  return 'colaborador';
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -44,19 +57,13 @@ async function fetchUserData(supaUser: SupaUser): Promise<User> {
     supabase.from('profiles').select('nome_completo, email').eq('id', supaUser.id).maybeSingle(),
     supabase.from('user_roles').select('role').eq('user_id', supaUser.id),
   ]);
-  const rolesList = (roles || []).map((r: any) => r.role as UserRole);
-  // Hierarquia: admin > rh > supervisor > colaborador
-  const role: UserRole =
-    rolesList.includes('admin') ? 'admin'
-    : rolesList.includes('rh') ? 'rh'
-    : rolesList.includes('supervisor') ? 'supervisor'
-    : 'colaborador';
+  const rolesList = (roles ?? []).map(r => r.role);
   return {
     id: supaUser.id,
-    username: supaUser.email || '',
-    email: supaUser.email || '',
-    nome: profile?.nome_completo || supaUser.email || '',
-    role,
+    username: supaUser.email ?? '',
+    email: supaUser.email ?? '',
+    nome: profile?.nome_completo ?? supaUser.email ?? '',
+    role: resolveRole(rolesList),
   };
 }
 
@@ -66,11 +73,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Listener PRIMEIRO (Lovable Cloud rule)
+    // Registra o listener ANTES de getSession() para não perder eventos (regra Supabase)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, sess) => {
       setSession(sess);
       if (sess?.user) {
-        // defer para evitar deadlock
+        // Defer para evitar deadlock dentro da máquina de estados do Supabase
         setTimeout(() => {
           fetchUserData(sess.user).then(setUser).catch(() => setUser(null));
         }, 0);
@@ -79,7 +86,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    // 2. Sessão atual
     supabase.auth.getSession().then(({ data: { session: sess } }) => {
       setSession(sess);
       if (sess?.user) {
@@ -130,17 +136,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Legacy stubs (mantêm telas antigas funcionando sem quebrar)
-  const listUsers = () => [];
-  const addUser = () => ({ ok: false, error: 'Use a tela de Cadastro' });
-  const updateUser = () => {};
-  const deleteUser = () => {};
+  const listUsers = (): StoredUser[] => [];
+  const addUser = (_u: StoredUser) => ({ ok: false, error: 'Use a tela de Cadastro' });
+  const updateUser = (_username: string, _patch: Partial<StoredUser>) => {};
+  const deleteUser = (_username: string) => {};
 
   return (
     <AuthContext.Provider value={{
       user, session, loading,
       login, signup, resetPassword, updatePassword, logout,
       isAuthenticated: !!session,
-      isAdmin: user?.role === 'admin' || user?.role === 'rh',
+      isAdmin: user ? ADMIN_ROLES.includes(user.role) : false,
       listUsers, addUser, updateUser, deleteUser,
     }}>
       {children}
