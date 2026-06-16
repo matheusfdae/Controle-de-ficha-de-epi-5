@@ -23,6 +23,10 @@ const Usuarios            = lazy(() => import('./pages/Usuarios'));
 const Estoque             = lazy(() => import('./pages/Estoque'));
 const Funcoes             = lazy(() => import('./pages/Funcoes'));
 const Integracao          = lazy(() => import('./pages/Integracao'));
+const TermosColetivos     = lazy(() => import('./pages/TermosColetivos'));
+const TermoColetivoNovo   = lazy(() => import('./pages/TermoColetivoNovo'));
+const TermoColetivoView   = lazy(() => import('./pages/TermoColetivoView'));
+const AssinarTermoColetivo = lazy(() => import('./pages/AssinarTermoColetivo'));
 const NotFound            = lazy(() => import('./pages/NotFound'));
 
 const queryClient = new QueryClient({
@@ -61,6 +65,7 @@ function AppRoutes() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password"  element={<ResetPassword />} />
         <Route path="/assinar/:id"     element={<AssinarFicha />} />
+        <Route path="/assinar-termo-coletivo/:id/:itemId" element={<AssinarTermoColetivo />} />
         <Route element={<ProtectedLayout />}>
           <Route path="/"             element={<Dashboard />} />
           <Route path="/nova-ficha"   element={<AdminRoute><NovaFicha /></AdminRoute>} />
@@ -73,6 +78,9 @@ function AppRoutes() {
           <Route path="/estoque"      element={<AdminRoute><Estoque /></AdminRoute>} />
           <Route path="/funcoes"      element={<AdminRoute><Funcoes /></AdminRoute>} />
           <Route path="/integracao"   element={<AdminRoute><Integracao /></AdminRoute>} />
+          <Route path="/termos-coletivos" element={<TermosColetivos />} />
+          <Route path="/termo-coletivo/novo" element={<AdminRoute><TermoColetivoNovo /></AdminRoute>} />
+          <Route path="/termo-coletivo/:id" element={<TermoColetivoView />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

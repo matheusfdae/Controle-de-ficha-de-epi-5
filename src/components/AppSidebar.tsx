@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, FilePlus2, Search, CalendarClock, Settings, ShieldCheck, LogOut, Users, Package, Briefcase, UserPlus, ClipboardSignature,
+  LayoutDashboard, FilePlus2, Search, CalendarClock, Settings, ShieldCheck, LogOut, Users, Package, Briefcase, UserPlus, ClipboardSignature, HardHat, Shirt, FileSignature,
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -13,10 +13,19 @@ import { Badge } from '@/components/ui/badge';
 
 const baseItems = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard, end: true, adminOnly: false },
-  { title: 'Nova Ficha', url: '/nova-ficha', icon: FilePlus2, end: false, adminOnly: true },
   { title: 'Assinar (Tablet)', url: '/pendentes', icon: ClipboardSignature, end: false, adminOnly: false },
-  { title: 'Consultar Fichas', url: '/consultar', icon: Search, end: false, adminOnly: false },
   { title: 'Vencimentos', url: '/vencimentos', icon: CalendarClock, end: false, adminOnly: false },
+];
+
+const epiItems = [
+  { title: 'Nova Ficha EPI', url: '/nova-ficha?tipo=epi', icon: FilePlus2, end: false, adminOnly: true },
+  { title: 'Termo Coletivo EPI', url: '/termos-coletivos', icon: FileSignature, end: false, adminOnly: false },
+  { title: 'Consultar Fichas EPI', url: '/consultar?tipo=epi', icon: Search, end: false, adminOnly: false },
+];
+
+const uniformeItems = [
+  { title: 'Nova Ficha Uniforme', url: '/nova-ficha?tipo=uniforme', icon: FilePlus2, end: false, adminOnly: true },
+  { title: 'Consultar Fichas Uniforme', url: '/consultar?tipo=uniforme', icon: Search, end: false, adminOnly: false },
 ];
 
 const adminItems = [
