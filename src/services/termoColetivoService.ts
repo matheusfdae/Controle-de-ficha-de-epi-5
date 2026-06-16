@@ -80,8 +80,7 @@ export async function getTermoColetivoFull(id: string): Promise<TermoColetivoFul
 export async function getTermoColetivoPublico(id: string): Promise<TermoColetivoFull | null> {
   const { data, error } = await supabase.rpc('get_termo_coletivo_publico', { _termo_id: id });
   if (error || !data) { console.error('getTermoColetivoPublico', error); return null; }
-  // RPC returns jsonb { termo, itens }
-  const r = data as { termo: TermoColetivo; itens: TermoColetivoItem[] } | null;
+  const r = data as unknown as { termo: TermoColetivo; itens: TermoColetivoItem[] } | null;
   if (!r?.termo) return null;
   return r;
 }
