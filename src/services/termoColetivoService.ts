@@ -97,7 +97,7 @@ export async function assinarItemColetivo(itemId: string, assinaturaDataUrl: str
     _ip: ip,
   });
   if (error) return { ok: false, error: error.message };
-  const r = data as { ok: boolean; error?: string };
+  const r = data as unknown as { ok: boolean; error?: string };
   return r;
 }
 
