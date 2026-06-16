@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, FilePlus2, Search, CalendarClock, Settings, ShieldCheck, LogOut, Users, Package, Briefcase, UserPlus, ClipboardSignature,
+  LayoutDashboard, FilePlus2, Search, CalendarClock, Settings, ShieldCheck, LogOut, Users, Package, Briefcase, UserPlus, ClipboardSignature, HardHat, Shirt, FileSignature,
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -13,10 +13,19 @@ import { Badge } from '@/components/ui/badge';
 
 const baseItems = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard, end: true, adminOnly: false },
-  { title: 'Nova Ficha', url: '/nova-ficha', icon: FilePlus2, end: false, adminOnly: true },
   { title: 'Assinar (Tablet)', url: '/pendentes', icon: ClipboardSignature, end: false, adminOnly: false },
-  { title: 'Consultar Fichas', url: '/consultar', icon: Search, end: false, adminOnly: false },
   { title: 'Vencimentos', url: '/vencimentos', icon: CalendarClock, end: false, adminOnly: false },
+];
+
+const epiItems = [
+  { title: 'Nova Ficha EPI', url: '/nova-ficha?tipo=epi', icon: FilePlus2, end: false, adminOnly: true },
+  { title: 'Termo Coletivo EPI', url: '/termos-coletivos', icon: FileSignature, end: false, adminOnly: false },
+  { title: 'Consultar Fichas EPI', url: '/consultar?tipo=epi', icon: Search, end: false, adminOnly: false },
+];
+
+const uniformeItems = [
+  { title: 'Nova Ficha Uniforme', url: '/nova-ficha?tipo=uniforme', icon: FilePlus2, end: false, adminOnly: true },
+  { title: 'Consultar Fichas Uniforme', url: '/consultar?tipo=uniforme', icon: Search, end: false, adminOnly: false },
 ];
 
 const adminItems = [
@@ -62,6 +71,42 @@ export function AppSidebar() {
               {visibleBase.map(item => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={isActive(item.url, item.end)} tooltip={item.title}>
+                    <NavLink to={item.url} end={item.end} className="flex items-center gap-2.5">
+                      <item.icon className="h-4 w-4" />
+                      {!collapsed && <span className="text-sm">{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="flex items-center gap-1.5"><HardHat className="h-3 w-3" /> EPI</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {epiItems.filter(i => !i.adminOnly || isAdmin).map(item => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild isActive={isActive(item.url.split('?')[0], item.end)} tooltip={item.title}>
+                    <NavLink to={item.url} end={item.end} className="flex items-center gap-2.5">
+                      <item.icon className="h-4 w-4" />
+                      {!collapsed && <span className="text-sm">{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="flex items-center gap-1.5"><Shirt className="h-3 w-3" /> Uniforme</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {uniformeItems.filter(i => !i.adminOnly || isAdmin).map(item => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild isActive={isActive(item.url.split('?')[0], item.end)} tooltip={item.title}>
                     <NavLink to={item.url} end={item.end} className="flex items-center gap-2.5">
                       <item.icon className="h-4 w-4" />
                       {!collapsed && <span className="text-sm">{item.title}</span>}
