@@ -82,6 +82,42 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        <SidebarGroup>
+          <SidebarGroupLabel className="flex items-center gap-1.5"><HardHat className="h-3 w-3" /> EPI</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {epiItems.filter(i => !i.adminOnly || isAdmin).map(item => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild isActive={isActive(item.url.split('?')[0], item.end)} tooltip={item.title}>
+                    <NavLink to={item.url} end={item.end} className="flex items-center gap-2.5">
+                      <item.icon className="h-4 w-4" />
+                      {!collapsed && <span className="text-sm">{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="flex items-center gap-1.5"><Shirt className="h-3 w-3" /> Uniforme</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {uniformeItems.filter(i => !i.adminOnly || isAdmin).map(item => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild isActive={isActive(item.url.split('?')[0], item.end)} tooltip={item.title}>
+                    <NavLink to={item.url} end={item.end} className="flex items-center gap-2.5">
+                      <item.icon className="h-4 w-4" />
+                      {!collapsed && <span className="text-sm">{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
         {isAdmin && (
           <SidebarGroup>
             <SidebarGroupLabel>Administração</SidebarGroupLabel>
