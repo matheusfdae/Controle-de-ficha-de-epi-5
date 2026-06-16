@@ -211,7 +211,7 @@ export default function NovaFicha() {
     <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-4xl mx-auto space-y-6">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground">Nova Ficha de EPI</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">Nova Ficha de {tipo === 'uniforme' ? 'Uniforme' : 'EPI'}</h2>
           <p className="text-sm text-muted-foreground">Preencha os dados do colaborador e os itens entregues.</p>
         </div>
 
@@ -295,7 +295,7 @@ export default function NovaFicha() {
         {/* EPI Items */}
         <Card>
           <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-base">Itens de Uniforme/EPI</CardTitle>
+            <CardTitle className="text-base">Itens de {tipo === 'uniforme' ? 'Uniforme' : 'EPI'}</CardTitle>
             <Button variant="outline" size="sm" onClick={addItem}>
               <Plus className="h-4 w-4 mr-1" /> Adicionar
             </Button>
