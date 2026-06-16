@@ -44,7 +44,7 @@ export async function listTermosColetivos(): Promise<TermoColetivo[]> {
 
 export async function createTermoColetivo(
   termo: Omit<TermoColetivo, 'id' | 'created_at' | 'updated_at' | 'status'>,
-  itens: Omit<TermoColetivoItem, 'termo_id' | 'id'>[]
+  itens: Omit<TermoColetivoItem, 'termo_id' | 'id' | 'ordem'>[]
 ): Promise<string> {
   const { data: u } = await supabase.auth.getUser();
   const { data: cab, error } = await supabase
