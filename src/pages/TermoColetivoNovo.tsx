@@ -39,7 +39,7 @@ export default function TermoColetivoNovo() {
   const [epis, setEpis] = useState<EPI[]>([]);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { listEpis().then(setEpis).catch(() => {}); }, []);
+  useEffect(() => { listEpis('epi').then(setEpis).catch(() => {}); }, []);
 
   const updateLinha = (i: number, patch: Partial<Linha>) => {
     setLinhas(prev => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));

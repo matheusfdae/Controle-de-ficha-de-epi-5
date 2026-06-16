@@ -1,5 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
+export type ItemTipo = 'epi' | 'uniforme';
+
 export interface EPI {
   id: string;
   codigo: string | null;
@@ -9,6 +11,7 @@ export interface EPI {
   estoque_atual: number;
   estoque_minimo: number;
   ativo: boolean;
+  tipo: ItemTipo;
 }
 
 export interface EPITamanho {
@@ -35,10 +38,12 @@ export interface FuncaoEPI {
 }
 
 // EPIs
-export async function listEpis(): Promise<EPI[]> {
-  const { data, error } = await supabase.from('epis').select('*').order('nome');
+export async function listEpis(tipo?: ItemTipo): Promise<EPI[]> {
+  let q = supabase.from('epis').select('*').order('nome');
+  if (tipo) q = q.eq('tipo', tipo);
+  const { data, error } = await q;
   if (error) throw error;
-  return (data || []) as EPI[];
+  return (data || []) as unknown as EPI[];
 }
 
 export async function upsertEpi(epi: Partial<EPI>): Promise<EPI> {
