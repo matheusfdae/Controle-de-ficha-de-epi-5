@@ -822,6 +822,114 @@ export type Database = {
           },
         ]
       }
+      termos_epi_coletivos: {
+        Row: {
+          created_at: string
+          criado_por: string | null
+          empresa: string | null
+          id: string
+          lider: string | null
+          mes_referencia: string
+          observacoes: string | null
+          posto: string
+          status: Database["public"]["Enums"]["termo_coletivo_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          criado_por?: string | null
+          empresa?: string | null
+          id?: string
+          lider?: string | null
+          mes_referencia: string
+          observacoes?: string | null
+          posto: string
+          status?: Database["public"]["Enums"]["termo_coletivo_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          criado_por?: string | null
+          empresa?: string | null
+          id?: string
+          lider?: string | null
+          mes_referencia?: string
+          observacoes?: string | null
+          posto?: string
+          status?: Database["public"]["Enums"]["termo_coletivo_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      termos_epi_coletivos_itens: {
+        Row: {
+          assinatura_url: string | null
+          ca: string | null
+          colaborador_cpf: string | null
+          colaborador_nome: string
+          created_at: string
+          data_assinatura: string | null
+          epi_id: string | null
+          id: string
+          ip_assinatura: string | null
+          material: string
+          ordem: number
+          quantidade: number
+          tamanho: string | null
+          termo_id: string
+          updated_at: string
+        }
+        Insert: {
+          assinatura_url?: string | null
+          ca?: string | null
+          colaborador_cpf?: string | null
+          colaborador_nome: string
+          created_at?: string
+          data_assinatura?: string | null
+          epi_id?: string | null
+          id?: string
+          ip_assinatura?: string | null
+          material: string
+          ordem?: number
+          quantidade?: number
+          tamanho?: string | null
+          termo_id: string
+          updated_at?: string
+        }
+        Update: {
+          assinatura_url?: string | null
+          ca?: string | null
+          colaborador_cpf?: string | null
+          colaborador_nome?: string
+          created_at?: string
+          data_assinatura?: string | null
+          epi_id?: string | null
+          id?: string
+          ip_assinatura?: string | null
+          material?: string
+          ordem?: number
+          quantidade?: number
+          tamanho?: string | null
+          termo_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "termos_epi_coletivos_itens_epi_id_fkey"
+            columns: ["epi_id"]
+            isOneToOne: false
+            referencedRelation: "epis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "termos_epi_coletivos_itens_termo_id_fkey"
+            columns: ["termo_id"]
+            isOneToOne: false
+            referencedRelation: "termos_epi_coletivos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       uniformes: {
         Row: {
           ativo: boolean
@@ -902,6 +1010,10 @@ export type Database = {
         }
         Returns: Json
       }
+      assinar_termo_coletivo_item: {
+        Args: { _assinatura: string; _ip?: string; _item_id: string }
+        Returns: Json
+      }
       assinar_termo_item_publico: {
         Args: { _assinatura: string; _ip?: string; _token: string }
         Returns: Json
@@ -911,6 +1023,7 @@ export type Database = {
         Returns: undefined
       }
       get_ficha_publica: { Args: { _ficha_id: string }; Returns: Json }
+      get_termo_coletivo_publico: { Args: { _termo_id: string }; Returns: Json }
       get_termo_item_por_token: { Args: { _token: string }; Returns: Json }
       has_role: {
         Args: {
@@ -943,6 +1056,7 @@ export type Database = {
         | "devolvida"
         | "cancelada"
       motivo_entrega: "admissao" | "reposicao" | "troca" | "devolucao"
+      termo_coletivo_status: "rascunho" | "em_assinatura" | "finalizado"
       termo_status: "rascunho" | "em_assinatura" | "concluido"
       tipo_item: "epi" | "uniforme"
       tipo_mov: "entrada" | "saida" | "devolucao" | "descarte"
@@ -1093,6 +1207,7 @@ export const Constants = {
         "cancelada",
       ],
       motivo_entrega: ["admissao", "reposicao", "troca", "devolucao"],
+      termo_coletivo_status: ["rascunho", "em_assinatura", "finalizado"],
       termo_status: ["rascunho", "em_assinatura", "concluido"],
       tipo_item: ["epi", "uniforme"],
       tipo_mov: ["entrada", "saida", "devolucao", "descarte"],
