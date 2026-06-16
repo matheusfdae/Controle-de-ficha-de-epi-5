@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,6 +21,8 @@ import { Empresa, listEmpresas } from '@/services/empresasService';
 
 export default function NovaFicha() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const tipo = (searchParams.get('tipo') === 'uniforme' ? 'uniforme' : 'epi') as 'epi' | 'uniforme';
   const today = new Date().toISOString().split('T')[0];
   const config = getConfig();
 
@@ -54,9 +56,9 @@ export default function NovaFicha() {
 
   useEffect(() => {
     listFuncoes().then(setFuncoes).catch(() => {});
-    listEpis().then(setEpis).catch(() => {});
+    listEpis(tipo).then(setEpis).catch(() => {});
     setEmpresas(listEmpresas());
-  }, []);
+  }, [tipo]);
 
   const aplicarFuncao = async (id: string) => {
     setFuncaoId(id);
@@ -65,20 +67,24 @@ export default function NovaFicha() {
     if (!id) return;
     try {
       const vincs = await listFuncaoEpis(id);
-      const novosItens: EPIItem[] = vincs.map(v => {
-        const epi = epis.find(e => e.id === v.epi_id);
-        return {
-          id: generateId(),
-          descricao: epi?.nome || '',
-          ca: epi?.ca_numero || '',
-          quantidade: v.quantidade || 1,
-          tamanho: v.tamanho || '',
-          dataEntrega: today,
-          postoServico: '',
-          recebido: false,
-          epiId: v.epi_id,
-        };
-      });
+      // Filtra somente itens compatíveis com o tipo atual da ficha (EPI ou Uniforme)
+      const idsValidos = new Set(epis.map(e => e.id));
+      const novosItens: EPIItem[] = vincs
+        .filter(v => idsValidos.has(v.epi_id))
+        .map(v => {
+          const epi = epis.find(e => e.id === v.epi_id);
+          return {
+            id: generateId(),
+            descricao: epi?.nome || '',
+            ca: epi?.ca_numero || '',
+            quantidade: v.quantidade || 1,
+            tamanho: v.tamanho || '',
+            dataEntrega: today,
+            postoServico: '',
+            recebido: false,
+            epiId: v.epi_id,
+          };
+        });
       if (novosItens.length) setItens(novosItens);
     } catch { /* ignore */ }
   };
