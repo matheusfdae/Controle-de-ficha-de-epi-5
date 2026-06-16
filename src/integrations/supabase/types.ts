@@ -156,6 +156,7 @@ export type Database = {
           fornecedor: string | null
           id: string
           nome: string
+          tipo: Database["public"]["Enums"]["item_tipo"]
           updated_at: string
           vida_util_dias: number | null
         }
@@ -173,6 +174,7 @@ export type Database = {
           fornecedor?: string | null
           id?: string
           nome: string
+          tipo?: Database["public"]["Enums"]["item_tipo"]
           updated_at?: string
           vida_util_dias?: number | null
         }
@@ -190,6 +192,7 @@ export type Database = {
           fornecedor?: string | null
           id?: string
           nome?: string
+          tipo?: Database["public"]["Enums"]["item_tipo"]
           updated_at?: string
           vida_util_dias?: number | null
         }
@@ -1055,6 +1058,7 @@ export type Database = {
         | "assinada"
         | "devolvida"
         | "cancelada"
+      item_tipo: "epi" | "uniforme"
       motivo_entrega: "admissao" | "reposicao" | "troca" | "devolucao"
       termo_coletivo_status: "rascunho" | "em_assinatura" | "finalizado"
       termo_status: "rascunho" | "em_assinatura" | "concluido"
@@ -1206,6 +1210,7 @@ export const Constants = {
         "devolvida",
         "cancelada",
       ],
+      item_tipo: ["epi", "uniforme"],
       motivo_entrega: ["admissao", "reposicao", "troca", "devolucao"],
       termo_coletivo_status: ["rascunho", "em_assinatura", "finalizado"],
       termo_status: ["rascunho", "em_assinatura", "concluido"],
