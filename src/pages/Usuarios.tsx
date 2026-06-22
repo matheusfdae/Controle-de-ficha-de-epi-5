@@ -173,6 +173,8 @@ export default function Usuarios() {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     if (error) { toast.error(error.message); return; }
+    // Marca para exigir troca de senha no próximo acesso
+    await supabase.from('profiles').update({ must_change_password: true }).eq('id', row.id);
     toast.success(`Link de redefinição enviado para ${row.email}`);
   };
 
