@@ -183,23 +183,30 @@ function renderDeclaroSection(doc: jsPDF, y: number): number {
 }
 
 function renderSignatureRow(doc: jsPDF, y: number, ficha: EPIFicha): number {
-  const SIG_H = 16;
+  const SIG_H = 18;
+  const LINE_Y = y + SIG_H - 6; // posição da linha de assinatura
   rect(doc, M,          y, CW / 2, SIG_H);
   rect(doc, M + CW / 2, y, CW / 2, SIG_H);
 
+  // ----- Coluna esquerda: Funcionário -----
+  // Assinatura desenhada ACIMA da linha
   if (ficha.assinaturaColaborador) {
-    try { doc.addImage(ficha.assinaturaColaborador, 'PNG', M + 5, y + 1, 55, 9); } catch {}
+    try { doc.addImage(ficha.assinaturaColaborador, 'PNG', M + 10, y + 1, CW / 2 - 20, LINE_Y - y - 1); } catch {}
   }
-  line(doc, M + 10, y + SIG_H - 5, M + CW / 2 - 10, y + SIG_H - 5);
-  text(doc, 'NOME COMPLETO (FUNCIONÁRIO)', M + CW / 4,    y + SIG_H - 1, { size: 6, align: 'center' });
-  text(doc, ficha.nomeFuncionario,          M + CW / 4,    y + SIG_H - 3, { size: 7, align: 'center' });
+  // Nome digitado também ACIMA da linha (à esquerda, sem cobrir a assinatura)
+  text(doc, ficha.nomeFuncionario, M + CW / 4, LINE_Y - 1, { size: 7, align: 'center' });
+  // Linha de assinatura
+  line(doc, M + 10, LINE_Y, M + CW / 2 - 10, LINE_Y);
+  // Label ABAIXO da linha
+  text(doc, 'NOME COMPLETO (FUNCIONÁRIO)', M + CW / 4, LINE_Y + 3, { size: 6, align: 'center' });
 
+  // ----- Coluna direita: Empresa -----
   if (ficha.assinaturaResponsavel) {
-    try { doc.addImage(ficha.assinaturaResponsavel, 'PNG', M + CW / 2 + 5, y + 1, 55, 9); } catch {}
+    try { doc.addImage(ficha.assinaturaResponsavel, 'PNG', M + CW / 2 + 10, y + 1, CW / 2 - 20, LINE_Y - y - 1); } catch {}
   }
-  line(doc, M + CW / 2 + 10, y + SIG_H - 5, M + CW - 10, y + SIG_H - 5);
-  text(doc, 'EMPRESA',        M + CW * 0.75, y + SIG_H - 1, { size: 6, align: 'center' });
-  text(doc, ficha.empresa,    M + CW * 0.75, y + SIG_H - 3, { size: 7, align: 'center' });
+  text(doc, ficha.empresa, M + CW * 0.75, LINE_Y - 1, { size: 7, align: 'center' });
+  line(doc, M + CW / 2 + 10, LINE_Y, M + CW - 10, LINE_Y);
+  text(doc, 'EMPRESA', M + CW * 0.75, LINE_Y + 3, { size: 6, align: 'center' });
 
   return y + SIG_H;
 }
