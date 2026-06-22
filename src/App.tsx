@@ -45,9 +45,12 @@ const PageLoader = () => (
 );
 
 function ProtectedLayout() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
   if (loading) return <PageLoader />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (user?.mustChangePassword && window.location.pathname !== '/reset-password') {
+    return <Navigate to="/reset-password" replace />;
+  }
   return <AppLayout />;
 }
 
