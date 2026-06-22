@@ -121,10 +121,14 @@ export default function Usuarios() {
       return;
     }
     const newId = data.user?.id;
-    if (newId && form.isAdmin) {
-      await supabase.from('user_roles').insert({ user_id: newId, role: 'admin' as any });
+    if (newId) {
+      // Marca para forçar troca de senha no primeiro acesso
+      await supabase.from('profiles').update({ must_change_password: true }).eq('id', newId);
+      if (form.isAdmin) {
+        await supabase.from('user_roles').insert({ user_id: newId, role: 'admin' as any });
+      }
     }
-    toast.success(`Usuário criado com sucesso! Login: ${form.email}`);
+    toast.success(`Usuário criado! Login: ${form.email} — será solicitada a troca de senha no 1º acesso.`);
     setForm({ nome: '', email: '', emailEditado: false, password: '', isAdmin: false });
     setShowPwd(false);
     setOpen(false);
@@ -169,6 +173,8 @@ export default function Usuarios() {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     if (error) { toast.error(error.message); return; }
+    // Marca para exigir troca de senha no próximo acesso
+    await supabase.from('profiles').update({ must_change_password: true }).eq('id', row.id);
     toast.success(`Link de redefinição enviado para ${row.email}`);
   };
 

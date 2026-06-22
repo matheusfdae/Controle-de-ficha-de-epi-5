@@ -10,6 +10,7 @@ export interface User {
   nome: string;
   email: string;
   role: UserRole;
+  mustChangePassword?: boolean;
 }
 
 interface StoredUser {
@@ -54,7 +55,7 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 async function fetchUserData(supaUser: SupaUser): Promise<User> {
   const [{ data: profile }, { data: roles }] = await Promise.all([
-    supabase.from('profiles').select('nome_completo, email').eq('id', supaUser.id).maybeSingle(),
+    supabase.from('profiles').select('nome_completo, email, must_change_password').eq('id', supaUser.id).maybeSingle(),
     supabase.from('user_roles').select('role').eq('user_id', supaUser.id),
   ]);
   const rolesList = (roles ?? []).map(r => r.role);
@@ -64,6 +65,7 @@ async function fetchUserData(supaUser: SupaUser): Promise<User> {
     email: supaUser.email ?? '',
     nome: profile?.nome_completo ?? supaUser.email ?? '',
     role: resolveRole(rolesList),
+    mustChangePassword: (profile as any)?.must_change_password === true,
   };
 }
 
@@ -128,6 +130,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updatePassword = async (newPassword: string) => {
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) return { ok: false, error: error.message };
+    // Limpa o flag de troca obrigatória, se houver
+    if (user?.id) {
+      await supabase.from('profiles').update({ must_change_password: false }).eq('id', user.id);
+      setUser({ ...user, mustChangePassword: false });
+    }
     return { ok: true };
   };
 
