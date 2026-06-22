@@ -130,6 +130,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updatePassword = async (newPassword: string) => {
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) return { ok: false, error: error.message };
+    // Limpa o flag de troca obrigatória, se houver
+    if (user?.id) {
+      await supabase.from('profiles').update({ must_change_password: false }).eq('id', user.id);
+      setUser({ ...user, mustChangePassword: false });
+    }
     return { ok: true };
   };
 
