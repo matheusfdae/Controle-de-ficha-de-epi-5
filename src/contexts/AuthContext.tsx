@@ -10,6 +10,7 @@ export interface User {
   nome: string;
   email: string;
   role: UserRole;
+  mustChangePassword?: boolean;
 }
 
 interface StoredUser {
