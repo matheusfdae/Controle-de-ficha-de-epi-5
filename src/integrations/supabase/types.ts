@@ -659,6 +659,7 @@ export type Database = {
           inativado_em: string | null
           matricula: string | null
           motivo_inativacao: string | null
+          must_change_password: boolean
           nome_completo: string
           setor: string | null
           supervisor_id: string | null
@@ -677,6 +678,7 @@ export type Database = {
           inativado_em?: string | null
           matricula?: string | null
           motivo_inativacao?: string | null
+          must_change_password?: boolean
           nome_completo?: string
           setor?: string | null
           supervisor_id?: string | null
@@ -695,6 +697,7 @@ export type Database = {
           inativado_em?: string | null
           matricula?: string | null
           motivo_inativacao?: string | null
+          must_change_password?: boolean
           nome_completo?: string
           setor?: string | null
           supervisor_id?: string | null
