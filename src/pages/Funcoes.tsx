@@ -13,6 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
+import BackButton from '@/components/BackButton';
   Funcao, EPI, FuncaoEPI,
   listFuncoes, upsertFuncao, deleteFuncao, listEpis,
   listFuncaoEpis, addFuncaoEpi, removeFuncaoEpi,
@@ -56,6 +57,7 @@ export default function Funcoes() {
   return (
     <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-6xl mx-auto space-y-6">
+        <BackButton />
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <p className="text-xs uppercase tracking-widest text-muted-foreground">Cargos & EPIs padrão</p>

@@ -8,6 +8,7 @@ import { ClipboardSignature, RefreshCw, Search, Tablet } from 'lucide-react';
 import { EPIFicha } from '@/types/epi';
 import { getFichas } from '@/services/fichaService';
 import { supabase } from '@/integrations/supabase/client';
+import BackButton from '@/components/BackButton';
 
 export default function AssinaturasPendentes() {
   const navigate = useNavigate();
@@ -41,6 +42,7 @@ export default function AssinaturasPendentes() {
   return (
     <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-4xl mx-auto space-y-5">
+        <BackButton />
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <div className="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-primary/10 text-primary">

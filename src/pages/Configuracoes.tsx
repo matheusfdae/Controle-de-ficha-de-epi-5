@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import SignaturePad from '@/components/SignaturePad';
 import { toast } from 'sonner';
+import BackButton from '@/components/BackButton';
 
 export default function Configuracoes() {
   const [config, setConfig] = useState<AppConfig>(getConfig());
@@ -97,6 +98,7 @@ export default function Configuracoes() {
   return (
     <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-4xl mx-auto space-y-6">
+        <BackButton />
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-foreground">Configurações</h2>
           <p className="text-sm text-muted-foreground">Personalize os dados da empresa, logo e assinatura padrão.</p>
