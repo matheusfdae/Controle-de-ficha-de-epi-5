@@ -209,6 +209,36 @@ export default function NovaFicha() {
     complemento: 'Complemento',
   };
 
+  // Auto-preenche dados quando o nome já existe no histórico
+  async function autocompletarPorNome(nome: string) {
+    const n = (nome || '').trim();
+    if (n.length < 3) return;
+    try {
+      const { data } = await supabase
+        .from('fichas_epi')
+        .select('nome_funcionario, funcao, telefone, cpf_snapshot, matricula_snapshot, posto_snapshot, empresa, turno, funcao_id')
+        .ilike('nome_funcionario', n)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      const prev = data?.[0];
+      if (!prev) return;
+      setForm(f => ({
+        ...f,
+        funcao: f.funcao || prev.funcao || '',
+        telefone: f.telefone || prev.telefone || '',
+        cpf: f.cpf || prev.cpf_snapshot || '',
+        matricula: f.matricula || prev.matricula_snapshot || '',
+        posto: f.posto || prev.posto_snapshot || '',
+        empresa: f.empresa || prev.empresa || f.empresa,
+        turno: (f.turno || prev.turno || 'diurno') as Turno,
+      }));
+      if (!funcaoId && prev.funcao_id) setFuncaoId(prev.funcao_id);
+      toast.success('Dados preenchidos a partir do último registro');
+    } catch {
+      // silencioso
+    }
+  }
+
   return (
     <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-4xl mx-auto space-y-6">
