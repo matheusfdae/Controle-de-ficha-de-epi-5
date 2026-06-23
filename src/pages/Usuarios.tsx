@@ -15,8 +15,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ShieldAlert, ShieldCheck, UserPlus, Pencil, Lock, Eye, EyeOff, Trash2, RefreshCw, KeyRound } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, UserPlus, Pencil, Lock, Eye, EyeOff, Trash2, RefreshCw, KeyRound, KeySquare } from 'lucide-react';
 import { toast } from 'sonner';
+import BackButton from '@/components/BackButton';
 
 interface Row {
   id: string;
@@ -198,6 +199,7 @@ export default function Usuarios() {
   return (
     <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-4xl mx-auto space-y-6">
+        <BackButton />
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-foreground">Gestão de Usuários</h2>
