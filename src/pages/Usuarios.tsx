@@ -406,6 +406,38 @@ export default function Usuarios() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={!!pwdTarget} onOpenChange={(o) => !o && setPwdTarget(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Definir nova senha</DialogTitle>
+              <DialogDescription>
+                Defina uma senha diretamente para <strong>{pwdTarget?.nome}</strong>.
+                Ele(a) precisará trocá-la no próximo acesso.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <Label>Nova senha</Label>
+              <div className="relative">
+                <Input
+                  type={pwdShow ? 'text' : 'password'}
+                  value={pwdValue}
+                  onChange={e => setPwdValue(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  className="pr-10"
+                />
+                <button type="button" onClick={() => setPwdShow(s => !s)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" tabIndex={-1}>
+                  {pwdShow ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPwdTarget(null)}>Cancelar</Button>
+              <Button onClick={handleDirectSetPassword}>Definir senha</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
