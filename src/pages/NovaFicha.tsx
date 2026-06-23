@@ -34,7 +34,7 @@ export default function NovaFicha() {
     matricula: '',
     motivo: 'admissao' as MotivoEntrega,
     turno: 'diurno' as Turno,
-    setor: '',
+    posto: '',
     empresa: config.empresaNome,
     dataEntrega: today,
     observacoes: '',
@@ -272,8 +272,8 @@ export default function NovaFicha() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="setor">Setor</Label>
-              <Input id="setor" value={form.setor} onChange={e => updateField('setor', e.target.value)} placeholder="Setor" />
+              <Label htmlFor="posto">Posto</Label>
+              <Input id="posto" value={form.posto} onChange={e => updateField('posto', e.target.value)} placeholder="Posto" />
             </div>
             <div>
               <Label htmlFor="empresa">Empresa</Label>
