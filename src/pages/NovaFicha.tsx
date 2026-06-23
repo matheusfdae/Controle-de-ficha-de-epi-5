@@ -18,6 +18,8 @@ import { getConfig } from '@/services/configService';
 import SignaturePad from '@/components/SignaturePad';
 import { Funcao, EPI, listFuncoes, listEpis, listFuncaoEpis } from '@/services/estoqueService';
 import { Empresa, listEmpresas } from '@/services/empresasService';
+import { supabase } from '@/integrations/supabase/client';
+import BackButton from '@/components/BackButton';
 
 export default function NovaFicha() {
   const navigate = useNavigate();
