@@ -134,7 +134,7 @@ export default function Integracao() {
           nome_completo: c.nome,
           matricula: c.matricula,
           cargo: c.funcao_nome,
-          setor: c.posto,
+          posto: c.posto,
           data_admissao: c.data_admissao,
         });
         if (pErr) throw pErr;
@@ -149,7 +149,7 @@ export default function Integracao() {
           funcao: c.funcao_nome,
           funcao_id: c.funcao_id,
           matricula_snapshot: c.matricula,
-          setor_snapshot: c.posto,
+          posto_snapshot: c.posto,
           motivo: 'admissao',
           status: 'pendente_assinatura',
         }).select().single();
