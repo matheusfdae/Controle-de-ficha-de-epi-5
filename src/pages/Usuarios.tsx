@@ -309,25 +309,31 @@ export default function Usuarios() {
                   <Pencil className="h-4 w-4" />
                 </Button>
                 {u.ativo && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon" title="Redefinir senha">
-                        <KeyRound className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Redefinir senha?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Será enviado um link de redefinição de senha para <strong>{u.email}</strong>.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleResetPassword(u)}>Enviar link</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  <>
+                    <Button variant="ghost" size="icon" title="Definir senha agora"
+                      onClick={() => { setPwdTarget(u); setPwdValue(''); setPwdShow(false); }}>
+                      <KeySquare className="h-4 w-4" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" title="Enviar e-mail de redefinição">
+                          <KeyRound className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Enviar link por e-mail?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Um link de redefinição será enviado para <strong>{u.email}</strong>.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleResetPassword(u)}>Enviar link</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </>
                 )}
                 {u.id !== user?.id && u.ativo && (
                   <AlertDialog>
