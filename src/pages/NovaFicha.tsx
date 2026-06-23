@@ -18,6 +18,8 @@ import { getConfig } from '@/services/configService';
 import SignaturePad from '@/components/SignaturePad';
 import { Funcao, EPI, listFuncoes, listEpis, listFuncaoEpis } from '@/services/estoqueService';
 import { Empresa, listEmpresas } from '@/services/empresasService';
+import { supabase } from '@/integrations/supabase/client';
+import BackButton from '@/components/BackButton';
 
 export default function NovaFicha() {
   const navigate = useNavigate();
@@ -34,7 +36,7 @@ export default function NovaFicha() {
     matricula: '',
     motivo: 'admissao' as MotivoEntrega,
     turno: 'diurno' as Turno,
-    setor: '',
+    posto: '',
     empresa: config.empresaNome,
     dataEntrega: today,
     observacoes: '',
@@ -207,12 +209,43 @@ export default function NovaFicha() {
     complemento: 'Complemento',
   };
 
+  // Auto-preenche dados quando o nome já existe no histórico
+  async function autocompletarPorNome(nome: string) {
+    const n = (nome || '').trim();
+    if (n.length < 3) return;
+    try {
+      const { data } = await supabase
+        .from('fichas_epi')
+        .select('nome_funcionario, funcao, telefone, cpf_snapshot, matricula_snapshot, posto_snapshot, empresa, turno, funcao_id')
+        .ilike('nome_funcionario', n)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      const prev = data?.[0];
+      if (!prev) return;
+      setForm(f => ({
+        ...f,
+        funcao: f.funcao || prev.funcao || '',
+        telefone: f.telefone || prev.telefone || '',
+        cpf: f.cpf || prev.cpf_snapshot || '',
+        matricula: f.matricula || prev.matricula_snapshot || '',
+        posto: f.posto || prev.posto_snapshot || '',
+        empresa: f.empresa || prev.empresa || f.empresa,
+        turno: (f.turno || prev.turno || 'diurno') as Turno,
+      }));
+      if (!funcaoId && prev.funcao_id) setFuncaoId(prev.funcao_id);
+      toast.success('Dados preenchidos a partir do último registro');
+    } catch {
+      // silencioso
+    }
+  }
+
   return (
     <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-4xl mx-auto space-y-6">
+        <BackButton />
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-foreground">Nova Ficha de {tipo === 'uniforme' ? 'Uniforme' : 'EPI'}</h2>
-          <p className="text-sm text-muted-foreground">Preencha os dados do colaborador e os itens entregues.</p>
+          <p className="text-sm text-muted-foreground">Preencha os dados do colaborador e os itens entregues. Ao digitar o nome, os dados anteriores serão sugeridos automaticamente.</p>
         </div>
 
         {/* Employee Data */}
@@ -223,7 +256,10 @@ export default function NovaFicha() {
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <Label htmlFor="nome">Nome do Funcionário *</Label>
-              <Input id="nome" value={form.nomeFuncionario} onChange={e => updateField('nomeFuncionario', e.target.value)} placeholder="Nome completo" />
+              <Input id="nome" value={form.nomeFuncionario}
+                onChange={e => updateField('nomeFuncionario', e.target.value)}
+                onBlur={() => autocompletarPorNome(form.nomeFuncionario)}
+                placeholder="Nome completo" />
             </div>
             <div>
               <Label htmlFor="funcao">Função</Label>
@@ -272,8 +308,8 @@ export default function NovaFicha() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="setor">Setor</Label>
-              <Input id="setor" value={form.setor} onChange={e => updateField('setor', e.target.value)} placeholder="Setor" />
+              <Label htmlFor="posto">Posto</Label>
+              <Input id="posto" value={form.posto} onChange={e => updateField('posto', e.target.value)} placeholder="Posto" />
             </div>
             <div>
               <Label htmlFor="empresa">Empresa</Label>

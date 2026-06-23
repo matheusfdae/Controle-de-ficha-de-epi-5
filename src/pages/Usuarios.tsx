@@ -15,8 +15,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ShieldAlert, ShieldCheck, UserPlus, Pencil, Lock, Eye, EyeOff, Trash2, RefreshCw, KeyRound } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, UserPlus, Pencil, Lock, Eye, EyeOff, Trash2, RefreshCw, KeyRound, KeySquare } from 'lucide-react';
 import { toast } from 'sonner';
+import BackButton from '@/components/BackButton';
 
 interface Row {
   id: string;
@@ -173,9 +174,23 @@ export default function Usuarios() {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     if (error) { toast.error(error.message); return; }
-    // Marca para exigir troca de senha no próximo acesso
     await supabase.from('profiles').update({ must_change_password: true }).eq('id', row.id);
     toast.success(`Link de redefinição enviado para ${row.email}`);
+  };
+
+  // Definir senha diretamente (admin) via Edge Function (service_role)
+  const [pwdTarget, setPwdTarget] = useState<Row | null>(null);
+  const [pwdValue, setPwdValue] = useState('');
+  const [pwdShow, setPwdShow] = useState(false);
+  const handleDirectSetPassword = async () => {
+    if (!pwdTarget) return;
+    if (pwdValue.length < 6) { toast.error('Senha mínima de 6 caracteres'); return; }
+    const { error } = await supabase.functions.invoke('admin-set-password', {
+      body: { user_id: pwdTarget.id, new_password: pwdValue, force_change: true },
+    });
+    if (error) { toast.error(error.message || 'Falha ao definir senha'); return; }
+    toast.success(`Senha redefinida. ${pwdTarget.nome} precisará trocá-la no próximo acesso.`);
+    setPwdTarget(null); setPwdValue(''); setPwdShow(false);
   };
 
   const roleLabel = (r: UserRole) =>
@@ -184,6 +199,7 @@ export default function Usuarios() {
   return (
     <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-4xl mx-auto space-y-6">
+        <BackButton />
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-foreground">Gestão de Usuários</h2>
@@ -293,25 +309,31 @@ export default function Usuarios() {
                   <Pencil className="h-4 w-4" />
                 </Button>
                 {u.ativo && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon" title="Redefinir senha">
-                        <KeyRound className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Redefinir senha?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Será enviado um link de redefinição de senha para <strong>{u.email}</strong>.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleResetPassword(u)}>Enviar link</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  <>
+                    <Button variant="ghost" size="icon" title="Definir senha agora"
+                      onClick={() => { setPwdTarget(u); setPwdValue(''); setPwdShow(false); }}>
+                      <KeySquare className="h-4 w-4" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" title="Enviar e-mail de redefinição">
+                          <KeyRound className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Enviar link por e-mail?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Um link de redefinição será enviado para <strong>{u.email}</strong>.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleResetPassword(u)}>Enviar link</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </>
                 )}
                 {u.id !== user?.id && u.ativo && (
                   <AlertDialog>
@@ -381,6 +403,38 @@ export default function Usuarios() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditing(null)}>Cancelar</Button>
               <Button onClick={saveEdit}>Salvar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!pwdTarget} onOpenChange={(o) => !o && setPwdTarget(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Definir nova senha</DialogTitle>
+              <DialogDescription>
+                Defina uma senha diretamente para <strong>{pwdTarget?.nome}</strong>.
+                Ele(a) precisará trocá-la no próximo acesso.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <Label>Nova senha</Label>
+              <div className="relative">
+                <Input
+                  type={pwdShow ? 'text' : 'password'}
+                  value={pwdValue}
+                  onChange={e => setPwdValue(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  className="pr-10"
+                />
+                <button type="button" onClick={() => setPwdShow(s => !s)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" tabIndex={-1}>
+                  {pwdShow ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPwdTarget(null)}>Cancelar</Button>
+              <Button onClick={handleDirectSetPassword}>Definir senha</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

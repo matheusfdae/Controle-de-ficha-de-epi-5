@@ -19,6 +19,7 @@ import { supabase } from '@/integrations/supabase/client';
 import EstoqueChart from '@/components/EstoqueChart';
 import EstoqueUniformePanel from '@/components/EstoqueUniformePanel';
 import RelatorioMovimentacoes from '@/components/RelatorioMovimentacoes';
+import BackButton from '@/components/BackButton';
 
 function EpiPanel() {
   const [epis, setEpis] = useState<EPI[]>([]);
@@ -194,6 +195,7 @@ export default function Estoque() {
   return (
     <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-6xl mx-auto space-y-6">
+        <BackButton />
         <div>
           <p className="text-xs uppercase tracking-widest text-muted-foreground">Gestão</p>
           <h1 className="text-3xl font-bold tracking-tight">Estoque</h1>

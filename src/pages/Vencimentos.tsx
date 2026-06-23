@@ -9,6 +9,7 @@ import { getFichas } from '@/services/fichaService';
 import { getConfig } from '@/services/configService';
 import { getItemValidade } from '@/lib/validade';
 import { supabase } from '@/integrations/supabase/client';
+import BackButton from '@/components/BackButton';
 
 interface VencimentoItem {
   fichaId: string;
@@ -242,6 +243,7 @@ export default function Vencimentos() {
   return (
     <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-5xl mx-auto space-y-6">
+        <BackButton />
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-foreground">Controle de Vencimentos</h2>
           <p className="text-sm text-muted-foreground">Acompanhe validades de EPIs e trocas programadas de uniforme.</p>

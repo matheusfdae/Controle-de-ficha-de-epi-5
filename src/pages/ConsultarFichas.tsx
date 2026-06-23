@@ -11,6 +11,7 @@ import { generatePDF } from '@/services/pdfService';
 import { useAuth } from '@/contexts/AuthContext';
 import { importFichasFromExcel, downloadTemplateExcel } from '@/services/importFichasService';
 import {
+import BackButton from '@/components/BackButton';
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
@@ -59,6 +60,7 @@ export default function ConsultarFichas() {
   return (
     <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-4xl mx-auto space-y-6">
+        <BackButton />
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-foreground">Consultar Fichas</h2>

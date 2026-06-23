@@ -18,7 +18,8 @@ const COLUMN_ALIASES: Record<string, string> = {
   cpf: 'cpf',
   matricula: 'matricula',
   funcao: 'funcao', cargo: 'funcao',
-  setor: 'setor', departamento: 'setor',
+  setor: 'posto', departamento: 'posto', posto_servico: 'posto',
+  posto: 'posto',
   empresa: 'empresa',
   telefone: 'telefone', celular: 'telefone', whatsapp: 'telefone',
   motivo: 'motivo',
@@ -29,7 +30,7 @@ const COLUMN_ALIASES: Record<string, string> = {
   ca: 'ca', numero_ca: 'ca', n_ca: 'ca',
   quantidade: 'quantidade', qtd: 'quantidade', qtde: 'quantidade',
   tamanho: 'tamanho', numeracao: 'tamanho',
-  posto_servico: 'posto', posto: 'posto', local: 'posto',
+  local: 'posto',
   data_validade: 'data_validade', validade: 'data_validade',
 };
 
@@ -140,7 +141,7 @@ export async function importFichasFromExcel(file: File): Promise<ImportResult> {
       matricula: (first.matricula || '').toString().trim(),
       motivo: (first.motivo || 'admissao').toString().toLowerCase() as any,
       turno: (first.turno || 'diurno').toString().toLowerCase() as any,
-      setor: (first.setor || '').toString().trim(),
+      posto: (first.posto || '').toString().trim(),
       empresa: (first.empresa || '').toString().trim(),
       dataEntrega: parseDate(first.data_entrega) || new Date().toISOString().split('T')[0],
       itens,
@@ -162,7 +163,7 @@ export async function importFichasFromExcel(file: File): Promise<ImportResult> {
 
 export async function downloadTemplateExcel() {
   const headers = [
-    'nome_funcionario', 'cpf', 'matricula', 'funcao', 'setor', 'empresa',
+    'nome_funcionario', 'cpf', 'matricula', 'funcao', 'posto', 'empresa',
     'telefone', 'motivo', 'turno', 'data_entrega', 'observacoes',
     'descricao_item', 'ca', 'quantidade', 'tamanho', 'posto_servico', 'data_validade',
   ];

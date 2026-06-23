@@ -16,6 +16,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import BackButton from '@/components/BackButton';
 
 export default function VisualizarFicha() {
   const { id } = useParams<{ id: string }>();
@@ -100,6 +101,7 @@ export default function VisualizarFicha() {
   return (
     <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-6xl mx-auto space-y-4">
+        <BackButton />
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-foreground">Ficha de EPI</h2>

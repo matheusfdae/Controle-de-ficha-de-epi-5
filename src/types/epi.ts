@@ -33,7 +33,7 @@ export interface EPIFicha {
   empresa: string;
   cpf: string;
   matricula: string;
-  setor: string;
+  posto: string;
   dataEntrega: string;
   itens: EPIItem[];
   assinaturaColaborador?: string;
