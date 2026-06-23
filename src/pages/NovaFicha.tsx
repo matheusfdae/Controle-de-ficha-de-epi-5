@@ -212,9 +212,10 @@ export default function NovaFicha() {
   return (
     <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-4xl mx-auto space-y-6">
+        <BackButton />
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-foreground">Nova Ficha de {tipo === 'uniforme' ? 'Uniforme' : 'EPI'}</h2>
-          <p className="text-sm text-muted-foreground">Preencha os dados do colaborador e os itens entregues.</p>
+          <p className="text-sm text-muted-foreground">Preencha os dados do colaborador e os itens entregues. Ao digitar o nome, os dados anteriores serão sugeridos automaticamente.</p>
         </div>
 
         {/* Employee Data */}
@@ -225,7 +226,10 @@ export default function NovaFicha() {
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <Label htmlFor="nome">Nome do Funcionário *</Label>
-              <Input id="nome" value={form.nomeFuncionario} onChange={e => updateField('nomeFuncionario', e.target.value)} placeholder="Nome completo" />
+              <Input id="nome" value={form.nomeFuncionario}
+                onChange={e => updateField('nomeFuncionario', e.target.value)}
+                onBlur={() => autocompletarPorNome(form.nomeFuncionario)}
+                placeholder="Nome completo" />
             </div>
             <div>
               <Label htmlFor="funcao">Função</Label>
