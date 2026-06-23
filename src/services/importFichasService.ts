@@ -30,7 +30,7 @@ const COLUMN_ALIASES: Record<string, string> = {
   ca: 'ca', numero_ca: 'ca', n_ca: 'ca',
   quantidade: 'quantidade', qtd: 'quantidade', qtde: 'quantidade',
   tamanho: 'tamanho', numeracao: 'tamanho',
-  posto_servico: 'posto', posto: 'posto', local: 'posto',
+  local: 'posto',
   data_validade: 'data_validade', validade: 'data_validade',
 };
 
