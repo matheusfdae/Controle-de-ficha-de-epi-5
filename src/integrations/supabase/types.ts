@@ -47,6 +47,60 @@ export type Database = {
         }
         Relationships: []
       }
+      assinaturas: {
+        Row: {
+          assinante: string | null
+          assinatura_url: string | null
+          created_at: string
+          data_hora: string
+          ficha_epi_id: string | null
+          id: string
+          ip_assinatura: string | null
+          item_id: string | null
+          termo_id: string | null
+          tipo: string
+        }
+        Insert: {
+          assinante?: string | null
+          assinatura_url?: string | null
+          created_at?: string
+          data_hora?: string
+          ficha_epi_id?: string | null
+          id?: string
+          ip_assinatura?: string | null
+          item_id?: string | null
+          termo_id?: string | null
+          tipo: string
+        }
+        Update: {
+          assinante?: string | null
+          assinatura_url?: string | null
+          created_at?: string
+          data_hora?: string
+          ficha_epi_id?: string | null
+          id?: string
+          ip_assinatura?: string | null
+          item_id?: string | null
+          termo_id?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assinaturas_ficha_epi_id_fkey"
+            columns: ["ficha_epi_id"]
+            isOneToOne: false
+            referencedRelation: "fichas_epi"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assinaturas_termo_id_fkey"
+            columns: ["termo_id"]
+            isOneToOne: false
+            referencedRelation: "termos_entrega_epi"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       colaboradores_integracao: {
         Row: {
           created_at: string
@@ -220,7 +274,7 @@ export type Database = {
           nome_funcionario: string | null
           numero: number
           observacoes: string | null
-          setor_snapshot: string | null
+          posto_snapshot: string | null
           status: Database["public"]["Enums"]["ficha_status"]
           telefone: string | null
           turno: string | null
@@ -247,7 +301,7 @@ export type Database = {
           nome_funcionario?: string | null
           numero?: number
           observacoes?: string | null
-          setor_snapshot?: string | null
+          posto_snapshot?: string | null
           status?: Database["public"]["Enums"]["ficha_status"]
           telefone?: string | null
           turno?: string | null
@@ -274,7 +328,7 @@ export type Database = {
           nome_funcionario?: string | null
           numero?: number
           observacoes?: string | null
-          setor_snapshot?: string | null
+          posto_snapshot?: string | null
           status?: Database["public"]["Enums"]["ficha_status"]
           telefone?: string | null
           turno?: string | null
@@ -661,7 +715,7 @@ export type Database = {
           motivo_inativacao: string | null
           must_change_password: boolean
           nome_completo: string
-          setor: string | null
+          posto: string | null
           supervisor_id: string | null
           updated_at: string
         }
@@ -680,7 +734,7 @@ export type Database = {
           motivo_inativacao?: string | null
           must_change_password?: boolean
           nome_completo?: string
-          setor?: string | null
+          posto?: string | null
           supervisor_id?: string | null
           updated_at?: string
         }
@@ -699,7 +753,7 @@ export type Database = {
           motivo_inativacao?: string | null
           must_change_password?: boolean
           nome_completo?: string
-          setor?: string | null
+          posto?: string | null
           supervisor_id?: string | null
           updated_at?: string
         }
@@ -718,6 +772,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           empresa: string | null
+          ficha_epi_id: string | null
           id: string
           lider: string | null
           mes: string
@@ -730,6 +785,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           empresa?: string | null
+          ficha_epi_id?: string | null
           id?: string
           lider?: string | null
           mes: string
@@ -742,6 +798,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           empresa?: string | null
+          ficha_epi_id?: string | null
           id?: string
           lider?: string | null
           mes?: string
@@ -750,7 +807,15 @@ export type Database = {
           status?: Database["public"]["Enums"]["termo_status"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "termos_entrega_epi_ficha_epi_id_fkey"
+            columns: ["ficha_epi_id"]
+            isOneToOne: false
+            referencedRelation: "fichas_epi"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       termos_entrega_epi_itens: {
         Row: {
@@ -1028,6 +1093,7 @@ export type Database = {
         Args: { _colaborador: string }
         Returns: undefined
       }
+      get_combo_publico: { Args: { _ficha_id: string }; Returns: Json }
       get_ficha_publica: { Args: { _ficha_id: string }; Returns: Json }
       get_termo_coletivo_publico: { Args: { _termo_id: string }; Returns: Json }
       get_termo_item_por_token: { Args: { _token: string }; Returns: Json }
@@ -1043,6 +1109,7 @@ export type Database = {
         Args: { _colaborador: string; _supervisor: string }
         Returns: boolean
       }
+      progresso_assinatura: { Args: { _ficha_id: string }; Returns: Json }
     }
     Enums: {
       app_role: "admin" | "rh" | "supervisor" | "colaborador"
