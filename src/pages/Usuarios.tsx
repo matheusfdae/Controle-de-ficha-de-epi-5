@@ -173,9 +173,23 @@ export default function Usuarios() {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     if (error) { toast.error(error.message); return; }
-    // Marca para exigir troca de senha no próximo acesso
     await supabase.from('profiles').update({ must_change_password: true }).eq('id', row.id);
     toast.success(`Link de redefinição enviado para ${row.email}`);
+  };
+
+  // Definir senha diretamente (admin) via Edge Function (service_role)
+  const [pwdTarget, setPwdTarget] = useState<Row | null>(null);
+  const [pwdValue, setPwdValue] = useState('');
+  const [pwdShow, setPwdShow] = useState(false);
+  const handleDirectSetPassword = async () => {
+    if (!pwdTarget) return;
+    if (pwdValue.length < 6) { toast.error('Senha mínima de 6 caracteres'); return; }
+    const { error } = await supabase.functions.invoke('admin-set-password', {
+      body: { user_id: pwdTarget.id, new_password: pwdValue, force_change: true },
+    });
+    if (error) { toast.error(error.message || 'Falha ao definir senha'); return; }
+    toast.success(`Senha redefinida. ${pwdTarget.nome} precisará trocá-la no próximo acesso.`);
+    setPwdTarget(null); setPwdValue(''); setPwdShow(false);
   };
 
   const roleLabel = (r: UserRole) =>
