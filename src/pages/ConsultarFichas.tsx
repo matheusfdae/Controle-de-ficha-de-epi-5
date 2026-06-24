@@ -10,8 +10,8 @@ import { getFichas, deleteFicha } from '@/services/fichaService';
 import { generatePDF } from '@/services/pdfService';
 import { useAuth } from '@/contexts/AuthContext';
 import { importFichasFromExcel, downloadTemplateExcel } from '@/services/importFichasService';
-import {
 import BackButton from '@/components/BackButton';
+import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
