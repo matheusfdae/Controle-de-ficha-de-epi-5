@@ -309,7 +309,12 @@ export default function NovaFicha() {
             </div>
             <div>
               <Label htmlFor="posto">Posto</Label>
-              <Input id="posto" value={form.posto} onChange={e => updateField('posto', e.target.value)} placeholder="Posto" />
+              <Input id="posto" value={form.posto} onChange={e => {
+                const novo = e.target.value;
+                const antigo = form.posto;
+                updateField('posto', novo);
+                setItens(prev => prev.map(it => (!it.postoServico || it.postoServico === antigo) ? { ...it, postoServico: novo } : it));
+              }} placeholder="Posto" />
             </div>
             <div>
               <Label htmlFor="empresa">Empresa</Label>
