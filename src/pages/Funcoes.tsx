@@ -12,8 +12,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import {
 import BackButton from '@/components/BackButton';
+import {
   Funcao, EPI, FuncaoEPI,
   listFuncoes, upsertFuncao, deleteFuncao, listEpis,
   listFuncaoEpis, addFuncaoEpi, removeFuncaoEpi,
