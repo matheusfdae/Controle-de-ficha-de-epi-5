@@ -267,7 +267,14 @@ function renderItemsTable(doc: jsPDF, y: number, ficha: EPIFicha): number {
           case 7: val = item.devolucao?.quantidade ? String(item.devolucao.quantidade) : ''; break;
           case 8: val = item.devolucao?.recebidoPor ?? ''; break;
         }
-        if (val) text(doc, val, cx + 1.5, y + 4, { size: 6 });
+        if (val) {
+          if (c === 2) {
+            const lines = doc.splitTextToSize(val, COL_W[2] - 3);
+            text(doc, lines.slice(0, 2).join('\n'), cx + 1.5, y + 3, { size: 5.5 });
+          } else {
+            text(doc, val, cx + 1.5, y + 4, { size: 6 });
+          }
+        }
       }
       cx += COL_W[c];
     }
