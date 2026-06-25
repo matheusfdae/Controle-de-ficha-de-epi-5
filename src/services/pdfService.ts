@@ -253,7 +253,7 @@ function renderItemsTable(doc: jsPDF, y: number, ficha: EPIFicha): number {
         switch (c) {
           case 0: val = item.dataEntrega ?? ''; break;
           case 1: val = String(item.quantidade); break;
-          case 2: val = item.descricao.substring(0, 45); break;
+          case 2: val = item.descricao ?? ''; break;
           case 3: val = item.tamanho ?? ''; break;
           case 4: val = item.postoServico ?? ''; break;
           case 5:
@@ -267,7 +267,14 @@ function renderItemsTable(doc: jsPDF, y: number, ficha: EPIFicha): number {
           case 7: val = item.devolucao?.quantidade ? String(item.devolucao.quantidade) : ''; break;
           case 8: val = item.devolucao?.recebidoPor ?? ''; break;
         }
-        if (val) text(doc, val, cx + 1.5, y + 4, { size: 6 });
+        if (val) {
+          if (c === 2) {
+            const lines = doc.splitTextToSize(val, COL_W[2] - 3);
+            text(doc, lines.slice(0, 2).join('\n'), cx + 1.5, y + 3, { size: 5.5 });
+          } else {
+            text(doc, val, cx + 1.5, y + 4, { size: 6 });
+          }
+        }
       }
       cx += COL_W[c];
     }
