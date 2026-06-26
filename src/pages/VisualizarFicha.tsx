@@ -27,6 +27,9 @@ export default function VisualizarFicha() {
   const [ficha, setFicha] = useState<EPIFicha | null>(null);
   const [assinaturaColaborador, setAssinaturaColaborador] = useState('');
   const [assinaturaResponsavel, setAssinaturaResponsavel] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<EPIFicha | null>(null);
+  const [epis, setEpis] = useState<EPI[]>([]);
 
   useEffect(() => {
     if (id) {
@@ -38,6 +41,7 @@ export default function VisualizarFicha() {
         }
       });
     }
+    listEpis().then(setEpis).catch(() => {});
   }, [id]);
 
   if (!ficha) {
