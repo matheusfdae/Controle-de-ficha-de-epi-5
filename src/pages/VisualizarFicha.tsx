@@ -3,9 +3,9 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Download, Copy, MessageCircle, Mail, CheckCircle2 } from 'lucide-react';
-import { EPIFicha } from '@/types/epi';
-import { getFichaById, saveFicha } from '@/services/fichaService';
+import { ArrowLeft, Download, Copy, MessageCircle, Mail, CheckCircle2, Pencil, Plus, Trash2, Save, X } from 'lucide-react';
+import { EPIFicha, EPIItem } from '@/types/epi';
+import { getFichaById, saveFicha, generateId } from '@/services/fichaService';
 import { generatePDF } from '@/services/pdfService';
 import SignaturePad from '@/components/SignaturePad';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,6 +17,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import BackButton from '@/components/BackButton';
+import { listEpis, EPI } from '@/services/estoqueService';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function VisualizarFicha() {
   const { id } = useParams<{ id: string }>();
