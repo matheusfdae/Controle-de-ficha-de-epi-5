@@ -350,12 +350,45 @@ export default function NovaFicha() {
                   className="mt-2"
                 />
                 <div className="flex-1 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                  <Input
-                    placeholder="Descrição do item"
-                    value={item.descricao}
-                    onChange={e => updateItem(item.id, 'descricao', e.target.value)}
-                    className="sm:col-span-2"
-                  />
+                  <div className="sm:col-span-2">
+                    {epis.length > 0 ? (
+                      <Select
+                        value={item.epiId || '__manual__'}
+                        onValueChange={(v) => {
+                          if (v === '__manual__') {
+                            updateItem(item.id, 'epiId', undefined);
+                            return;
+                          }
+                          const epi = epis.find(e => e.id === v);
+                          if (!epi) return;
+                          setItens(prev => prev.map(i => i.id === item.id ? {
+                            ...i,
+                            epiId: epi.id,
+                            descricao: epi.nome,
+                            ca: epi.ca_numero || '',
+                          } : i));
+                        }}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Selecione o item do catálogo" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__manual__">— Digitar manualmente —</SelectItem>
+                          {epis.map(e => (
+                            <SelectItem key={e.id} value={e.id}>
+                              {e.nome}{e.ca_numero ? ` (CA ${e.ca_numero})` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : null}
+                    {(!item.epiId || epis.length === 0) && (
+                      <Input
+                        placeholder="Descrição do item"
+                        value={item.descricao}
+                        onChange={e => updateItem(item.id, 'descricao', e.target.value)}
+                        className={epis.length > 0 ? 'mt-2' : ''}
+                      />
+                    )}
+                  </div>
                   <Input
                     placeholder="C.A."
                     value={item.ca}
