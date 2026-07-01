@@ -25,6 +25,7 @@ const DEFAULTS: AppConfig = {
   assinaturaEmpresa: '',
   diasAlertaVencimento: 30,
   diasValidadeEpi: 180,
+  carimboEmpresa: '',
 };
 
 export function getConfig(): AppConfig {
