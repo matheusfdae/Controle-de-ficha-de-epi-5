@@ -182,7 +182,7 @@ function renderDeclaroSection(doc: jsPDF, y: number): number {
   return y + declH;
 }
 
-function renderSignatureRow(doc: jsPDF, y: number, ficha: EPIFicha): number {
+function renderSignatureRow(doc: jsPDF, y: number, ficha: EPIFicha, config: AppConfig): number {
   const SIG_H = 18;
   const LINE_Y = y + SIG_H - 6; // posição da linha de assinatura
   rect(doc, M,          y, CW / 2, SIG_H);
