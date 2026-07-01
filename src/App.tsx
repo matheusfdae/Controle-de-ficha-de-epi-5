@@ -18,6 +18,7 @@ const VisualizarFicha     = lazy(() => import('./pages/VisualizarFicha'));
 const AssinarFicha        = lazy(() => import('./pages/AssinarFicha'));
 const AssinaturasPendentes = lazy(() => import('./pages/AssinaturasPendentes'));
 const Vencimentos         = lazy(() => import('./pages/Vencimentos'));
+const RankPostos          = lazy(() => import('./pages/RankPostos'));
 const Configuracoes       = lazy(() => import('./pages/Configuracoes'));
 const Usuarios            = lazy(() => import('./pages/Usuarios'));
 const Estoque             = lazy(() => import('./pages/Estoque'));
