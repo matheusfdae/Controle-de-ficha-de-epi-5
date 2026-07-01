@@ -77,6 +77,7 @@ function AppRoutes() {
           <Route path="/ficha/:id"    element={<VisualizarFicha />} />
           <Route path="/vencimentos"  element={<Vencimentos />} />
           <Route path="/pendentes"    element={<AssinaturasPendentes />} />
+          <Route path="/rank-postos"  element={<RankPostos />} />
           <Route path="/configuracoes" element={<AdminRoute><Configuracoes /></AdminRoute>} />
           <Route path="/usuarios"     element={<AdminRoute><Usuarios /></AdminRoute>} />
           <Route path="/estoque"      element={<AdminRoute><Estoque /></AdminRoute>} />
