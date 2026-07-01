@@ -182,7 +182,7 @@ function renderDeclaroSection(doc: jsPDF, y: number): number {
   return y + declH;
 }
 
-function renderSignatureRow(doc: jsPDF, y: number, ficha: EPIFicha): number {
+function renderSignatureRow(doc: jsPDF, y: number, ficha: EPIFicha, config: AppConfig): number {
   const SIG_H = 18;
   const LINE_Y = y + SIG_H - 6; // posição da linha de assinatura
   rect(doc, M,          y, CW / 2, SIG_H);
@@ -204,9 +204,13 @@ function renderSignatureRow(doc: jsPDF, y: number, ficha: EPIFicha): number {
   if (ficha.assinaturaResponsavel) {
     try { doc.addImage(ficha.assinaturaResponsavel, 'PNG', M + CW / 2 + 10, y + 1, CW / 2 - 20, LINE_Y - y - 1); } catch {}
   }
+  if (config.carimboEmpresa) {
+    try { doc.addImage(config.carimboEmpresa, 'PNG', M + CW - 55, y + 1, 45, SIG_H - 4); } catch {}
+  }
   text(doc, ficha.empresa, M + CW * 0.75, LINE_Y - 1, { size: 7, align: 'center' });
   line(doc, M + CW / 2 + 10, LINE_Y, M + CW - 10, LINE_Y);
   text(doc, 'EMPRESA', M + CW * 0.75, LINE_Y + 3, { size: 6, align: 'center' });
+
 
   return y + SIG_H;
 }
@@ -320,7 +324,7 @@ export function generatePDF(ficha: EPIFicha): void {
   y = renderEmployeeRows(doc, y, ficha);
   y = renderTermsSection(doc, y);
   y = renderDeclaroSection(doc, y);
-  y = renderSignatureRow(doc, y, ficha);
+  y = renderSignatureRow(doc, y, ficha, config);
   y = renderItemsTable(doc, y, ficha);
   renderFooter(doc, y, ficha);
 

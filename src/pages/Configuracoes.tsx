@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Building2, PenTool, Image as ImageIcon, Save, Trash2, Upload, Bell, Plus, Pencil, Building } from 'lucide-react';
+import { Building2, PenTool, Image as ImageIcon, Save, Trash2, Upload, Bell, Plus, Pencil, Building, Stamp } from 'lucide-react';
 import { AppConfig, getConfig, saveConfig } from '@/services/configService';
 import { Empresa, listEmpresas, saveEmpresa, deleteEmpresa } from '@/services/empresasService';
 import {
@@ -18,6 +18,7 @@ export default function Configuracoes() {
   const [config, setConfig] = useState<AppConfig>(getConfig());
   const [novaAssinatura, setNovaAssinatura] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const carimboRef = useRef<HTMLInputElement>(null);
 
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [empresaDialog, setEmpresaDialog] = useState(false);
@@ -95,6 +96,24 @@ export default function Configuracoes() {
     toast.success('Logo removida');
   };
 
+  const handleCarimboUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { toast.error('Imagem muito grande (máx 2MB)'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const updated = saveConfig({ carimboEmpresa: reader.result as string });
+      setConfig(updated);
+      toast.success('Carimbo atualizado!');
+    };
+    reader.readAsDataURL(file);
+  };
+  const handleRemoveCarimbo = () => {
+    const updated = saveConfig({ carimboEmpresa: '' });
+    setConfig(updated);
+    toast.success('Carimbo removido');
+  };
+
   return (
     <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-4xl mx-auto space-y-6">
@@ -105,11 +124,12 @@ export default function Configuracoes() {
         </div>
 
         <Tabs defaultValue="empresa" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5 max-w-3xl">
+          <TabsList className="grid w-full grid-cols-6 max-w-3xl">
             <TabsTrigger value="empresa"><Building2 className="h-4 w-4 mr-1.5" />Empresa</TabsTrigger>
             <TabsTrigger value="empresas"><Building className="h-4 w-4 mr-1.5" />Empresas</TabsTrigger>
             <TabsTrigger value="logo"><ImageIcon className="h-4 w-4 mr-1.5" />Logo</TabsTrigger>
             <TabsTrigger value="assinatura"><PenTool className="h-4 w-4 mr-1.5" />Assinatura</TabsTrigger>
+            <TabsTrigger value="carimbo"><Stamp className="h-4 w-4 mr-1.5" />Carimbo</TabsTrigger>
             <TabsTrigger value="alertas"><Bell className="h-4 w-4 mr-1.5" />Alertas</TabsTrigger>
           </TabsList>
 
@@ -305,6 +325,52 @@ export default function Configuracoes() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* CARIMBO */}
+          <TabsContent value="carimbo">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Carimbo da Empresa</CardTitle>
+                <CardDescription>
+                  Envie uma imagem (PNG/JPG). Ela será aplicada como carimbo sobre a assinatura da empresa, com efeito de tinta e leve rotação.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-center min-h-[180px] border-2 border-dashed rounded-lg bg-muted/30 relative overflow-hidden">
+                  {config.carimboEmpresa ? (
+                    <img
+                      src={config.carimboEmpresa}
+                      alt="Carimbo"
+                      className="max-h-40 object-contain"
+                      style={{
+                        transform: 'rotate(-8deg)',
+                        opacity: 0.78,
+                        filter: 'contrast(1.4) saturate(0) brightness(0.9) sepia(1) hue-rotate(-40deg) saturate(6)',
+                        mixBlendMode: 'multiply',
+                      }}
+                    />
+                  ) : (
+                    <div className="text-center text-muted-foreground">
+                      <Stamp className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">Nenhum carimbo carregado</p>
+                    </div>
+                  )}
+                </div>
+                <input ref={carimboRef} type="file" accept="image/*" className="hidden" onChange={handleCarimboUpload} />
+                <div className="flex gap-2 justify-end">
+                  {config.carimboEmpresa && (
+                    <Button variant="outline" onClick={handleRemoveCarimbo}>
+                      <Trash2 className="h-4 w-4 mr-2" /> Remover
+                    </Button>
+                  )}
+                  <Button onClick={() => carimboRef.current?.click()}>
+                    <Upload className="h-4 w-4 mr-2" /> Enviar Imagem
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
 
           {/* ALERTAS */}
           <TabsContent value="alertas">

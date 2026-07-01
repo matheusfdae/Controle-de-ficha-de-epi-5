@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, FilePlus2, Search, CalendarClock, Settings, ShieldCheck, LogOut, Users, Package, Briefcase, UserPlus, ClipboardSignature, HardHat, Shirt, FileSignature,
+  LayoutDashboard, FilePlus2, Search, CalendarClock, Settings, ShieldCheck, LogOut, Users, Package, Briefcase, UserPlus, ClipboardSignature, HardHat, Shirt, FileSignature, Trophy,
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -15,6 +15,7 @@ const baseItems = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard, end: true, adminOnly: false },
   { title: 'Assinar (Tablet)', url: '/pendentes', icon: ClipboardSignature, end: false, adminOnly: false },
   { title: 'Vencimentos', url: '/vencimentos', icon: CalendarClock, end: false, adminOnly: false },
+  { title: 'Rank por Posto', url: '/rank-postos', icon: Trophy, end: false, adminOnly: false },
 ];
 
 const epiItems = [

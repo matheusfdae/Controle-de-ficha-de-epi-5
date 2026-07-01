@@ -11,6 +11,7 @@ export interface AppConfig {
   assinaturaEmpresa: string; // base64 PNG da assinatura padrão
   diasAlertaVencimento: number;
   diasValidadeEpi: number;
+  carimboEmpresa: string; // base64 PNG do carimbo
 }
 
 const DEFAULTS: AppConfig = {
@@ -24,6 +25,7 @@ const DEFAULTS: AppConfig = {
   assinaturaEmpresa: '',
   diasAlertaVencimento: 30,
   diasValidadeEpi: 180,
+  carimboEmpresa: '',
 };
 
 export function getConfig(): AppConfig {
