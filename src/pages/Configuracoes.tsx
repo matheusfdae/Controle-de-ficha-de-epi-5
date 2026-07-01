@@ -326,6 +326,52 @@ export default function Configuracoes() {
             </Card>
           </TabsContent>
 
+          {/* CARIMBO */}
+          <TabsContent value="carimbo">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Carimbo da Empresa</CardTitle>
+                <CardDescription>
+                  Envie uma imagem (PNG/JPG). Ela será aplicada como carimbo sobre a assinatura da empresa, com efeito de tinta e leve rotação.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-center min-h-[180px] border-2 border-dashed rounded-lg bg-muted/30 relative overflow-hidden">
+                  {config.carimboEmpresa ? (
+                    <img
+                      src={config.carimboEmpresa}
+                      alt="Carimbo"
+                      className="max-h-40 object-contain"
+                      style={{
+                        transform: 'rotate(-8deg)',
+                        opacity: 0.78,
+                        filter: 'contrast(1.4) saturate(0) brightness(0.9) sepia(1) hue-rotate(-40deg) saturate(6)',
+                        mixBlendMode: 'multiply',
+                      }}
+                    />
+                  ) : (
+                    <div className="text-center text-muted-foreground">
+                      <Stamp className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">Nenhum carimbo carregado</p>
+                    </div>
+                  )}
+                </div>
+                <input ref={carimboRef} type="file" accept="image/*" className="hidden" onChange={handleCarimboUpload} />
+                <div className="flex gap-2 justify-end">
+                  {config.carimboEmpresa && (
+                    <Button variant="outline" onClick={handleRemoveCarimbo}>
+                      <Trash2 className="h-4 w-4 mr-2" /> Remover
+                    </Button>
+                  )}
+                  <Button onClick={() => carimboRef.current?.click()}>
+                    <Upload className="h-4 w-4 mr-2" /> Enviar Imagem
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+
           {/* ALERTAS */}
           <TabsContent value="alertas">
             <Card>
