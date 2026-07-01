@@ -96,6 +96,24 @@ export default function Configuracoes() {
     toast.success('Logo removida');
   };
 
+  const handleCarimboUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { toast.error('Imagem muito grande (máx 2MB)'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const updated = saveConfig({ carimboEmpresa: reader.result as string });
+      setConfig(updated);
+      toast.success('Carimbo atualizado!');
+    };
+    reader.readAsDataURL(file);
+  };
+  const handleRemoveCarimbo = () => {
+    const updated = saveConfig({ carimboEmpresa: '' });
+    setConfig(updated);
+    toast.success('Carimbo removido');
+  };
+
   return (
     <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-4xl mx-auto space-y-6">
