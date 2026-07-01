@@ -324,7 +324,7 @@ export function generatePDF(ficha: EPIFicha): void {
   y = renderEmployeeRows(doc, y, ficha);
   y = renderTermsSection(doc, y);
   y = renderDeclaroSection(doc, y);
-  y = renderSignatureRow(doc, y, ficha);
+  y = renderSignatureRow(doc, y, ficha, config);
   y = renderItemsTable(doc, y, ficha);
   renderFooter(doc, y, ficha);
 
