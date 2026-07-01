@@ -18,6 +18,7 @@ export default function Configuracoes() {
   const [config, setConfig] = useState<AppConfig>(getConfig());
   const [novaAssinatura, setNovaAssinatura] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const carimboRef = useRef<HTMLInputElement>(null);
 
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [empresaDialog, setEmpresaDialog] = useState(false);
