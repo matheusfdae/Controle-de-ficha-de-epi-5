@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Building2, PenTool, Image as ImageIcon, Save, Trash2, Upload, Bell, Plus, Pencil, Building } from 'lucide-react';
+import { Building2, PenTool, Image as ImageIcon, Save, Trash2, Upload, Bell, Plus, Pencil, Building, Stamp } from 'lucide-react';
 import { AppConfig, getConfig, saveConfig } from '@/services/configService';
 import { Empresa, listEmpresas, saveEmpresa, deleteEmpresa } from '@/services/empresasService';
 import {
