@@ -159,13 +159,11 @@ export default function Usuarios() {
   };
 
   const handleDelete = async (row: Row) => {
-    // Soft delete: inativa o profile (não temos service_role no client para excluir auth.users)
-    const { error } = await supabase
-      .from('profiles')
-      .update({ ativo: false, inativado_em: new Date().toISOString() })
-      .eq('id', row.id);
-    if (error) { toast.error(error.message); return; }
-    toast.success('Usuário inativado com sucesso!');
+    const { error } = await supabase.functions.invoke('admin-delete-user', {
+      body: { user_id: row.id },
+    });
+    if (error) { toast.error(error.message || 'Falha ao excluir'); return; }
+    toast.success(`Usuário ${row.nome} excluído definitivamente!`);
     load();
   };
 
