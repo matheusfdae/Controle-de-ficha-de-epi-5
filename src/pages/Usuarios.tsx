@@ -333,7 +333,7 @@ export default function Usuarios() {
                     </AlertDialog>
                   </>
                 )}
-                {u.id !== user?.id && u.ativo && (
+                {u.id !== user?.id && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="ghost" size="icon" title="Excluir usuário">
@@ -344,7 +344,7 @@ export default function Usuarios() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          O usuário <strong>{u.nome}</strong> será inativado e perderá o acesso ao sistema. Esta ação pode ser revertida pelo suporte.
+                          O usuário <strong>{u.nome}</strong> será excluído DEFINITIVAMENTE do sistema. Esta ação não pode ser desfeita.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
