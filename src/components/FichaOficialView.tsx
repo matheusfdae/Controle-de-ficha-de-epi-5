@@ -124,29 +124,22 @@ export default function FichaOficialView({ ficha, signMode }: Props) {
           </div>
         </div>
         <div className="w-1/2 p-3 flex flex-col items-center justify-end relative" style={{ minHeight: 80 }}>
-          <div className="flex-1" />
-          {ficha.assinaturaResponsavel ? (
-            <img src={ficha.assinaturaResponsavel} alt="Assinatura responsável" className="max-h-12 object-contain mb-1" />
-          ) : (
-            <div className="text-[10px] uppercase mb-1 text-muted-foreground italic">Assinatura</div>
-          )}
-          {config.carimboEmpresa && (
-            <img
-              src={config.carimboEmpresa}
-              alt="Carimbo"
-              className="absolute pointer-events-none"
-              style={{
-                right: 12,
-                bottom: 18,
-                maxHeight: 70,
-                maxWidth: 130,
-                transform: 'rotate(-10deg)',
-                opacity: 0.75,
-                filter: 'contrast(1.4) saturate(0) brightness(0.9) sepia(1) hue-rotate(-40deg) saturate(6)',
-                mixBlendMode: 'multiply',
-              }}
-            />
-          )}
+          <div className="flex-1 w-full flex items-center justify-center">
+            {config.carimboEmpresa && (
+              <img
+                src={config.carimboEmpresa}
+                alt="Carimbo"
+                className="pointer-events-none"
+                style={{
+                  maxHeight: 70,
+                  maxWidth: 160,
+                  opacity: 0.85,
+                  filter: 'contrast(1.4) saturate(0) brightness(0.9) sepia(1) hue-rotate(-40deg) saturate(6)',
+                  mixBlendMode: 'multiply',
+                }}
+              />
+            )}
+          </div>
           <div className="w-full border-t border-black pt-1 text-center text-[10px] font-bold">
             EMPRESA
           </div>
