@@ -159,10 +159,13 @@ export default function Usuarios() {
   };
 
   const handleDelete = async (row: Row) => {
-    const { error } = await supabase.functions.invoke('admin-delete-user', {
+    const { data, error } = await supabase.functions.invoke('admin-delete-user', {
       body: { user_id: row.id },
     });
-    if (error) { toast.error(error.message || 'Falha ao excluir'); return; }
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error || error?.message || 'Falha ao excluir');
+      return;
+    }
     toast.success(`Usuário ${row.nome} excluído definitivamente!`);
     load();
   };
