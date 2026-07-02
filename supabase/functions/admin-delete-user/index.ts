@@ -48,9 +48,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Remove vínculos primeiro (evita conflitos de FK)
+    // Remove dados relacionados que têm ON DELETE RESTRICT
+    // Fichas EPI e itens (itens caem em cascade via ficha_id)
+    await admin.from("fichas_epi").delete().eq("colaborador_id", user_id);
+    await admin.from("fichas_uniforme").delete().eq("colaborador_id", user_id);
+
+    // Remove vínculos
     await admin.from("user_roles").delete().eq("user_id", user_id);
-    await admin.from("profiles").delete().eq("id", user_id);
+    const { error: profErr } = await admin.from("profiles").delete().eq("id", user_id);
+    if (profErr) throw profErr;
 
     const { error: delErr } = await admin.auth.admin.deleteUser(user_id);
     if (delErr) throw delErr;
