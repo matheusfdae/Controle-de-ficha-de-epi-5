@@ -200,16 +200,16 @@ function renderSignatureRow(doc: jsPDF, y: number, ficha: EPIFicha, config: AppC
   // Label ABAIXO da linha
   text(doc, 'NOME COMPLETO (FUNCIONÁRIO)', M + CW / 4, LINE_Y + 3, { size: 6, align: 'center' });
 
-  // ----- Coluna direita: Empresa -----
-  if (ficha.assinaturaResponsavel) {
-    try { doc.addImage(ficha.assinaturaResponsavel, 'PNG', M + CW / 2 + 10, y + 1, CW / 2 - 20, LINE_Y - y - 1); } catch {}
-  }
+  // ----- Coluna direita: Empresa (somente carimbo centralizado) -----
   if (config.carimboEmpresa) {
-    try { doc.addImage(config.carimboEmpresa, 'PNG', M + CW - 55, y + 1, 45, SIG_H - 4); } catch {}
+    const stampW = 40;
+    const stampH = SIG_H - 6;
+    const stampX = M + CW / 2 + (CW / 2 - stampW) / 2;
+    try { doc.addImage(config.carimboEmpresa, 'PNG', stampX, y + 1, stampW, stampH); } catch {}
   }
-  text(doc, ficha.empresa, M + CW * 0.75, LINE_Y - 1, { size: 7, align: 'center' });
   line(doc, M + CW / 2 + 10, LINE_Y, M + CW - 10, LINE_Y);
   text(doc, 'EMPRESA', M + CW * 0.75, LINE_Y + 3, { size: 6, align: 'center' });
+  text(doc, ficha.empresa, M + CW * 0.75, LINE_Y + 6, { size: 6, align: 'center' });
 
 
   return y + SIG_H;

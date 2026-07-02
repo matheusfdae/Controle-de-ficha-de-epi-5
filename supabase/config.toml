@@ -2,3 +2,6 @@ project_id = "mtpvcdqerkhmmpinotbe"
 
 [functions.admin-set-password]
 verify_jwt = true
+
+[functions.admin-delete-user]
+verify_jwt = true

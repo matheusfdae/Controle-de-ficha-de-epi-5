@@ -109,5 +109,14 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', sans-serif;
+    text-transform: uppercase;
+  }
+
+  /* Preserva a digitação natural em campos sensíveis (senha, email, url, código) */
+  input[type="password"],
+  input[type="email"],
+  input[type="url"],
+  code, pre, kbd, samp {
+    text-transform: none;
   }
 }

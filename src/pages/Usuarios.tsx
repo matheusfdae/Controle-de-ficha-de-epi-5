@@ -159,13 +159,11 @@ export default function Usuarios() {
   };
 
   const handleDelete = async (row: Row) => {
-    // Soft delete: inativa o profile (não temos service_role no client para excluir auth.users)
-    const { error } = await supabase
-      .from('profiles')
-      .update({ ativo: false, inativado_em: new Date().toISOString() })
-      .eq('id', row.id);
-    if (error) { toast.error(error.message); return; }
-    toast.success('Usuário inativado com sucesso!');
+    const { error } = await supabase.functions.invoke('admin-delete-user', {
+      body: { user_id: row.id },
+    });
+    if (error) { toast.error(error.message || 'Falha ao excluir'); return; }
+    toast.success(`Usuário ${row.nome} excluído definitivamente!`);
     load();
   };
 
@@ -335,7 +333,7 @@ export default function Usuarios() {
                     </AlertDialog>
                   </>
                 )}
-                {u.id !== user?.id && u.ativo && (
+                {u.id !== user?.id && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="ghost" size="icon" title="Excluir usuário">
@@ -346,7 +344,7 @@ export default function Usuarios() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          O usuário <strong>{u.nome}</strong> será inativado e perderá o acesso ao sistema. Esta ação pode ser revertida pelo suporte.
+                          O usuário <strong>{u.nome}</strong> será excluído DEFINITIVAMENTE do sistema. Esta ação não pode ser desfeita.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
