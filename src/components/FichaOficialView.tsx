@@ -1,6 +1,6 @@
 import { EPIFicha, MotivoEntrega } from '@/types/epi';
-import { ReactNode } from 'react';
-import { getConfig } from '@/services/configService';
+import { ReactNode, useEffect, useState } from 'react';
+import { getConfig, loadConfig } from '@/services/configService';
 
 interface Props {
   ficha: EPIFicha;
@@ -27,7 +27,12 @@ const motivos: { key: MotivoEntrega; label: string }[] = [
 export default function FichaOficialView({ ficha, signMode }: Props) {
   const minRows = 9;
   const rowsToRender = Math.max(ficha.itens.length, minRows);
-  const config = getConfig();
+  const [config, setConfig] = useState(getConfig());
+  useEffect(() => {
+    let active = true;
+    loadConfig().then(cfg => { if (active) setConfig(cfg); });
+    return () => { active = false; };
+  }, []);
   const nomeParts = config.empresaNome.split(' ');
   const linha1 = nomeParts[0] || '';
   const linha2 = nomeParts.slice(1).join(' ') || '';
@@ -124,12 +129,19 @@ export default function FichaOficialView({ ficha, signMode }: Props) {
           </div>
         </div>
         <div className="w-1/2 p-3 flex flex-col items-center justify-end relative" style={{ minHeight: 80 }}>
-          <div className="flex-1 w-full flex items-center justify-center">
+          <div className="flex-1 w-full flex items-center justify-center relative">
+            {(ficha.assinaturaResponsavel || config.assinaturaEmpresa) && (
+              <img
+                src={ficha.assinaturaResponsavel || config.assinaturaEmpresa}
+                alt="Assinatura da empresa"
+                className="max-h-12 max-w-[220px] object-contain"
+              />
+            )}
             {config.carimboEmpresa && (
               <img
                 src={config.carimboEmpresa}
                 alt="Carimbo"
-                className="pointer-events-none"
+                className="pointer-events-none absolute"
                 style={{
                   maxHeight: 70,
                   maxWidth: 160,

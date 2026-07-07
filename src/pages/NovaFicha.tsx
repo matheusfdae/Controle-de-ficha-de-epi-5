@@ -14,7 +14,7 @@ import {
 import { toast } from 'sonner';
 import { EPIFicha, EPIItem, MotivoEntrega, Turno } from '@/types/epi';
 import { generateId, saveFicha } from '@/services/fichaService';
-import { getConfig } from '@/services/configService';
+import { getConfig, loadConfig } from '@/services/configService';
 import SignaturePad from '@/components/SignaturePad';
 import { Funcao, EPI, listFuncoes, listEpis, listFuncaoEpis } from '@/services/estoqueService';
 import { Empresa, listEmpresas } from '@/services/empresasService';
@@ -26,7 +26,7 @@ export default function NovaFicha() {
   const [searchParams] = useSearchParams();
   const tipo = (searchParams.get('tipo') === 'uniforme' ? 'uniforme' : 'epi') as 'epi' | 'uniforme';
   const today = new Date().toISOString().split('T')[0];
-  const config = getConfig();
+  const [config, setConfig] = useState(getConfig());
 
   const [form, setForm] = useState({
     nomeFuncionario: '',
@@ -61,6 +61,17 @@ export default function NovaFicha() {
     listEpis(tipo).then(setEpis).catch(() => {});
     setEmpresas(listEmpresas());
   }, [tipo]);
+
+  useEffect(() => {
+    let active = true;
+    loadConfig().then(cfg => {
+      if (!active) return;
+      setConfig(cfg);
+      setForm(prev => ({ ...prev, empresa: prev.empresa || cfg.empresaNome }));
+      setAssinaturaResponsavel(prev => prev || cfg.assinaturaEmpresa || '');
+    });
+    return () => { active = false; };
+  }, []);
 
   const aplicarFuncao = async (id: string) => {
     setFuncaoId(id);
@@ -320,9 +331,11 @@ export default function NovaFicha() {
               <Label htmlFor="empresa">Empresa</Label>
               <Select value={form.empresa} onValueChange={v => updateField('empresa', v)}>
                 <SelectTrigger><SelectValue placeholder="Selecione a empresa" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="MATRIZ">MATRIZ</SelectItem>
-                  <SelectItem value="APOIO">APOIO</SelectItem>
+                  <SelectContent>
+                    <SelectItem value={config.empresaNome}>{config.empresaNome}</SelectItem>
+                    {empresas.map(e => <SelectItem key={e.id} value={e.nome}>{e.nome}</SelectItem>)}
+                    <SelectItem value="MATRIZ">MATRIZ</SelectItem>
+                    <SelectItem value="APOIO">APOIO</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -1,4 +1,7 @@
+import { supabase } from '@/integrations/supabase/client';
+
 const KEY = 'epi_config';
+const REMOTE_KEY = 'global';
 
 export interface AppConfig {
   empresaNome: string;
@@ -38,9 +41,38 @@ export function getConfig(): AppConfig {
   }
 }
 
-export function saveConfig(config: Partial<AppConfig>): AppConfig {
+function persistLocal(config: AppConfig) {
+  localStorage.setItem(KEY, JSON.stringify(config));
+}
+
+export async function loadConfig(): Promise<AppConfig> {
+  try {
+    const { data, error } = await (supabase.from as any)('app_config')
+      .select('value')
+      .eq('key', REMOTE_KEY)
+      .maybeSingle();
+    if (error) throw error;
+    if (data?.value && typeof data.value === 'object') {
+      const merged = { ...DEFAULTS, ...(data.value as Partial<AppConfig>) };
+      persistLocal(merged);
+      return merged;
+    }
+  } catch (error) {
+    console.warn('Falha ao carregar configurações do backend', error);
+  }
+  return getConfig();
+}
+
+export async function saveConfig(config: Partial<AppConfig>): Promise<AppConfig> {
   const merged = { ...getConfig(), ...config };
-  localStorage.setItem(KEY, JSON.stringify(merged));
+  persistLocal(merged);
+
+  const { error } = await (supabase.from as any)('app_config').upsert({
+    key: REMOTE_KEY,
+    value: merged,
+  });
+  if (error) throw error;
+
   return merged;
 }
 

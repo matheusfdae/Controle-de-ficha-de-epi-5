@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import { EPIFicha } from '@/types/epi';
-import { getConfig, AppConfig } from '@/services/configService';
+import { loadConfig, AppConfig } from '@/services/configService';
 
 // ===== Constantes de layout =====
 
@@ -62,12 +62,22 @@ function text(doc: jsPDF, txt: string, x: number, y: number, opts: TextOpts = {}
   opts.align ? doc.text(txt, x, y, { align: opts.align }) : doc.text(txt, x, y);
 }
 
+function imageFormat(dataUrl: string): 'PNG' | 'JPEG' | 'WEBP' {
+  if (dataUrl.startsWith('data:image/jpeg') || dataUrl.startsWith('data:image/jpg')) return 'JPEG';
+  if (dataUrl.startsWith('data:image/webp')) return 'WEBP';
+  return 'PNG';
+}
+
+function addDataImage(doc: jsPDF, dataUrl: string, x: number, y: number, w: number, h: number) {
+  doc.addImage(dataUrl, imageFormat(dataUrl), x, y, w, h);
+}
+
 // ===== Seções do PDF =====
 
 function renderHeader(doc: jsPDF, y: number, config: AppConfig): number {
   rect(doc, M, y, 40, 16);
   if (config.logoDataUrl) {
-    try { doc.addImage(config.logoDataUrl, 'PNG', M + 2, y + 2, 36, 12); } catch {}
+    try { addDataImage(doc, config.logoDataUrl, M + 2, y + 2, 36, 12); } catch {}
   } else {
     const parts = config.empresaNome.split(' ');
     text(doc, parts[0] ?? '', M + 20, y + 6,  { bold: true, size: 8, align: 'center' });
@@ -201,11 +211,15 @@ function renderSignatureRow(doc: jsPDF, y: number, ficha: EPIFicha, config: AppC
   text(doc, 'NOME COMPLETO (FUNCIONÁRIO)', M + CW / 4, LINE_Y + 3, { size: 6, align: 'center' });
 
   // ----- Coluna direita: Empresa (somente carimbo centralizado) -----
+  const assinaturaEmpresa = ficha.assinaturaResponsavel || config.assinaturaEmpresa;
+  if (assinaturaEmpresa) {
+    try { addDataImage(doc, assinaturaEmpresa, M + CW / 2 + 26, y + 1, CW / 2 - 52, LINE_Y - y - 1); } catch {}
+  }
   if (config.carimboEmpresa) {
     const stampW = 40;
     const stampH = SIG_H - 6;
     const stampX = M + CW / 2 + (CW / 2 - stampW) / 2;
-    try { doc.addImage(config.carimboEmpresa, 'PNG', stampX, y + 1, stampW, stampH); } catch {}
+    try { addDataImage(doc, config.carimboEmpresa, stampX, y + 1, stampW, stampH); } catch {}
   }
   line(doc, M + CW / 2 + 10, LINE_Y, M + CW - 10, LINE_Y);
   text(doc, 'EMPRESA', M + CW * 0.75, LINE_Y + 3, { size: 6, align: 'center' });
@@ -315,8 +329,8 @@ function renderFooter(doc: jsPDF, y: number, ficha: EPIFicha): void {
 
 // ===== Entry point =====
 
-export function generatePDF(ficha: EPIFicha): void {
-  const config = getConfig();
+export async function generatePDF(ficha: EPIFicha): Promise<void> {
+  const config = await loadConfig();
   const doc = new jsPDF('l', 'mm', 'a4');
 
   let y = M;

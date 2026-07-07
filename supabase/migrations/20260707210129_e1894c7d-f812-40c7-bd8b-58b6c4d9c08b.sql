@@ -1,0 +1,1 @@
+ALTER TABLE public.app_config DROP CONSTRAINT IF EXISTS app_config_updated_by_fkey;

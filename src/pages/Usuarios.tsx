@@ -109,25 +109,18 @@ export default function Usuarios() {
       toast.error('A senha deve ter no mínimo 6 caracteres');
       return;
     }
-    const { data, error } = await supabase.auth.signUp({
-      email: form.email.trim().toLowerCase(),
-      password: form.password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-        data: { nome_completo: form.nome },
+    const role: UserRole = form.isAdmin ? 'admin' : 'colaborador';
+    const { data, error } = await supabase.functions.invoke('admin-create-user', {
+      body: {
+        nome: form.nome.trim(),
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+        role,
       },
     });
-    if (error) {
-      toast.error(error.message);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error || error?.message || 'Falha ao criar usuário');
       return;
-    }
-    const newId = data.user?.id;
-    if (newId) {
-      // Marca para forçar troca de senha no primeiro acesso
-      await supabase.from('profiles').update({ must_change_password: true }).eq('id', newId);
-      if (form.isAdmin) {
-        await supabase.from('user_roles').insert({ user_id: newId, role: 'admin' as any });
-      }
     }
     toast.success(`Usuário criado! Login: ${form.email} — será solicitada a troca de senha no 1º acesso.`);
     setForm({ nome: '', email: '', emailEditado: false, password: '', isAdmin: false });
@@ -143,19 +136,26 @@ export default function Usuarios() {
 
   const saveEdit = async () => {
     if (!editing) return;
-    await supabase.from('profiles').update({ nome_completo: editForm.nome }).eq('id', editing.id);
-    const novoRole: UserRole = editForm.isAdmin ? 'admin' : (editForm.role === 'admin' ? 'colaborador' : editForm.role);
-    if (novoRole !== editing.role) {
-      if (editing.role !== 'colaborador') {
-        await supabase.from('user_roles').delete().eq('user_id', editing.id).eq('role', editing.role as any);
+    try {
+      const { error: profErr } = await supabase.from('profiles').update({ nome_completo: editForm.nome }).eq('id', editing.id);
+      if (profErr) throw profErr;
+      const novoRole: UserRole = editForm.isAdmin ? 'admin' : (editForm.role === 'admin' ? 'colaborador' : editForm.role);
+      if (novoRole !== editing.role) {
+        if (editing.role !== 'colaborador') {
+          const { error } = await supabase.from('user_roles').delete().eq('user_id', editing.id).eq('role', editing.role as any);
+          if (error) throw error;
+        }
+        if (novoRole !== 'colaborador') {
+          const { error } = await supabase.from('user_roles').insert({ user_id: editing.id, role: novoRole as any });
+          if (error) throw error;
+        }
       }
-      if (novoRole !== 'colaborador') {
-        await supabase.from('user_roles').insert({ user_id: editing.id, role: novoRole as any });
-      }
+      toast.success('Usuário atualizado!');
+      setEditing(null);
+      load();
+    } catch (error: any) {
+      toast.error(error?.message || 'Falha ao atualizar usuário');
     }
-    toast.success('Usuário atualizado!');
-    setEditing(null);
-    load();
   };
 
   const handleDelete = async (row: Row) => {

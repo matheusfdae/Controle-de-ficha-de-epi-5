@@ -51,6 +51,15 @@ export default function SignaturePad({ label, onSave, initialValue, disabled }: 
     };
   }, [disabled]);
 
+  useEffect(() => {
+    const pad = padRef.current;
+    if (!pad) return;
+    if (initialValue) {
+      pad.fromDataURL(initialValue);
+      setIsEmpty(false);
+    }
+  }, [initialValue]);
+
   const clear = () => {
     padRef.current?.clear();
     setIsEmpty(true);
