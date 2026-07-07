@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Building2, PenTool, Image as ImageIcon, Save, Trash2, Upload, Bell, Plus, Pencil, Building, Stamp } from 'lucide-react';
-import { AppConfig, getConfig, saveConfig } from '@/services/configService';
+import { AppConfig, getConfig, loadConfig, saveConfig } from '@/services/configService';
 import { Empresa, listEmpresas, saveEmpresa, deleteEmpresa } from '@/services/empresasService';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -27,8 +27,10 @@ export default function Configuracoes() {
   const reloadEmpresas = () => setEmpresas(listEmpresas());
 
   useEffect(() => {
-    setConfig(getConfig());
+    let active = true;
+    loadConfig().then(cfg => { if (active) setConfig(cfg); });
     reloadEmpresas();
+    return () => { active = false; };
   }, []);
 
   const update = <K extends keyof AppConfig>(key: K, value: AppConfig[K]) => {
@@ -51,26 +53,39 @@ export default function Configuracoes() {
     toast.success('Empresa removida');
   };
 
-  const handleSave = () => {
-    saveConfig(config);
-    toast.success('Configurações salvas!');
+  const handleSave = async () => {
+    try {
+      const updated = await saveConfig(config);
+      setConfig(updated);
+      toast.success('Configurações salvas!');
+    } catch (error: any) {
+      toast.error(error?.message || 'Falha ao salvar configurações');
+    }
   };
 
-  const handleSaveAssinatura = () => {
+  const handleSaveAssinatura = async () => {
     if (!novaAssinatura) {
       toast.error('Desenhe a nova assinatura primeiro');
       return;
     }
-    const updated = saveConfig({ assinaturaEmpresa: novaAssinatura });
-    setConfig(updated);
-    setNovaAssinatura('');
-    toast.success('Assinatura da empresa atualizada!');
+    try {
+      const updated = await saveConfig({ assinaturaEmpresa: novaAssinatura });
+      setConfig(updated);
+      setNovaAssinatura('');
+      toast.success('Assinatura da empresa atualizada!');
+    } catch (error: any) {
+      toast.error(error?.message || 'Falha ao salvar assinatura');
+    }
   };
 
-  const handleRemoveAssinatura = () => {
-    const updated = saveConfig({ assinaturaEmpresa: '' });
-    setConfig(updated);
-    toast.success('Assinatura removida');
+  const handleRemoveAssinatura = async () => {
+    try {
+      const updated = await saveConfig({ assinaturaEmpresa: '' });
+      setConfig(updated);
+      toast.success('Assinatura removida');
+    } catch (error: any) {
+      toast.error(error?.message || 'Falha ao remover assinatura');
+    }
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,19 +96,27 @@ export default function Configuracoes() {
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const dataUrl = reader.result as string;
-      const updated = saveConfig({ logoDataUrl: dataUrl });
-      setConfig(updated);
-      toast.success('Logo atualizada!');
+      try {
+        const updated = await saveConfig({ logoDataUrl: dataUrl });
+        setConfig(updated);
+        toast.success('Logo atualizada!');
+      } catch (error: any) {
+        toast.error(error?.message || 'Falha ao salvar logo');
+      }
     };
     reader.readAsDataURL(file);
   };
 
-  const handleRemoveLogo = () => {
-    const updated = saveConfig({ logoDataUrl: '' });
-    setConfig(updated);
-    toast.success('Logo removida');
+  const handleRemoveLogo = async () => {
+    try {
+      const updated = await saveConfig({ logoDataUrl: '' });
+      setConfig(updated);
+      toast.success('Logo removida');
+    } catch (error: any) {
+      toast.error(error?.message || 'Falha ao remover logo');
+    }
   };
 
   const handleCarimboUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -101,17 +124,25 @@ export default function Configuracoes() {
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) { toast.error('Imagem muito grande (máx 2MB)'); return; }
     const reader = new FileReader();
-    reader.onload = () => {
-      const updated = saveConfig({ carimboEmpresa: reader.result as string });
-      setConfig(updated);
-      toast.success('Carimbo atualizado!');
+    reader.onload = async () => {
+      try {
+        const updated = await saveConfig({ carimboEmpresa: reader.result as string });
+        setConfig(updated);
+        toast.success('Carimbo atualizado!');
+      } catch (error: any) {
+        toast.error(error?.message || 'Falha ao salvar carimbo');
+      }
     };
     reader.readAsDataURL(file);
   };
-  const handleRemoveCarimbo = () => {
-    const updated = saveConfig({ carimboEmpresa: '' });
-    setConfig(updated);
-    toast.success('Carimbo removido');
+  const handleRemoveCarimbo = async () => {
+    try {
+      const updated = await saveConfig({ carimboEmpresa: '' });
+      setConfig(updated);
+      toast.success('Carimbo removido');
+    } catch (error: any) {
+      toast.error(error?.message || 'Falha ao remover carimbo');
+    }
   };
 
   return (
