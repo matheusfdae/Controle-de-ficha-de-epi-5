@@ -42,7 +42,7 @@ interface AuthContextType {
 const ADMIN_ROLES: UserRole[] = ['admin', 'rh'];
 
 // Ordem de precedência: o primeiro role encontrado na lista do usuário vence
-const ROLE_HIERARCHY: UserRole[] = ['admin', 'rh', 'supervisor', 'colaborador'];
+const ROLE_HIERARCHY: UserRole[] = ['admin', 'rh', 'supervisor', 'almoxarife', 'colaborador'];
 
 function resolveRole(roles: string[]): UserRole {
   for (const role of ROLE_HIERARCHY) {
