@@ -2,13 +2,20 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
-type Role = 'admin' | 'rh' | 'supervisor' | 'colaborador';
+type Role = 'admin' | 'rh' | 'supervisor' | 'almoxarife' | 'colaborador';
+const ROLES: Role[] = ['admin', 'rh', 'supervisor', 'almoxarife', 'colaborador'];
+
+interface PermissionRow {
+  module: string;
+  can_view?: boolean;
+  can_create?: boolean;
+  can_edit?: boolean;
+  can_delete?: boolean;
+}
 
 const headers = { ...corsHeaders, 'Content-Type': 'application/json' };
-
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers });
-}
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers });
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -29,12 +36,9 @@ Deno.serve(async (req) => {
     if (claimsError || !claimsData?.claims?.sub) return json({ error: 'Não autenticado' }, 401);
 
     const admin = createClient(supabaseUrl, serviceKey);
-    const { data: roles, error: rolesError } = await admin
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', claimsData.claims.sub);
-    if (rolesError) throw rolesError;
-    const canManage = (roles || []).some((r: any) => r.role === 'admin' || r.role === 'rh');
+    const { data: rolesData } = await admin
+      .from('user_roles').select('role').eq('user_id', claimsData.claims.sub);
+    const canManage = (rolesData || []).some((r: any) => r.role === 'admin' || r.role === 'rh');
     if (!canManage) return json({ error: 'Apenas administradores/RH' }, 403);
 
     const body = await req.json().catch(() => null) as {
@@ -42,26 +46,44 @@ Deno.serve(async (req) => {
       email?: string;
       password?: string;
       role?: Role;
+      permissions?: PermissionRow[];
+      send_invite?: boolean;
+      redirect_to?: string;
     } | null;
+
     const nome = String(body?.nome || '').trim();
     const email = String(body?.email || '').trim().toLowerCase();
     const password = String(body?.password || '');
-    const role: Role = ['admin', 'rh', 'supervisor', 'colaborador'].includes(body?.role as string)
-      ? body!.role!
-      : 'colaborador';
+    const role: Role = ROLES.includes(body?.role as Role) ? body!.role! : 'colaborador';
+    const permissions = Array.isArray(body?.permissions) ? body!.permissions! : [];
+    const sendInvite = body?.send_invite !== false && password.length === 0;
+    const redirectTo = body?.redirect_to || undefined;
 
     if (!nome) return json({ error: 'Nome obrigatório' }, 400);
-    if (!email || !email.includes('@')) return json({ error: 'E-mail/login inválido' }, 400);
-    if (password.length < 6) return json({ error: 'Senha mínima de 6 caracteres' }, 400);
+    if (!email || !email.includes('@')) return json({ error: 'E-mail inválido' }, 400);
+    if (!sendInvite && password.length < 6) {
+      return json({ error: 'Senha mínima de 6 caracteres' }, 400);
+    }
 
-    const { data: created, error: createError } = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { nome_completo: nome },
-    });
-    if (createError) throw createError;
-    const userId = created.user?.id;
+    let userId: string | undefined;
+
+    if (sendInvite) {
+      const { data: invited, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
+        data: { nome_completo: nome },
+        redirectTo,
+      });
+      if (invErr) throw invErr;
+      userId = invited.user?.id;
+    } else {
+      const { data: created, error: createError } = await admin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { nome_completo: nome },
+      });
+      if (createError) throw createError;
+      userId = created.user?.id;
+    }
     if (!userId) return json({ error: 'Usuário não foi criado' }, 500);
 
     const { error: profileError } = await admin.from('profiles').upsert({
@@ -74,12 +96,32 @@ Deno.serve(async (req) => {
     if (profileError) throw profileError;
 
     await admin.from('user_roles').delete().eq('user_id', userId);
-    const rolesToInsert = [{ user_id: userId, role: 'colaborador' as Role }];
+    const rolesToInsert: Array<{ user_id: string; role: Role }> = [
+      { user_id: userId, role: 'colaborador' },
+    ];
     if (role !== 'colaborador') rolesToInsert.push({ user_id: userId, role });
     const { error: roleError } = await admin.from('user_roles').insert(rolesToInsert);
     if (roleError) throw roleError;
 
-    return json({ ok: true, user_id: userId });
+    if (permissions.length > 0) {
+      await admin.from('user_permissions').delete().eq('user_id', userId);
+      const rows = permissions
+        .filter((p) => p && p.module)
+        .map((p) => ({
+          user_id: userId!,
+          module: p.module,
+          can_view: !!p.can_view,
+          can_create: !!p.can_create,
+          can_edit: !!p.can_edit,
+          can_delete: !!p.can_delete,
+        }));
+      if (rows.length > 0) {
+        const { error: permErr } = await admin.from('user_permissions').insert(rows);
+        if (permErr) throw permErr;
+      }
+    }
+
+    return json({ ok: true, user_id: userId, invited: sendInvite });
   } catch (error: any) {
     return json({ error: error?.message || String(error) }, 500);
   }
