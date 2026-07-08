@@ -1067,6 +1067,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_permissions: {
+        Row: {
+          can_create: boolean
+          can_delete: boolean
+          can_edit: boolean
+          can_view: boolean
+          created_at: string
+          id: string
+          module: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          can_create?: boolean
+          can_delete?: boolean
+          can_edit?: boolean
+          can_view?: boolean
+          created_at?: string
+          id?: string
+          module: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          can_create?: boolean
+          can_delete?: boolean
+          can_edit?: boolean
+          can_view?: boolean
+          created_at?: string
+          id?: string
+          module?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1118,6 +1154,10 @@ export type Database = {
       get_ficha_publica: { Args: { _ficha_id: string }; Returns: Json }
       get_termo_coletivo_publico: { Args: { _termo_id: string }; Returns: Json }
       get_termo_item_por_token: { Args: { _token: string }; Returns: Json }
+      has_permission: {
+        Args: { _action: string; _module: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1133,7 +1173,7 @@ export type Database = {
       progresso_assinatura: { Args: { _ficha_id: string }; Returns: Json }
     }
     Enums: {
-      app_role: "admin" | "rh" | "supervisor" | "colaborador"
+      app_role: "admin" | "rh" | "supervisor" | "colaborador" | "almoxarife"
       epi_categoria:
         | "protecao_cabeca"
         | "auditiva"
@@ -1283,7 +1323,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "rh", "supervisor", "colaborador"],
+      app_role: ["admin", "rh", "supervisor", "colaborador", "almoxarife"],
       epi_categoria: [
         "protecao_cabeca",
         "auditiva",

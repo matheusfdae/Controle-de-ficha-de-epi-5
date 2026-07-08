@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import type { Session, User as SupaUser } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
-export type UserRole = 'admin' | 'rh' | 'supervisor' | 'colaborador' | 'operador';
+export type UserRole = 'admin' | 'rh' | 'supervisor' | 'almoxarife' | 'colaborador' | 'operador';
 
 export interface User {
   id: string;
@@ -42,7 +42,7 @@ interface AuthContextType {
 const ADMIN_ROLES: UserRole[] = ['admin', 'rh'];
 
 // Ordem de precedência: o primeiro role encontrado na lista do usuário vence
-const ROLE_HIERARCHY: UserRole[] = ['admin', 'rh', 'supervisor', 'colaborador'];
+const ROLE_HIERARCHY: UserRole[] = ['admin', 'rh', 'supervisor', 'almoxarife', 'colaborador'];
 
 function resolveRole(roles: string[]): UserRole {
   for (const role of ROLE_HIERARCHY) {

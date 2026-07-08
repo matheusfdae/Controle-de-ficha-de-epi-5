@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
@@ -15,9 +15,17 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ShieldAlert, ShieldCheck, UserPlus, Pencil, Lock, Eye, EyeOff, Trash2, RefreshCw, KeyRound, KeySquare } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, UserPlus, Pencil, Trash2, RefreshCw, KeyRound, KeySquare, Mail, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import BackButton from '@/components/BackButton';
+import { PermissionsMatrix } from '@/components/PermissionsMatrix';
+import {
+  MODULES, ROLE_PRESETS, ROLE_LABELS, ROLE_BADGE_CLASS, RolePreset,
+  PermissionMap, emptyPermissions, permissionsToRows, rowsToPermissions,
+} from '@/lib/permissions';
+
+type ManageableRole = Exclude<RolePreset, never>;
+const ROLE_OPTIONS: ManageableRole[] = ['admin', 'rh', 'supervisor', 'almoxarife', 'colaborador'];
 
 interface Row {
   id: string;
@@ -27,18 +35,14 @@ interface Row {
   ativo: boolean;
 }
 
-const LOGIN_DOMAIN = 'sistema.local';
-
-// "João da Silva" → "joao.silva"
-function gerarLoginDeNome(nome: string): string {
-  const limpo = nome
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase().replace(/[^a-z\s]/g, '').trim();
-  const partes = limpo.split(/\s+/).filter(p => p.length > 1 && !['da', 'de', 'do', 'das', 'dos', 'e'].includes(p));
-  if (partes.length === 0) return '';
-  if (partes.length === 1) return partes[0];
-  return `${partes[0]}.${partes[partes.length - 1]}`;
-}
+const emptyForm = {
+  nome: '',
+  email: '',
+  password: '',
+  sendInvite: true,
+  role: 'colaborador' as ManageableRole,
+  permissions: ROLE_PRESETS.colaborador,
+};
 
 export default function Usuarios() {
   const { user, isAdmin } = useAuth();
@@ -46,11 +50,16 @@ export default function Usuarios() {
   const [loading, setLoading] = useState(true);
 
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ nome: '', email: '', emailEditado: false, password: '', isAdmin: false });
+  const [form, setForm] = useState<typeof emptyForm>({ ...emptyForm });
   const [showPwd, setShowPwd] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [editing, setEditing] = useState<Row | null>(null);
-  const [editForm, setEditForm] = useState({ nome: '', role: 'colaborador' as UserRole, isAdmin: false });
+  const [editForm, setEditForm] = useState({
+    nome: '', role: 'colaborador' as ManageableRole, permissions: emptyPermissions(),
+  });
+  const [pwdTarget, setPwdTarget] = useState<Row | null>(null);
+  const [pwdValue, setPwdValue] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -62,6 +71,7 @@ export default function Usuarios() {
         userRoles.includes('admin') ? 'admin'
         : userRoles.includes('rh') ? 'rh'
         : userRoles.includes('supervisor') ? 'supervisor'
+        : userRoles.includes('almoxarife') ? 'almoxarife'
         : 'colaborador';
       return { id: p.id, email: p.email, nome: p.nome_completo || p.email, role, ativo: p.ativo !== false };
     });
@@ -70,13 +80,6 @@ export default function Usuarios() {
   };
 
   useEffect(() => { if (isAdmin) load(); }, [isAdmin]);
-
-  // Auto-preenche email quando digita o nome (até o usuário editar manualmente)
-  useEffect(() => {
-    if (form.emailEditado) return;
-    const login = gerarLoginDeNome(form.nome);
-    setForm(f => ({ ...f, email: login ? `${login}@${LOGIN_DOMAIN}` : '' }));
-  }, [form.nome, form.emailEditado]);
 
   if (!isAdmin) {
     return (
@@ -96,42 +99,65 @@ export default function Usuarios() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
     let s = '';
     for (let i = 0; i < 10; i++) s += chars[Math.floor(Math.random() * chars.length)];
-    setForm(f => ({ ...f, password: s }));
+    setForm(f => ({ ...f, password: s, sendInvite: false }));
     setShowPwd(true);
   };
 
+  const applyRolePreset = (role: ManageableRole, target: 'new' | 'edit') => {
+    const preset = ROLE_PRESETS[role];
+    if (target === 'new') setForm(f => ({ ...f, role, permissions: { ...preset } }));
+    else setEditForm(f => ({ ...f, role, permissions: { ...preset } }));
+  };
+
   const handleAdd = async () => {
-    if (!form.nome.trim() || !form.email.trim() || !form.password.trim()) {
-      toast.error('Preencha todos os campos');
-      return;
+    if (!form.nome.trim() || !form.email.trim()) {
+      toast.error('Preencha nome e e-mail corporativo'); return;
     }
-    if (form.password.length < 6) {
-      toast.error('A senha deve ter no mínimo 6 caracteres');
-      return;
+    if (!form.email.includes('@')) { toast.error('E-mail inválido'); return; }
+    if (!form.sendInvite && form.password.length < 6) {
+      toast.error('Senha manual precisa de pelo menos 6 caracteres'); return;
     }
-    const role: UserRole = form.isAdmin ? 'admin' : 'colaborador';
+    setSaving(true);
     const { data, error } = await supabase.functions.invoke('admin-create-user', {
       body: {
         nome: form.nome.trim(),
         email: form.email.trim().toLowerCase(),
-        password: form.password,
-        role,
+        password: form.sendInvite ? '' : form.password,
+        role: form.role,
+        send_invite: form.sendInvite,
+        redirect_to: `${window.location.origin}/reset-password`,
+        permissions: permissionsToRows(form.permissions),
       },
     });
+    setSaving(false);
     if (error || (data as any)?.error) {
       toast.error((data as any)?.error || error?.message || 'Falha ao criar usuário');
       return;
     }
-    toast.success(`Usuário criado! Login: ${form.email} — será solicitada a troca de senha no 1º acesso.`);
-    setForm({ nome: '', email: '', emailEditado: false, password: '', isAdmin: false });
+    if (form.sendInvite) {
+      toast.success(`Convite enviado para ${form.email}. O usuário definirá a senha pelo link do e-mail.`);
+    } else {
+      toast.success(`Usuário criado. Senha temporária definida — troca obrigatória no 1º acesso.`);
+    }
+    setForm({ ...emptyForm });
     setShowPwd(false);
     setOpen(false);
-    setTimeout(load, 500);
+    setTimeout(load, 400);
   };
 
-  const startEdit = (row: Row) => {
+  const startEdit = async (row: Row) => {
     setEditing(row);
-    setEditForm({ nome: row.nome, role: row.role, isAdmin: row.role === 'admin' });
+    const { data: perms } = await supabase.from('user_permissions')
+      .select('module, can_view, can_create, can_edit, can_delete')
+      .eq('user_id', row.id);
+    const permMap = perms && perms.length > 0
+      ? rowsToPermissions(perms as any)
+      : ROLE_PRESETS[(row.role as ManageableRole) ?? 'colaborador'];
+    setEditForm({
+      nome: row.nome,
+      role: (ROLE_OPTIONS.includes(row.role as ManageableRole) ? row.role : 'colaborador') as ManageableRole,
+      permissions: permMap,
+    });
   };
 
   const saveEdit = async () => {
@@ -139,17 +165,23 @@ export default function Usuarios() {
     try {
       const { error: profErr } = await supabase.from('profiles').update({ nome_completo: editForm.nome }).eq('id', editing.id);
       if (profErr) throw profErr;
-      const novoRole: UserRole = editForm.isAdmin ? 'admin' : (editForm.role === 'admin' ? 'colaborador' : editForm.role);
-      if (novoRole !== editing.role) {
-        if (editing.role !== 'colaborador') {
-          const { error } = await supabase.from('user_roles').delete().eq('user_id', editing.id).eq('role', editing.role as any);
-          if (error) throw error;
-        }
-        if (novoRole !== 'colaborador') {
-          const { error } = await supabase.from('user_roles').insert({ user_id: editing.id, role: novoRole as any });
-          if (error) throw error;
-        }
+
+      // Sincroniza papel: remove os "elevados" e insere apenas o novo (colaborador é sempre garantido)
+      const elevated = ['admin', 'rh', 'supervisor', 'almoxarife'];
+      await supabase.from('user_roles').delete().eq('user_id', editing.id).in('role', elevated as any);
+      if (editForm.role !== 'colaborador') {
+        const { error } = await supabase.from('user_roles').insert({ user_id: editing.id, role: editForm.role as any });
+        if (error) throw error;
       }
+
+      // Substitui todas as permissões
+      await supabase.from('user_permissions').delete().eq('user_id', editing.id);
+      const rows = permissionsToRows(editForm.permissions).map(r => ({ ...r, user_id: editing.id }));
+      if (rows.length > 0) {
+        const { error } = await supabase.from('user_permissions').insert(rows);
+        if (error) throw error;
+      }
+
       toast.success('Usuário atualizado!');
       setEditing(null);
       load();
@@ -170,19 +202,17 @@ export default function Usuarios() {
     load();
   };
 
-  const handleResetPassword = async (row: Row) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(row.email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+  const handleResendInvite = async (row: Row) => {
+    const { data, error } = await supabase.functions.invoke('admin-resend-invite', {
+      body: { email: row.email, redirect_to: `${window.location.origin}/reset-password` },
     });
-    if (error) { toast.error(error.message); return; }
-    await supabase.from('profiles').update({ must_change_password: true }).eq('id', row.id);
-    toast.success(`Link de redefinição enviado para ${row.email}`);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error || error?.message || 'Falha ao reenviar convite');
+      return;
+    }
+    toast.success(`Link de acesso reenviado para ${row.email}`);
   };
 
-  // Definir senha diretamente (admin) via Edge Function (service_role)
-  const [pwdTarget, setPwdTarget] = useState<Row | null>(null);
-  const [pwdValue, setPwdValue] = useState('');
-  const [pwdShow, setPwdShow] = useState(false);
   const handleDirectSetPassword = async () => {
     if (!pwdTarget) return;
     if (pwdValue.length < 6) { toast.error('Senha mínima de 6 caracteres'); return; }
@@ -191,87 +221,103 @@ export default function Usuarios() {
     });
     if (error) { toast.error(error.message || 'Falha ao definir senha'); return; }
     toast.success(`Senha redefinida. ${pwdTarget.nome} precisará trocá-la no próximo acesso.`);
-    setPwdTarget(null); setPwdValue(''); setPwdShow(false);
+    setPwdTarget(null); setPwdValue('');
   };
-
-  const roleLabel = (r: UserRole) =>
-    r === 'admin' ? 'Administrador' : r === 'rh' ? 'RH' : r === 'supervisor' ? 'Supervisor' : 'Colaborador';
 
   return (
     <div className="p-4 lg:p-8 pb-20">
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-5xl mx-auto space-y-6">
         <BackButton />
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-foreground">Gestão de Usuários</h2>
             <p className="text-sm text-muted-foreground">
-              Administre quem pode acessar e modificar o sistema.
+              Cadastre por e-mail corporativo, defina papel e marque permissões por módulo.
             </p>
           </div>
-          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setShowPwd(false); setForm({ nome: '', email: '', emailEditado: false, password: '', isAdmin: false }); } }}>
+          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setShowPwd(false); setForm({ ...emptyForm }); } }}>
             <DialogTrigger asChild>
               <Button><UserPlus className="h-4 w-4 mr-2" /> Novo Usuário</Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Novo Usuário</DialogTitle>
-                <DialogDescription>O login é gerado automaticamente a partir do nome.</DialogDescription>
+                <DialogDescription>
+                  O usuário receberá um e-mail com link para criar a própria senha no primeiro acesso.
+                </DialogDescription>
               </DialogHeader>
-              <div className="space-y-3">
-                <div>
-                  <Label>Nome completo</Label>
-                  <Input
-                    value={form.nome}
-                    onChange={e => setForm({ ...form, nome: e.target.value })}
-                    placeholder="Ex: João da Silva"
-                  />
-                </div>
-                <div>
-                  <Label>Login (e-mail)</Label>
-                  <Input
-                    type="email"
-                    value={form.email}
-                    onChange={e => setForm({ ...form, email: e.target.value, emailEditado: true })}
-                    placeholder="joao.silva@sistema.local"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Gerado automaticamente como nome.sobrenome — edite se quiser.</p>
-                </div>
-                <div>
-                  <Label>Senha</Label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Input
-                        type={showPwd ? 'text' : 'password'}
-                        value={form.password}
-                        onChange={e => setForm({ ...form, password: e.target.value })}
-                        placeholder="Mínimo 6 caracteres"
-                        className="pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPwd(s => !s)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        tabIndex={-1}
-                      >
-                        {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                    <Button type="button" variant="outline" size="icon" onClick={gerarSenha} title="Gerar senha">
-                      <RefreshCw className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+              <Tabs defaultValue="dados">
+                <TabsList className="grid grid-cols-2">
+                  <TabsTrigger value="dados">Dados</TabsTrigger>
+                  <TabsTrigger value="permissoes">Permissões</TabsTrigger>
+                </TabsList>
+                <TabsContent value="dados" className="space-y-3 pt-3">
                   <div>
-                    <Label className="cursor-pointer">Administrador</Label>
-                    <p className="text-xs text-muted-foreground">Acesso total ao sistema</p>
+                    <Label>Nome completo</Label>
+                    <Input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} placeholder="Ex: João da Silva" />
                   </div>
-                  <Switch checked={form.isAdmin} onCheckedChange={(c) => setForm({ ...form, isAdmin: c })} />
-                </div>
-              </div>
+                  <div>
+                    <Label>E-mail corporativo</Label>
+                    <Input type="email" value={form.email}
+                      onChange={e => setForm({ ...form, email: e.target.value })}
+                      placeholder="joao.silva@empresa.com.br" />
+                  </div>
+                  <div>
+                    <Label>Papel</Label>
+                    <Select value={form.role} onValueChange={(v) => applyRolePreset(v as ManageableRole, 'new')}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {ROLE_OPTIONS.map(r => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      As permissões vêm marcadas pelo perfil e podem ser ajustadas na próxima aba.
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg border bg-muted/30 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="sendInvite"
+                        type="checkbox"
+                        checked={form.sendInvite}
+                        onChange={(e) => setForm({ ...form, sendInvite: e.target.checked, password: e.target.checked ? '' : form.password })}
+                        className="h-4 w-4"
+                      />
+                      <Label htmlFor="sendInvite" className="cursor-pointer">
+                        Enviar link de definição de senha por e-mail (recomendado)
+                      </Label>
+                    </div>
+                    {!form.sendInvite && (
+                      <div>
+                        <Label>Senha temporária</Label>
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <Input type={showPwd ? 'text' : 'password'} value={form.password}
+                              onChange={e => setForm({ ...form, password: e.target.value })}
+                              placeholder="Mínimo 6 caracteres" className="pr-10" />
+                            <button type="button" onClick={() => setShowPwd(s => !s)}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" tabIndex={-1}>
+                              {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                          </div>
+                          <Button type="button" variant="outline" size="icon" onClick={gerarSenha} title="Gerar senha">
+                            <RefreshCw className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Troca será obrigatória no primeiro acesso.</p>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+                <TabsContent value="permissoes" className="pt-3">
+                  <PermissionsMatrix value={form.permissions} onChange={(p) => setForm({ ...form, permissions: p })} />
+                </TabsContent>
+              </Tabs>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-                <Button onClick={handleAdd}>Criar</Button>
+                <Button onClick={handleAdd} disabled={saving}>
+                  {saving ? 'Salvando...' : (form.sendInvite ? 'Enviar convite' : 'Criar usuário')}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -280,127 +326,120 @@ export default function Usuarios() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Usuários cadastrados</CardTitle>
-            <CardDescription>
-              Gerencie nome, perfil e acesso dos usuários do sistema.
-            </CardDescription>
+            <CardDescription>Gerencie nome, papel e permissões dos usuários do sistema.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             {loading && <p className="text-sm text-muted-foreground">Carregando...</p>}
             {!loading && users.length === 0 && (
               <p className="text-sm text-muted-foreground">Nenhum usuário encontrado.</p>
             )}
-            {users.map(u => (
-              <div key={u.id} className={`flex items-center gap-3 p-3 rounded-lg border transition ${!u.ativo ? 'opacity-50' : 'hover:bg-muted/30'}`}>
-                <div className={`p-2 rounded-lg ${u.role === 'admin' ? 'bg-primary/10' : 'bg-muted'}`}>
-                  {u.role === 'admin'
-                    ? <ShieldCheck className="h-4 w-4 text-primary" />
-                    : <Lock className="h-4 w-4 text-muted-foreground" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm text-foreground truncate">
-                    {u.nome} {u.id === user?.id && <span className="text-xs text-muted-foreground">(você)</span>}
-                    {!u.ativo && <span className="text-xs text-destructive ml-1">(inativo)</span>}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">{u.email}</p>
-                </div>
-                <Badge variant={u.role === 'admin' ? 'default' : 'secondary'}>
-                  {roleLabel(u.role)}
-                </Badge>
-                <Button variant="ghost" size="icon" onClick={() => startEdit(u)} title="Editar">
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                {u.ativo && (
-                  <>
-                    <Button variant="ghost" size="icon" title="Definir senha agora"
-                      onClick={() => { setPwdTarget(u); setPwdValue(''); setPwdShow(false); }}>
-                      <KeySquare className="h-4 w-4" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" title="Enviar e-mail de redefinição">
-                          <KeyRound className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Enviar link por e-mail?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Um link de redefinição será enviado para <strong>{u.email}</strong>.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleResetPassword(u)}>Enviar link</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </>
-                )}
-                {u.id !== user?.id && (
+            {users.map(u => {
+              const badgeClass = ROLE_BADGE_CLASS[(u.role as RolePreset)] ?? ROLE_BADGE_CLASS.colaborador;
+              return (
+                <div key={u.id} className={`flex items-center gap-3 p-3 rounded-lg border transition ${!u.ativo ? 'opacity-60' : 'hover:bg-muted/30'}`}>
+                  <div className="p-2 rounded-lg bg-muted">
+                    <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm text-foreground truncate">
+                      {u.nome}
+                      {u.id === user?.id && <span className="text-xs text-muted-foreground ml-1">(você)</span>}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                  </div>
+                  <Badge className={`${badgeClass} border-0`}>{ROLE_LABELS[(u.role as RolePreset)] ?? u.role}</Badge>
+                  <Button variant="ghost" size="icon" onClick={() => startEdit(u)} title="Editar">
+                    <Pencil className="h-4 w-4" />
+                  </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon" title="Excluir usuário">
-                        <Trash2 className="h-4 w-4 text-destructive" />
+                      <Button variant="ghost" size="icon" title="Reenviar convite por e-mail">
+                        <Mail className="h-4 w-4" />
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
+                        <AlertDialogTitle>Reenviar convite?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          O usuário <strong>{u.nome}</strong> será excluído DEFINITIVAMENTE do sistema. Esta ação não pode ser desfeita.
+                          Um novo link para definir a senha será enviado para <strong>{u.email}</strong>.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          onClick={() => handleDelete(u)}
-                        >Excluir</AlertDialogAction>
+                        <AlertDialogAction onClick={() => handleResendInvite(u)}>Enviar</AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
-                )}
-              </div>
-            ))}
+                  <Button variant="ghost" size="icon" title="Definir senha manualmente"
+                    onClick={() => { setPwdTarget(u); setPwdValue(''); }}>
+                    <KeySquare className="h-4 w-4" />
+                  </Button>
+                  {u.id !== user?.id && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" title="Excluir usuário">
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            O usuário <strong>{u.nome}</strong> será excluído DEFINITIVAMENTE do sistema, junto com suas fichas e integrações. Esta ação não pode ser desfeita.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => handleDelete(u)}
+                          >Excluir</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
 
         <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
-          <DialogContent>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Editar usuário</DialogTitle>
+              <DialogDescription>{editing?.email}</DialogDescription>
             </DialogHeader>
-            <div className="space-y-3">
-              <div>
-                <Label>Nome</Label>
-                <Input value={editForm.nome} onChange={e => setEditForm({ ...editForm, nome: e.target.value })} />
-              </div>
-              <div>
-                <Label>Perfil base</Label>
-                <Select
-                  value={editForm.isAdmin ? 'admin' : editForm.role === 'admin' ? 'colaborador' : editForm.role}
-                  onValueChange={(v: UserRole) => setEditForm({ ...editForm, role: v, isAdmin: v === 'admin' })}
-                  disabled={editForm.isAdmin}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="rh">RH</SelectItem>
-                    <SelectItem value="supervisor">Supervisor</SelectItem>
-                    <SelectItem value="colaborador">Colaborador</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+            <Tabs defaultValue="dados">
+              <TabsList className="grid grid-cols-2">
+                <TabsTrigger value="dados">Dados</TabsTrigger>
+                <TabsTrigger value="permissoes">Permissões</TabsTrigger>
+              </TabsList>
+              <TabsContent value="dados" className="space-y-3 pt-3">
                 <div>
-                  <Label className="cursor-pointer">Administrador</Label>
-                  <p className="text-xs text-muted-foreground">Acesso total ao sistema</p>
+                  <Label>Nome</Label>
+                  <Input value={editForm.nome} onChange={e => setEditForm({ ...editForm, nome: e.target.value })} />
                 </div>
-                <Switch
-                  checked={editForm.isAdmin}
-                  onCheckedChange={(c) => setEditForm({ ...editForm, isAdmin: c })}
+                <div>
+                  <Label>Papel</Label>
+                  <Select value={editForm.role} onValueChange={(v) => applyRolePreset(v as ManageableRole, 'edit')}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ROLE_OPTIONS.map(r => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Trocar o papel reaplica as permissões padrão desse perfil.
+                  </p>
+                </div>
+              </TabsContent>
+              <TabsContent value="permissoes" className="pt-3">
+                <PermissionsMatrix
+                  value={editForm.permissions}
+                  onChange={(p) => setEditForm({ ...editForm, permissions: p })}
                 />
-              </div>
-            </div>
+              </TabsContent>
+            </Tabs>
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditing(null)}>Cancelar</Button>
               <Button onClick={saveEdit}>Salvar</Button>
@@ -414,24 +453,12 @@ export default function Usuarios() {
               <DialogTitle>Definir nova senha</DialogTitle>
               <DialogDescription>
                 Defina uma senha diretamente para <strong>{pwdTarget?.nome}</strong>.
-                Ele(a) precisará trocá-la no próximo acesso.
+                O usuário precisará trocá-la no próximo acesso.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
               <Label>Nova senha</Label>
-              <div className="relative">
-                <Input
-                  type={pwdShow ? 'text' : 'password'}
-                  value={pwdValue}
-                  onChange={e => setPwdValue(e.target.value)}
-                  placeholder="Mínimo 6 caracteres"
-                  className="pr-10"
-                />
-                <button type="button" onClick={() => setPwdShow(s => !s)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" tabIndex={-1}>
-                  {pwdShow ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
+              <Input type="text" value={pwdValue} onChange={e => setPwdValue(e.target.value)} placeholder="Mínimo 6 caracteres" />
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setPwdTarget(null)}>Cancelar</Button>
