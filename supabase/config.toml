@@ -12,3 +12,6 @@ verify_jwt = true
 [functions.admin-resend-invite]
 verify_jwt = true
 
+[functions.admin-update-email]
+verify_jwt = true
+
