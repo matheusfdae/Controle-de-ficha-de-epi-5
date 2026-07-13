@@ -56,7 +56,7 @@ export default function Usuarios() {
 
   const [editing, setEditing] = useState<Row | null>(null);
   const [editForm, setEditForm] = useState({
-    nome: '', role: 'colaborador' as ManageableRole, permissions: emptyPermissions(),
+    nome: '', email: '', role: 'colaborador' as ManageableRole, permissions: emptyPermissions(),
   });
   const [pwdTarget, setPwdTarget] = useState<Row | null>(null);
   const [pwdValue, setPwdValue] = useState('');
@@ -155,6 +155,7 @@ export default function Usuarios() {
       : ROLE_PRESETS[(row.role as ManageableRole) ?? 'colaborador'];
     setEditForm({
       nome: row.nome,
+      email: row.email || '',
       role: (ROLE_OPTIONS.includes(row.role as ManageableRole) ? row.role : 'colaborador') as ManageableRole,
       permissions: permMap,
     });
@@ -163,6 +164,20 @@ export default function Usuarios() {
   const saveEdit = async () => {
     if (!editing) return;
     try {
+      const novoEmail = (editForm.email || '').trim().toLowerCase();
+      if (!novoEmail || !novoEmail.includes('@')) {
+        toast.error('E-mail inválido'); return;
+      }
+      // Se o e-mail mudou, atualiza via edge function (auth + profile)
+      if (novoEmail !== (editing.email || '').toLowerCase()) {
+        const { data, error } = await supabase.functions.invoke('admin-update-email', {
+          body: { user_id: editing.id, new_email: novoEmail },
+        });
+        if (error || (data as any)?.error) {
+          throw new Error((data as any)?.error || error?.message || 'Falha ao atualizar e-mail');
+        }
+      }
+
       const { error: profErr } = await supabase.from('profiles').update({ nome_completo: editForm.nome }).eq('id', editing.id);
       if (profErr) throw profErr;
 
@@ -419,6 +434,18 @@ export default function Usuarios() {
                 <div>
                   <Label>Nome</Label>
                   <Input value={editForm.nome} onChange={e => setEditForm({ ...editForm, nome: e.target.value })} />
+                </div>
+                <div>
+                  <Label>E-mail corporativo</Label>
+                  <Input
+                    type="email"
+                    value={editForm.email}
+                    onChange={e => setEditForm({ ...editForm, email: e.target.value })}
+                    placeholder="usuario@empresa.com"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Alterar o e-mail muda o login do usuário (confirmado automaticamente).
+                  </p>
                 </div>
                 <div>
                   <Label>Papel</Label>
