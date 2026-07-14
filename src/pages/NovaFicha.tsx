@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { EPIFicha, EPIItem, MotivoEntrega, Turno } from '@/types/epi';
-import { generateId, saveFicha } from '@/services/fichaService';
+import { generateId, saveFicha, criarTokenAssinatura } from '@/services/fichaService';
 import { getConfig, loadConfig } from '@/services/configService';
 import SignaturePad from '@/components/SignaturePad';
 import { Funcao, EPI, listFuncoes, listEpis, listFuncaoEpis } from '@/services/estoqueService';
@@ -200,7 +200,9 @@ export default function NovaFicha() {
     const ficha = buildFicha(false);
     try {
       await saveFicha(ficha);
-      const link = `${window.location.origin}/assinar/${ficha.id}`;
+      const token = await criarTokenAssinatura(ficha.id);
+      if (!token) { toast.error('Erro ao gerar link de assinatura'); return; }
+      const link = `${window.location.origin}/assinar/${token}`;
       const msg = `Olá ${form.nomeFuncionario}, segue o link para assinatura da sua ficha de EPI: ${link}`;
       const waNumber = phone.length <= 11 ? `55${phone}` : phone;
       window.open(`https://web.whatsapp.com/send?phone=${waNumber}&text=${encodeURIComponent(msg)}`, '_blank');

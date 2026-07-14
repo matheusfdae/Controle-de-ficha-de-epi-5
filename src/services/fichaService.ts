@@ -83,19 +83,31 @@ export async function getFichas(): Promise<EPIFicha[]> {
   return fichas.map(f => mapFichaFromDB(f, (itens ?? []).filter(i => i.ficha_id === f.id)));
 }
 
+/** Busca autenticada (RLS): usada nas telas internas (VisualizarFicha etc). */
 export async function getFichaById(id: string): Promise<EPIFicha | undefined> {
-  // Tenta autenticado primeiro; se falhar (link público), usa RPC
   const { data: ficha } = await supabase
     .from('fichas_epi').select('*').eq('id', id).maybeSingle();
+  if (!ficha) return undefined;
 
-  if (ficha) {
-    const { data: itens } = await supabase
-      .from('fichas_epi_itens').select('*').eq('ficha_id', id);
-    return mapFichaFromDB(ficha, itens ?? []);
-  }
+  const { data: itens } = await supabase
+    .from('fichas_epi_itens').select('*').eq('ficha_id', id);
+  return mapFichaFromDB(ficha, itens ?? []);
+}
 
-  // Fallback público (RPC SECURITY DEFINER)
-  const { data: pub } = await supabase.rpc('get_ficha_publica', { _ficha_id: id });
+/** Gera um token de assinatura de uso único (72h) para compartilhar via link público. */
+export async function criarTokenAssinatura(fichaId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('assinatura_tokens')
+    .insert({ ficha_id: fichaId, tipo_ficha: 'epi' })
+    .select('token')
+    .single();
+  if (error || !data) { console.error('criarTokenAssinatura', error); return null; }
+  return data.token;
+}
+
+/** Busca pública (sem login), via token de assinatura_tokens — usada no link de assinatura remota. */
+export async function getFichaPorToken(token: string): Promise<EPIFicha | undefined> {
+  const { data: pub } = await supabase.rpc('get_ficha_publica_por_token', { _token: token });
   if (!pub) return undefined;
   const payload = pub as { ficha: FichaRow; itens: ItemRow[] };
   return mapFichaFromDB(payload.ficha, payload.itens ?? []);
@@ -161,9 +173,9 @@ export async function deleteFicha(id: string): Promise<void> {
   await supabase.from('fichas_epi').delete().eq('id', id);
 }
 
-/** Assina via link público (sem login) */
+/** Assina via link público (sem login), validando o token de assinatura */
 export async function assinarFichaPublica(
-  fichaId: string,
+  token: string,
   assinaturaBase64: string,
   itensRecebidosIds: string[],
 ): Promise<{ ok: boolean; error?: string }> {
@@ -173,8 +185,8 @@ export async function assinarFichaPublica(
     if (r.ok) ip = (await r.json() as { ip: string }).ip;
   } catch { /* ignore */ }
 
-  const { data, error } = await supabase.rpc('assinar_ficha_publica', {
-    _ficha_id: fichaId,
+  const { data, error } = await supabase.rpc('assinar_ficha_publica_por_token', {
+    _token: token,
     _assinatura: assinaturaBase64,
     _itens_recebidos: itensRecebidosIds,
     _ip: ip,

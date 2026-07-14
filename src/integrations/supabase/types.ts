@@ -68,6 +68,36 @@ export type Database = {
         }
         Relationships: []
       }
+      termo_coletivo_tokens: {
+        Row: {
+          created_at: string
+          expira_em: string
+          id: string
+          item_id: string
+          token: string
+          usado: boolean
+          usado_em: string | null
+        }
+        Insert: {
+          created_at?: string
+          expira_em?: string
+          id?: string
+          item_id: string
+          token?: string
+          usado?: boolean
+          usado_em?: string | null
+        }
+        Update: {
+          created_at?: string
+          expira_em?: string
+          id?: string
+          item_id?: string
+          token?: string
+          usado?: boolean
+          usado_em?: string | null
+        }
+        Relationships: []
+      }
       assinaturas: {
         Row: {
           assinante: string | null
@@ -1152,7 +1182,22 @@ export type Database = {
       }
       get_combo_publico: { Args: { _ficha_id: string }; Returns: Json }
       get_ficha_publica: { Args: { _ficha_id: string }; Returns: Json }
+      get_ficha_publica_por_token: { Args: { _token: string }; Returns: Json }
+      assinar_ficha_publica_por_token: {
+        Args: {
+          _assinatura: string
+          _ip?: string
+          _itens_recebidos: string[]
+          _token: string
+        }
+        Returns: Json
+      }
       get_termo_coletivo_publico: { Args: { _termo_id: string }; Returns: Json }
+      get_termo_coletivo_item_por_token: { Args: { _token: string }; Returns: Json }
+      assinar_termo_coletivo_item_por_token: {
+        Args: { _assinatura: string; _ip?: string; _token: string }
+        Returns: Json
+      }
       get_termo_item_por_token: { Args: { _token: string }; Returns: Json }
       has_permission: {
         Args: { _action: string; _module: string; _user_id: string }

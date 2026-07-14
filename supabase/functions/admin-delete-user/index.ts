@@ -30,7 +30,9 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const { data: roles } = await admin
       .from('user_roles').select('role').eq('user_id', callerId);
-    const canManage = (roles || []).some((r: any) => r.role === 'admin' || r.role === 'rh');
+    const callerRoles = (roles || []).map((r: any) => r.role);
+    const callerIsAdmin = callerRoles.includes('admin');
+    const canManage = callerIsAdmin || callerRoles.includes('rh');
     if (!canManage) return json({ error: 'Apenas administradores/RH' }, 403);
 
     const { user_id } = await req.json();
@@ -39,6 +41,13 @@ Deno.serve(async (req) => {
     }
     if (user_id === callerId) {
       return json({ error: 'Você não pode excluir a si mesmo' }, 400);
+    }
+    if (!callerIsAdmin) {
+      const { data: targetRoles } = await admin
+        .from('user_roles').select('role').eq('user_id', user_id);
+      if ((targetRoles || []).some((r: any) => r.role === 'admin')) {
+        return json({ error: 'RH não pode excluir contas de administrador' }, 403);
+      }
     }
 
     const run = async (label: string, promise: PromiseLike<{ error: any }>) => {

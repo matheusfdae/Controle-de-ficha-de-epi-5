@@ -4,21 +4,21 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, Download, ShieldCheck } from 'lucide-react';
 import { EPIFicha } from '@/types/epi';
-import { getFichaById, assinarFichaPublica } from '@/services/fichaService';
+import { getFichaPorToken, assinarFichaPublica } from '@/services/fichaService';
 import { generatePDF } from '@/services/pdfService';
 import SignaturePad from '@/components/SignaturePad';
 import FichaOficialView from '@/components/FichaOficialView';
 import { toast } from 'sonner';
 
 export default function AssinarFicha() {
-  const { id } = useParams<{ id: string }>();
+  const { token } = useParams<{ token: string }>();
   const [ficha, setFicha] = useState<EPIFicha | null>(null);
   const [assinatura, setAssinatura] = useState('');
   const [itensRecebidos, setItensRecebidos] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    if (id) {
-      getFichaById(id).then(f => {
+    if (token) {
+      getFichaPorToken(token).then(f => {
         if (f) {
           setFicha(f);
           const rec: Record<string, boolean> = {};
@@ -27,12 +27,12 @@ export default function AssinarFicha() {
         }
       });
     }
-  }, [id]);
+  }, [token]);
 
   if (!ficha) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <p className="text-muted-foreground">Ficha não encontrada ou link inválido.</p>
+        <p className="text-muted-foreground">Link inválido, expirado ou já utilizado.</p>
       </div>
     );
   }
@@ -66,9 +66,14 @@ export default function AssinarFicha() {
     if (recebidosIds.length === 0) { toast.error('Marque ao menos um item recebido'); return; }
     if (!assinatura) { toast.error('Por favor, assine no campo abaixo'); return; }
 
-    const r = await assinarFichaPublica(ficha.id, assinatura, recebidosIds);
+    if (!token) return;
+    const r = await assinarFichaPublica(token, assinatura, recebidosIds);
     if (!r.ok) {
-      toast.error(r.error === 'ja_assinada' ? 'Esta ficha já foi assinada.' : (r.error || 'Erro ao assinar'));
+      toast.error(
+        r.error === 'ja_assinada' ? 'Esta ficha já foi assinada.'
+        : r.error === 'token_invalido' ? 'Link inválido, expirado ou já utilizado.'
+        : (r.error || 'Erro ao assinar')
+      );
       return;
     }
     const updated: EPIFicha = {

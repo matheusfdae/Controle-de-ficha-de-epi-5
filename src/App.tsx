@@ -68,8 +68,8 @@ function AppRoutes() {
         <Route path="/login"           element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password"  element={<ResetPassword />} />
-        <Route path="/assinar/:id"     element={<AssinarFicha />} />
-        <Route path="/assinar-termo-coletivo/:id/:itemId" element={<AssinarTermoColetivo />} />
+        <Route path="/assinar/:token"     element={<AssinarFicha />} />
+        <Route path="/assinar-termo-coletivo/:token" element={<AssinarTermoColetivo />} />
         <Route element={<ProtectedLayout />}>
           <Route path="/"             element={<Dashboard />} />
           <Route path="/nova-ficha"   element={<AdminRoute><NovaFicha /></AdminRoute>} />

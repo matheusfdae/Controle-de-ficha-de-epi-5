@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Eye, Download, ClipboardList, MessageCircle, Upload, FileSpreadsheet, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { EPIFicha } from '@/types/epi';
-import { getFichas, deleteFicha } from '@/services/fichaService';
+import { getFichas, deleteFicha, criarTokenAssinatura } from '@/services/fichaService';
 import { generatePDF } from '@/services/pdfService';
 import { useAuth } from '@/contexts/AuthContext';
 import { importFichasFromExcel, downloadTemplateExcel } from '@/services/importFichasService';
@@ -120,11 +120,13 @@ export default function ConsultarFichas() {
                         variant="ghost"
                         size="icon"
                         title="Enviar link de assinatura via WhatsApp"
-                        onClick={() => {
+                        onClick={async () => {
                           const tel = (ficha.telefone || '').replace(/\D/g, '');
                           if (!tel) { toast.error('Telefone do colaborador não cadastrado'); return; }
+                          const token = await criarTokenAssinatura(ficha.id);
+                          if (!token) { toast.error('Erro ao gerar link de assinatura'); return; }
                           const numero = tel.startsWith('55') ? tel : `55${tel}`;
-                          const url = `${window.location.origin}/assinar/${ficha.id}`;
+                          const url = `${window.location.origin}/assinar/${token}`;
                           const msg = encodeURIComponent(`Olá ${ficha.nomeFuncionario}, segue o link para assinatura da sua ficha de EPI/Uniforme: ${url}`);
                           window.open(`https://wa.me/${numero}?text=${msg}`, '_blank');
                         }}

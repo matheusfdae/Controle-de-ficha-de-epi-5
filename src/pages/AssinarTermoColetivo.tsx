@@ -5,38 +5,36 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import SignaturePad from '@/components/SignaturePad';
-import { assinarItemColetivo, getTermoColetivoPublico, TermoColetivoFull, TermoColetivoItem } from '@/services/termoColetivoService';
+import { assinarItemColetivoPorToken, getTermoColetivoItemPorToken, TermoColetivo, TermoColetivoItem } from '@/services/termoColetivoService';
 
 export default function AssinarTermoColetivo() {
-  const { id, itemId } = useParams<{ id: string; itemId: string }>();
-  const [data, setData] = useState<TermoColetivoFull | null>(null);
-  const [item, setItem] = useState<TermoColetivoItem | null>(null);
+  const { token } = useParams<{ token: string }>();
+  const [data, setData] = useState<{ termo: Pick<TermoColetivo, 'posto' | 'mes_referencia'>; item: TermoColetivoItem } | null>(null);
   const [pad, setPad] = useState('');
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
-      if (!id || !itemId) { setLoading(false); return; }
-      const d = await getTermoColetivoPublico(id);
+      if (!token) { setLoading(false); return; }
+      const d = await getTermoColetivoItemPorToken(token);
       setData(d);
-      const it = d?.itens.find(i => i.id === itemId) ?? null;
-      setItem(it);
-      if (it?.data_assinatura) setDone(true);
+      if (d?.item?.data_assinatura) setDone(true);
       setLoading(false);
     })();
-  }, [id, itemId]);
+  }, [token]);
 
   const submit = async () => {
-    if (!itemId || !pad) return toast.error('Assine antes de confirmar');
-    const r = await assinarItemColetivo(itemId, pad);
-    if (!r.ok) return toast.error(r.error ?? 'Erro ao salvar');
+    if (!token || !pad) return toast.error('Assine antes de confirmar');
+    const r = await assinarItemColetivoPorToken(token, pad);
+    if (!r.ok) return toast.error(r.error === 'token_invalido' ? 'Link inválido ou expirado.' : (r.error ?? 'Erro ao salvar'));
     setDone(true);
     toast.success('Assinatura registrada');
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-sm">Carregando…</div>;
-  if (!data || !item) return <div className="min-h-screen flex items-center justify-center text-sm">Link inválido ou item não encontrado.</div>;
+  if (!data) return <div className="min-h-screen flex items-center justify-center text-sm">Link inválido, expirado ou item não encontrado.</div>;
+  const { item } = data;
 
   return (
     <div className="min-h-screen bg-muted/30 p-4 flex items-start justify-center">

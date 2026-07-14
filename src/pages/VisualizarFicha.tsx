@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Download, Copy, MessageCircle, Mail, CheckCircle2, Pencil, Plus, Trash2, Save, X } from 'lucide-react';
 import { EPIFicha, EPIItem } from '@/types/epi';
-import { getFichaById, saveFicha, generateId } from '@/services/fichaService';
+import { getFichaById, saveFicha, generateId, criarTokenAssinatura } from '@/services/fichaService';
 import { generatePDF } from '@/services/pdfService';
 import SignaturePad from '@/components/SignaturePad';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,6 +30,8 @@ export default function VisualizarFicha() {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<EPIFicha | null>(null);
   const [epis, setEpis] = useState<EPI[]>([]);
+  const [shareUrl, setShareUrl] = useState('');
+  const [gerandoLink, setGerandoLink] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -78,20 +80,24 @@ export default function VisualizarFicha() {
     }
   };
 
-  const shareLink = () => {
-    const url = `${window.location.origin}/assinar/${ficha.id}`;
-    navigator.clipboard.writeText(url);
-    toast.success('Link copiado para a área de transferência!');
+  const gerarLink = async () => {
+    if (shareUrl || gerandoLink) return;
+    setGerandoLink(true);
+    const token = await criarTokenAssinatura(ficha.id);
+    setGerandoLink(false);
+    if (!token) { toast.error('Erro ao gerar link de assinatura'); return; }
+    setShareUrl(`${window.location.origin}/assinar/${token}`);
   };
 
-  const shareUrl = `${window.location.origin}/assinar/${ficha.id}`;
   const shareMessage = `Olá ${ficha.nomeFuncionario}, segue o link para assinatura da sua ficha de EPI: ${shareUrl}`;
 
   const copyLink = () => {
+    if (!shareUrl) return;
     navigator.clipboard.writeText(shareUrl);
     toast.success('Link copiado!');
   };
   const sendWhatsApp = () => {
+    if (!shareUrl) return;
     const phone = (ficha.telefone || '').replace(/\D/g, '');
     const url = phone
       ? `https://wa.me/55${phone}?text=${encodeURIComponent(shareMessage)}`
@@ -99,6 +105,7 @@ export default function VisualizarFicha() {
     window.open(url, '_blank');
   };
   const sendEmail = () => {
+    if (!shareUrl) return;
     const subject = encodeURIComponent('Assinatura de Ficha de EPI');
     const body = encodeURIComponent(shareMessage);
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
@@ -122,7 +129,7 @@ export default function VisualizarFicha() {
         {/* Ações */}
         <div className="flex flex-wrap gap-2">
           {!isSigned && isAdmin && (
-            <Dialog>
+            <Dialog onOpenChange={(open) => { if (open) gerarLink(); }}>
               <DialogTrigger asChild>
                 <Button variant="outline">
                   <MessageCircle className="h-4 w-4 mr-2" /> Enviar Link de Assinatura
@@ -135,7 +142,7 @@ export default function VisualizarFicha() {
                 <div className="space-y-3">
                   <div>
                     <Label>Link público</Label>
-                    <Input readOnly value={shareUrl} onClick={(e) => e.currentTarget.select()} />
+                    <Input readOnly value={gerandoLink ? 'Gerando link…' : shareUrl} onClick={(e) => e.currentTarget.select()} />
                   </div>
                   <p className="text-xs text-muted-foreground">
                     O colaborador abre o link, marca os itens recebidos e assina diretamente do celular.

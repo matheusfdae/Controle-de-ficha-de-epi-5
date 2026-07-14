@@ -38,7 +38,9 @@ Deno.serve(async (req) => {
     const admin = createClient(supabaseUrl, serviceKey);
     const { data: rolesData } = await admin
       .from('user_roles').select('role').eq('user_id', claimsData.claims.sub);
-    const canManage = (rolesData || []).some((r: any) => r.role === 'admin' || r.role === 'rh');
+    const callerRoles = (rolesData || []).map((r: any) => r.role);
+    const callerIsAdmin = callerRoles.includes('admin');
+    const canManage = callerIsAdmin || callerRoles.includes('rh');
     if (!canManage) return json({ error: 'Apenas administradores/RH' }, 403);
 
     const body = await req.json().catch(() => null) as {
@@ -59,6 +61,9 @@ Deno.serve(async (req) => {
     const sendInvite = body?.send_invite !== false && password.length === 0;
     const redirectTo = body?.redirect_to || undefined;
 
+    if (role === 'admin' && !callerIsAdmin) {
+      return json({ error: 'Apenas administradores podem criar contas de administrador' }, 403);
+    }
     if (!nome) return json({ error: 'Nome obrigatório' }, 400);
     if (!email || !email.includes('@')) return json({ error: 'E-mail inválido' }, 400);
     if (!sendInvite && password.length < 6) {

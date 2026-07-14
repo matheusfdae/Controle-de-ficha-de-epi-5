@@ -77,28 +77,60 @@ export async function getTermoColetivoFull(id: string): Promise<TermoColetivoFul
   return { termo: termo as TermoColetivo, itens: (itens ?? []) as TermoColetivoItem[] };
 }
 
-export async function getTermoColetivoPublico(id: string): Promise<TermoColetivoFull | null> {
-  const { data, error } = await supabase.rpc('get_termo_coletivo_publico', { _termo_id: id });
-  if (error || !data) { console.error('getTermoColetivoPublico', error); return null; }
-  const r = data as unknown as { termo: TermoColetivo; itens: TermoColetivoItem[] } | null;
-  if (!r?.termo) return null;
-  return r;
+/** Gera (ou renova) o link público de assinatura de um item — só admin/rh. */
+export async function gerarTokenTermoItem(itemId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('termo_coletivo_tokens')
+    .insert({ item_id: itemId })
+    .select('token')
+    .single();
+  if (error || !data) { console.error('gerarTokenTermoItem', error); return null; }
+  return data.token;
 }
 
+/** Busca pública (sem login) de um único item do termo, via token dedicado. */
+export async function getTermoColetivoItemPorToken(
+  token: string,
+): Promise<{ termo: Pick<TermoColetivo, 'posto' | 'mes_referencia'>; item: TermoColetivoItem } | null> {
+  const { data, error } = await supabase.rpc('get_termo_coletivo_item_por_token', { _token: token });
+  if (error || !data) { console.error('getTermoColetivoItemPorToken', error); return null; }
+  return data as unknown as { termo: Pick<TermoColetivo, 'posto' | 'mes_referencia'>; item: TermoColetivoItem };
+}
+
+/** Assinatura via link público (sem login), validando o token do item. */
+export async function assinarItemColetivoPorToken(token: string, assinaturaDataUrl: string): Promise<{ ok: boolean; error?: string }> {
+  let ip: string | null = null;
+  try {
+    const r = await fetch('https://api.ipify.org?format=json');
+    if (r.ok) ip = (await r.json()).ip;
+  } catch { /* ignore */ }
+  const { data, error } = await supabase.rpc('assinar_termo_coletivo_item_por_token', {
+    _token: token,
+    _assinatura: assinaturaDataUrl,
+    _ip: ip,
+  });
+  if (error) return { ok: false, error: error.message };
+  return data as unknown as { ok: boolean; error?: string };
+}
+
+/** Assinatura presencial (tablet), com usuário admin/rh autenticado — respeita RLS da tabela. */
 export async function assinarItemColetivo(itemId: string, assinaturaDataUrl: string): Promise<{ ok: boolean; error?: string }> {
   let ip: string | null = null;
   try {
     const r = await fetch('https://api.ipify.org?format=json');
     if (r.ok) ip = (await r.json()).ip;
   } catch { /* ignore */ }
-  const { data, error } = await supabase.rpc('assinar_termo_coletivo_item', {
-    _item_id: itemId,
-    _assinatura: assinaturaDataUrl,
-    _ip: ip,
-  });
+
+  const { data: current } = await supabase
+    .from('termos_epi_coletivos_itens').select('data_assinatura').eq('id', itemId).maybeSingle();
+  if (current?.data_assinatura) return { ok: false, error: 'ja_assinado' };
+
+  const { error } = await supabase
+    .from('termos_epi_coletivos_itens')
+    .update({ assinatura_url: assinaturaDataUrl, data_assinatura: new Date().toISOString(), ip_assinatura: ip })
+    .eq('id', itemId);
   if (error) return { ok: false, error: error.message };
-  const r = data as unknown as { ok: boolean; error?: string };
-  return r;
+  return { ok: true };
 }
 
 export async function finalizarTermo(id: string): Promise<void> {

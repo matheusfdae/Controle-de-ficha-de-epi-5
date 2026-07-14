@@ -6,8 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ClipboardSignature, RefreshCw, Search, Tablet } from 'lucide-react';
 import { EPIFicha } from '@/types/epi';
-import { getFichas } from '@/services/fichaService';
+import { getFichas, criarTokenAssinatura } from '@/services/fichaService';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import BackButton from '@/components/BackButton';
 
 export default function AssinaturasPendentes() {
@@ -15,6 +16,15 @@ export default function AssinaturasPendentes() {
   const [fichas, setFichas] = useState<EPIFicha[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
+  const [gerandoId, setGerandoId] = useState<string | null>(null);
+
+  const irAssinar = async (fichaId: string) => {
+    setGerandoId(fichaId);
+    const token = await criarTokenAssinatura(fichaId);
+    setGerandoId(null);
+    if (!token) { toast.error('Erro ao gerar link de assinatura'); return; }
+    navigate(`/assinar/${token}`);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -91,8 +101,8 @@ export default function AssinaturasPendentes() {
                       {f.funcao} · {f.itens.length} {f.itens.length === 1 ? 'item' : 'itens'} · criada em {new Date(f.criadoEm).toLocaleDateString('pt-BR')}
                     </p>
                   </div>
-                  <Button size="lg" onClick={() => navigate(`/assinar/${f.id}`)}>
-                    <ClipboardSignature className="h-4 w-4 mr-2" /> Assinar
+                  <Button size="lg" onClick={() => irAssinar(f.id)} disabled={gerandoId === f.id}>
+                    <ClipboardSignature className="h-4 w-4 mr-2" /> {gerandoId === f.id ? 'Gerando link…' : 'Assinar'}
                   </Button>
                 </CardContent>
               </Card>

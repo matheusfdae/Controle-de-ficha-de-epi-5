@@ -27,11 +27,25 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const { data: roles } = await admin
       .from('user_roles').select('role').eq('user_id', claimsData.claims.sub);
-    const canManage = (roles || []).some((r: any) => r.role === 'admin' || r.role === 'rh');
+    const callerRoles = (roles || []).map((r: any) => r.role);
+    const callerIsAdmin = callerRoles.includes('admin');
+    const canManage = callerIsAdmin || callerRoles.includes('rh');
     if (!canManage) return json({ error: 'Apenas administradores/RH' }, 403);
 
     const { email, redirect_to } = await req.json().catch(() => ({} as any));
     if (!email || !String(email).includes('@')) return json({ error: 'E-mail inválido' }, 400);
+
+    if (!callerIsAdmin) {
+      const { data: targetProfile } = await admin
+        .from('profiles').select('id').eq('email', String(email).toLowerCase()).maybeSingle();
+      if (targetProfile) {
+        const { data: targetRoles } = await admin
+          .from('user_roles').select('role').eq('user_id', targetProfile.id);
+        if ((targetRoles || []).some((r: any) => r.role === 'admin')) {
+          return json({ error: 'RH não pode redefinir senha de contas de administrador' }, 403);
+        }
+      }
+    }
 
     const { error: resetErr } = await admin.auth.admin.generateLink({
       type: 'recovery',

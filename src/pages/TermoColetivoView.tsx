@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ArrowLeft, Tablet, Link2, CheckCircle2, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import SignaturePad from '@/components/SignaturePad';
-import { assinarItemColetivo, finalizarTermo, getTermoColetivoFull, TermoColetivoFull } from '@/services/termoColetivoService';
+import { assinarItemColetivo, finalizarTermo, getTermoColetivoFull, gerarTokenTermoItem, TermoColetivoFull } from '@/services/termoColetivoService';
 
 export default function TermoColetivoView() {
   const { id } = useParams<{ id: string }>();
@@ -56,8 +56,10 @@ export default function TermoColetivoView() {
     }
   };
 
-  const copyLink = (itemId: string) => {
-    const url = `${window.location.origin}/assinar-termo-coletivo/${id}/${itemId}`;
+  const copyLink = async (itemId: string) => {
+    const token = await gerarTokenTermoItem(itemId);
+    if (!token) { toast.error('Erro ao gerar link'); return; }
+    const url = `${window.location.origin}/assinar-termo-coletivo/${token}`;
     navigator.clipboard.writeText(url);
     toast.success('Link copiado');
   };
