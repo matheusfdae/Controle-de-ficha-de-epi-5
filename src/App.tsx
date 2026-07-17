@@ -9,8 +9,9 @@ import AppLayout from "@/components/AppLayout";
 
 // Páginas carregadas sob demanda (code splitting)
 const Login               = lazy(() => import('./pages/Login'));
-const ForgotPassword      = lazy(() => import('./pages/ForgotPassword'));
+const AceitarConvite      = lazy(() => import('./pages/AceitarConvite'));
 const ResetPassword       = lazy(() => import('./pages/ResetPassword'));
+const Convites            = lazy(() => import('./pages/Convites'));
 const Dashboard           = lazy(() => import('./pages/Dashboard'));
 const NovaFicha           = lazy(() => import('./pages/NovaFicha'));
 const ConsultarFichas     = lazy(() => import('./pages/ConsultarFichas'));
@@ -66,7 +67,7 @@ function AppRoutes() {
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/login"           element={<Login />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/aceitar-convite" element={<AceitarConvite />} />
         <Route path="/reset-password"  element={<ResetPassword />} />
         <Route path="/assinar/:token"     element={<AssinarFicha />} />
         <Route path="/assinar-termo-coletivo/:token" element={<AssinarTermoColetivo />} />
@@ -80,6 +81,7 @@ function AppRoutes() {
           <Route path="/rank-postos"  element={<RankPostos />} />
           <Route path="/configuracoes" element={<AdminRoute><Configuracoes /></AdminRoute>} />
           <Route path="/usuarios"     element={<AdminRoute><Usuarios /></AdminRoute>} />
+          <Route path="/convites"     element={<Convites />} />
           <Route path="/estoque"      element={<AdminRoute><Estoque /></AdminRoute>} />
           <Route path="/funcoes"      element={<AdminRoute><Funcoes /></AdminRoute>} />
           <Route path="/integracao"   element={<AdminRoute><Integracao /></AdminRoute>} />
