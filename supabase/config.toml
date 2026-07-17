@@ -1,17 +1,29 @@
 project_id = "mtpvcdqerkhmmpinotbe"
 
+# verify_jwt = false nas 5 funções admin-* e no clerk-webhook: o Authorization
+# Bearer agora carrega um JWT emitido pelo Clerk, não pelo Supabase — o gate
+# de plataforma rejeitaria esse token antes mesmo de chamar a função. Cada
+# função já valida o token do Clerk internamente via verifyCaller()
+# (supabase/functions/_shared/clerk.ts). O clerk-webhook não usa Bearer
+# nenhum, valida a assinatura Svix do próprio corpo da requisição.
 [functions.admin-set-password]
-verify_jwt = true
+verify_jwt = false
 
 [functions.admin-delete-user]
-verify_jwt = true
+verify_jwt = false
 
 [functions.admin-create-user]
-verify_jwt = true
+verify_jwt = false
 
 [functions.admin-resend-invite]
-verify_jwt = true
+verify_jwt = false
 
 [functions.admin-update-email]
-verify_jwt = true
+verify_jwt = false
+
+[functions.clerk-webhook]
+verify_jwt = false
+
+[functions.admin-invite-user]
+verify_jwt = false
 
