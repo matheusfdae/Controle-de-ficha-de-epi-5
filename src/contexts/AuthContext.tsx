@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import type { Session, User as SupaUser } from '@supabase/supabase-js';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { useAuth as useClerkAuth, useUser, useClerk } from '@clerk/clerk-react';
 import { supabase } from '@/integrations/supabase/client';
 
 export type UserRole = 'admin' | 'rh' | 'supervisor' | 'almoxarife' | 'colaborador' | 'operador';
@@ -13,29 +13,13 @@ export interface User {
   mustChangePassword?: boolean;
 }
 
-interface StoredUser {
-  username: string;
-  password: string;
-  nome: string;
-  role: UserRole;
-}
-
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
-  signup: (email: string, password: string, nome: string) => Promise<{ ok: boolean; error?: string }>;
-  resetPassword: (email: string) => Promise<{ ok: boolean; error?: string }>;
-  updatePassword: (newPassword: string) => Promise<{ ok: boolean; error?: string }>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   isAdmin: boolean; // admin OR rh (mantém gating atual)
-  // Legacy stubs — telas antigas ainda chamam estas funções
-  listUsers: () => StoredUser[];
-  addUser: (u: StoredUser) => { ok: boolean; error?: string };
-  updateUser: (username: string, patch: Partial<StoredUser>) => void;
-  deleteUser: (username: string) => void;
+  refreshUser: () => Promise<void>;
 }
 
 // Roles com acesso de administrador
@@ -53,108 +37,63 @@ function resolveRole(roles: string[]): UserRole {
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
-async function fetchUserData(supaUser: SupaUser): Promise<User> {
-  const [{ data: profile }, { data: roles }] = await Promise.all([
-    supabase.from('profiles').select('nome_completo, email, must_change_password').eq('id', supaUser.id).maybeSingle(),
-    supabase.from('user_roles').select('role').eq('user_id', supaUser.id),
-  ]);
+async function fetchUserData(clerkUserId: string, fallbackEmail: string): Promise<User | null> {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, nome_completo, email, must_change_password')
+    .eq('clerk_user_id', clerkUserId)
+    .maybeSingle();
+  if (!profile) return null;
+
+  const { data: roles } = await supabase.from('user_roles').select('role').eq('user_id', profile.id);
   const rolesList = (roles ?? []).map(r => r.role);
+
   return {
-    id: supaUser.id,
-    username: supaUser.email ?? '',
-    email: supaUser.email ?? '',
-    nome: profile?.nome_completo ?? supaUser.email ?? '',
+    id: profile.id,
+    username: profile.email ?? fallbackEmail,
+    email: profile.email ?? fallbackEmail,
+    nome: profile.nome_completo ?? fallbackEmail,
     role: resolveRole(rolesList),
-    mustChangePassword: (profile as any)?.must_change_password === true,
+    mustChangePassword: (profile as any).must_change_password === true,
   };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { isLoaded, isSignedIn } = useClerkAuth();
+  const { user: clerkUser } = useUser();
+  const { signOut } = useClerk();
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(true);
+
+  const refreshUser = useCallback(async () => {
+    if (!clerkUser) {
+      setUser(null);
+      setProfileLoading(false);
+      return;
+    }
+    setProfileLoading(true);
+    const data = await fetchUserData(clerkUser.id, clerkUser.primaryEmailAddress?.emailAddress ?? '');
+    setUser(data);
+    setProfileLoading(false);
+  }, [clerkUser]);
 
   useEffect(() => {
-    // Registra o listener ANTES de getSession() para não perder eventos (regra Supabase)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, sess) => {
-      setSession(sess);
-      if (sess?.user) {
-        // Defer para evitar deadlock dentro da máquina de estados do Supabase
-        setTimeout(() => {
-          fetchUserData(sess.user).then(setUser).catch(() => setUser(null));
-        }, 0);
-      } else {
-        setUser(null);
-      }
-    });
-
-    supabase.auth.getSession().then(({ data: { session: sess } }) => {
-      setSession(sess);
-      if (sess?.user) {
-        fetchUserData(sess.user).then(setUser).finally(() => setLoading(false));
-      } else {
-        setLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const login = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { ok: false, error: error.message };
-    return { ok: true };
-  };
-
-  const signup = async (email: string, password: string, nome: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-        data: { nome_completo: nome },
-      },
-    });
-    if (error) return { ok: false, error: error.message };
-    return { ok: true };
-  };
-
-  const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    if (error) return { ok: false, error: error.message };
-    return { ok: true };
-  };
-
-  const updatePassword = async (newPassword: string) => {
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) return { ok: false, error: error.message };
-    // Limpa o flag de troca obrigatória, se houver
-    if (user?.id) {
-      await supabase.from('profiles').update({ must_change_password: false }).eq('id', user.id);
-      setUser({ ...user, mustChangePassword: false });
-    }
-    return { ok: true };
-  };
+    if (!isLoaded) return;
+    refreshUser();
+  }, [isLoaded, isSignedIn, clerkUser?.id, refreshUser]);
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    await signOut();
   };
-
-  // Legacy stubs (mantêm telas antigas funcionando sem quebrar)
-  const listUsers = (): StoredUser[] => [];
-  const addUser = (_u: StoredUser) => ({ ok: false, error: 'Use a tela de Cadastro' });
-  const updateUser = (_username: string, _patch: Partial<StoredUser>) => {};
-  const deleteUser = (_username: string) => {};
 
   return (
     <AuthContext.Provider value={{
-      user, session, loading,
-      login, signup, resetPassword, updatePassword, logout,
-      isAuthenticated: !!session,
+      user,
+      loading: !isLoaded || profileLoading,
+      logout,
+      isAuthenticated: !!isSignedIn,
       isAdmin: user ? ADMIN_ROLES.includes(user.role) : false,
-      listUsers, addUser, updateUser, deleteUser,
+      refreshUser,
     }}>
       {children}
     </AuthContext.Provider>

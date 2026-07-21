@@ -1,30 +1,28 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useUser } from '@clerk/clerk-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { KeyRound } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+// Tela de troca de senha obrigatória (profiles.must_change_password), para
+// quando um admin definiu uma senha temporária (admin-create-user /
+// admin-set-password / admin-resend-invite). O Clerk exige a senha atual
+// para trocar via user.updatePassword — aqui é a senha temporária que o
+// usuário acabou de usar para logar.
 export default function ResetPassword() {
+  const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
-  const [ready, setReady] = useState(false);
-  const { updatePassword } = useAuth();
+  const { user: clerkUser } = useUser();
+  const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    // O Supabase coloca o token no hash; o cliente já trata via onAuthStateChange.
-    // Apenas indicamos que a página está pronta.
-    if (window.location.hash.includes('type=recovery') || window.location.hash.includes('access_token')) {
-      setReady(true);
-    } else {
-      setReady(true); // permite mesmo assim — updateUser falhará se não houver sessão
-    }
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,14 +34,21 @@ export default function ResetPassword() {
       toast.error('A senha deve ter ao menos 6 caracteres');
       return;
     }
+    if (!clerkUser) return;
+
     setBusy(true);
-    const r = await updatePassword(password);
-    setBusy(false);
-    if (r.ok) {
+    try {
+      await clerkUser.updatePassword({ currentPassword, newPassword: password });
+      if (user?.id) {
+        await supabase.from('profiles').update({ must_change_password: false }).eq('id', user.id);
+        await refreshUser();
+      }
       toast.success('Senha atualizada!');
       navigate('/');
-    } else {
-      toast.error(r.error || 'Falha ao atualizar senha');
+    } catch (err: any) {
+      toast.error(err?.errors?.[0]?.message || err?.message || 'Falha ao atualizar senha');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -58,21 +63,21 @@ export default function ResetPassword() {
           <CardDescription>Defina sua nova senha de acesso</CardDescription>
         </CardHeader>
         <CardContent>
-          {!ready ? (
-            <p className="text-sm text-muted-foreground text-center">Carregando…</p>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="p1">Nova senha</Label>
-                <Input id="p1" type="password" value={password} onChange={e => setPassword(e.target.value)} minLength={6} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="p2">Confirmar senha</Label>
-                <Input id="p2" type="password" value={confirm} onChange={e => setConfirm(e.target.value)} minLength={6} required />
-              </div>
-              <Button type="submit" className="w-full" disabled={busy}>Salvar</Button>
-            </form>
-          )}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="p0">Senha temporária (atual)</Label>
+              <Input id="p0" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="p1">Nova senha</Label>
+              <Input id="p1" type="password" value={password} onChange={e => setPassword(e.target.value)} minLength={6} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="p2">Confirmar senha</Label>
+              <Input id="p2" type="password" value={confirm} onChange={e => setConfirm(e.target.value)} minLength={6} required />
+            </div>
+            <Button type="submit" className="w-full" disabled={busy}>Salvar</Button>
+          </form>
         </CardContent>
       </Card>
     </div>

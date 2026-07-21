@@ -1,54 +1,29 @@
 // deno-lint-ignore-file
-import { createClient } from 'npm:@supabase/supabase-js@2';
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
-
-const headers = { ...corsHeaders, 'Content-Type': 'application/json' };
-
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers });
-}
+import { verifyCaller, serviceClient, clerkClient, json, corsHeaders } from '../_shared/clerk.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Método não permitido' }, 405);
 
   try {
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-    const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
-
-    const auth = req.headers.get('Authorization') || '';
-    if (!auth.startsWith('Bearer ')) return json({ error: 'Não autenticado' }, 401);
-    const userClient = createClient(SUPABASE_URL, ANON_KEY, {
-      global: { headers: { Authorization: auth } },
-    });
-    const token = auth.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims?.sub) return json({ error: 'Não autenticado' }, 401);
-    const callerId = claimsData.claims.sub;
-
-    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
-    const { data: roles } = await admin
-      .from('user_roles').select('role').eq('user_id', callerId);
-    const callerRoles = (roles || []).map((r: any) => r.role);
-    const callerIsAdmin = callerRoles.includes('admin');
-    const canManage = callerIsAdmin || callerRoles.includes('rh');
-    if (!canManage) return json({ error: 'Apenas administradores/RH' }, 403);
+    const caller = await verifyCaller(req);
+    if (!caller) return json({ error: 'Não autenticado' }, 401);
+    if (!caller.canManage) return json({ error: 'Apenas administradores/RH' }, 403);
 
     const { user_id } = await req.json();
-    if (!user_id) {
-      return json({ error: 'user_id obrigatório' }, 400);
-    }
-    if (user_id === callerId) {
-      return json({ error: 'Você não pode excluir a si mesmo' }, 400);
-    }
-    if (!callerIsAdmin) {
-      const { data: targetRoles } = await admin
-        .from('user_roles').select('role').eq('user_id', user_id);
+    if (!user_id) return json({ error: 'user_id obrigatório' }, 400);
+    if (user_id === caller.profileId) return json({ error: 'Você não pode excluir a si mesmo' }, 400);
+
+    const admin = serviceClient();
+
+    if (!caller.isAdmin) {
+      const { data: targetRoles } = await admin.from('user_roles').select('role').eq('user_id', user_id);
       if ((targetRoles || []).some((r: any) => r.role === 'admin')) {
         return json({ error: 'RH não pode excluir contas de administrador' }, 403);
       }
     }
+
+    const { data: target } = await admin.from('profiles').select('clerk_user_id').eq('id', user_id).maybeSingle();
 
     const run = async (label: string, promise: PromiseLike<{ error: any }>) => {
       const { error } = await promise;
@@ -63,11 +38,12 @@ Deno.serve(async (req) => {
     await run('Remover fichas de EPI', admin.from('fichas_epi').delete().eq('colaborador_id', user_id));
     await run('Remover fichas de uniforme', admin.from('fichas_uniforme').delete().eq('colaborador_id', user_id));
 
-    await run('Remover permissões', admin.from('user_roles').delete().eq('user_id', user_id));
+    await run('Remover papéis', admin.from('user_roles').delete().eq('user_id', user_id));
     await run('Remover perfil', admin.from('profiles').delete().eq('id', user_id));
 
-    const { error: delErr } = await admin.auth.admin.deleteUser(user_id);
-    if (delErr) throw delErr;
+    if (target?.clerk_user_id) {
+      await clerkClient.users.deleteUser(target.clerk_user_id);
+    }
 
     return json({ ok: true });
   } catch (e: any) {

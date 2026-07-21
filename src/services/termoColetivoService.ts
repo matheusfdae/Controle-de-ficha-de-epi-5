@@ -46,10 +46,11 @@ export async function createTermoColetivo(
   termo: Omit<TermoColetivo, 'id' | 'created_at' | 'updated_at' | 'status'>,
   itens: Omit<TermoColetivoItem, 'termo_id' | 'id' | 'ordem'>[]
 ): Promise<string> {
-  const { data: u } = await supabase.auth.getUser();
+  // criado_por vem do DEFAULT current_profile_id() no banco (não há mais
+  // sessão Supabase Auth no client para ler o id do usuário).
   const { data: cab, error } = await supabase
     .from('termos_epi_coletivos')
-    .insert({ ...termo, criado_por: u.user?.id ?? null, status: 'em_assinatura' })
+    .insert({ ...termo, status: 'em_assinatura' })
     .select('id')
     .single();
   if (error || !cab) throw error ?? new Error('Falha ao criar termo');

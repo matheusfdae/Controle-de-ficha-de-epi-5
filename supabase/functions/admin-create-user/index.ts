@@ -1,6 +1,5 @@
 // deno-lint-ignore-file
-import { createClient } from 'npm:@supabase/supabase-js@2';
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+import { verifyCaller, serviceClient, clerkClient, randomTempPassword, json, corsHeaders } from '../_shared/clerk.ts';
 
 type Role = 'admin' | 'rh' | 'supervisor' | 'almoxarife' | 'colaborador';
 const ROLES: Role[] = ['admin', 'rh', 'supervisor', 'almoxarife', 'colaborador'];
@@ -13,35 +12,14 @@ interface PermissionRow {
   can_delete?: boolean;
 }
 
-const headers = { ...corsHeaders, 'Content-Type': 'application/json' };
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers });
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Método não permitido' }, 405);
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const authHeader = req.headers.get('Authorization') || '';
-    if (!authHeader.startsWith('Bearer ')) return json({ error: 'Não autenticado' }, 401);
-
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims?.sub) return json({ error: 'Não autenticado' }, 401);
-
-    const admin = createClient(supabaseUrl, serviceKey);
-    const { data: rolesData } = await admin
-      .from('user_roles').select('role').eq('user_id', claimsData.claims.sub);
-    const callerRoles = (rolesData || []).map((r: any) => r.role);
-    const callerIsAdmin = callerRoles.includes('admin');
-    const canManage = callerIsAdmin || callerRoles.includes('rh');
-    if (!canManage) return json({ error: 'Apenas administradores/RH' }, 403);
+    const caller = await verifyCaller(req);
+    if (!caller) return json({ error: 'Não autenticado' }, 401);
+    if (!caller.canManage) return json({ error: 'Apenas administradores/RH' }, 403);
 
     const body = await req.json().catch(() => null) as {
       nome?: string;
@@ -49,58 +27,51 @@ Deno.serve(async (req) => {
       password?: string;
       role?: Role;
       permissions?: PermissionRow[];
-      send_invite?: boolean;
-      redirect_to?: string;
     } | null;
 
     const nome = String(body?.nome || '').trim();
     const email = String(body?.email || '').trim().toLowerCase();
-    const password = String(body?.password || '');
     const role: Role = ROLES.includes(body?.role as Role) ? body!.role! : 'colaborador';
     const permissions = Array.isArray(body?.permissions) ? body!.permissions! : [];
-    const sendInvite = body?.send_invite !== false && password.length === 0;
-    const redirectTo = body?.redirect_to || undefined;
+    const explicitPassword = String(body?.password || '');
 
-    if (role === 'admin' && !callerIsAdmin) {
+    if (role === 'admin' && !caller.isAdmin) {
       return json({ error: 'Apenas administradores podem criar contas de administrador' }, 403);
     }
     if (!nome) return json({ error: 'Nome obrigatório' }, 400);
     if (!email || !email.includes('@')) return json({ error: 'E-mail inválido' }, 400);
-    if (!sendInvite && password.length < 6) {
+    if (explicitPassword.length > 0 && explicitPassword.length < 6) {
       return json({ error: 'Senha mínima de 6 caracteres' }, 400);
     }
 
-    let userId: string | undefined;
+    // Cadastro é só-por-admin (self-signup desligado no Clerk) — sempre
+    // criamos o usuário direto no Clerk. Sem senha explícita, geramos uma
+    // temporária e marcamos must_change_password (mesmo fluxo do
+    // admin-set-password/admin-resend-invite); não existe mais o "link
+    // mágico de convite" do Supabase.
+    const generatedPassword = explicitPassword.length === 0 ? randomTempPassword() : undefined;
+    const password = explicitPassword.length >= 6 ? explicitPassword : generatedPassword!;
 
-    if (sendInvite) {
-      const { data: invited, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
-        data: { nome_completo: nome },
-        redirectTo,
-      });
-      if (invErr) throw invErr;
-      userId = invited.user?.id;
-    } else {
-      const { data: created, error: createError } = await admin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { nome_completo: nome },
-      });
-      if (createError) throw createError;
-      userId = created.user?.id;
-    }
-    if (!userId) return json({ error: 'Usuário não foi criado' }, 500);
-
-    const { error: profileError } = await admin.from('profiles').upsert({
-      id: userId,
-      email,
-      nome_completo: nome,
-      ativo: true,
-      must_change_password: true,
+    const clerkUser = await clerkClient.users.createUser({
+      emailAddress: [email],
+      password,
+      skipPasswordChecks: !!generatedPassword,
+      firstName: nome,
     });
-    if (profileError) throw profileError;
 
-    await admin.from('user_roles').delete().eq('user_id', userId);
+    const admin = serviceClient();
+    const { data: profile, error: profileError } = await admin.from('profiles')
+      .insert({
+        clerk_user_id: clerkUser.id,
+        email,
+        nome_completo: nome,
+        ativo: true,
+        must_change_password: true,
+      })
+      .select('id').single();
+    if (profileError) throw profileError;
+    const userId = profile.id;
+
     const rolesToInsert: Array<{ user_id: string; role: Role }> = [
       { user_id: userId, role: 'colaborador' },
     ];
@@ -109,11 +80,10 @@ Deno.serve(async (req) => {
     if (roleError) throw roleError;
 
     if (permissions.length > 0) {
-      await admin.from('user_permissions').delete().eq('user_id', userId);
       const rows = permissions
         .filter((p) => p && p.module)
         .map((p) => ({
-          user_id: userId!,
+          user_id: userId,
           module: p.module,
           can_view: !!p.can_view,
           can_create: !!p.can_create,
@@ -126,7 +96,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return json({ ok: true, user_id: userId, invited: sendInvite });
+    return json({ ok: true, user_id: userId, temp_password: generatedPassword });
   } catch (error: any) {
     return json({ error: error?.message || String(error) }, 500);
   }
