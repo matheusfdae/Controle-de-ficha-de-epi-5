@@ -181,9 +181,9 @@ export async function assinarFichaPublica(
 ): Promise<{ ok: boolean; error?: string }> {
   let ip: string | null = null;
   try {
-    const r = await fetch('https://api.ipify.org?format=json');
+    const r = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(3000) });
     if (r.ok) ip = (await r.json() as { ip: string }).ip;
-  } catch { /* ignore */ }
+  } catch { /* rede lenta/instável (comum em 3G/4G) não pode travar a assinatura */ }
 
   const { data, error } = await supabase.rpc('assinar_ficha_publica_por_token', {
     _token: token,
