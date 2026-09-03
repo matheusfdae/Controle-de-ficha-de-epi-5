@@ -3,6 +3,7 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { Separator } from '@/components/ui/separator';
 import InstallAppButton from '@/components/InstallAppButton';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const titles: Record<string, string> = {
   '/': 'Dashboard',
@@ -28,7 +29,10 @@ export default function AppLayout() {
             <SidebarTrigger />
             <Separator orientation="vertical" className="h-5 mx-1" />
             <h1 className="text-sm font-semibold text-foreground truncate">{title}</h1>
-            <div className="ml-auto"><InstallAppButton /></div>
+            <div className="ml-auto flex items-center gap-1">
+              <ThemeToggle />
+              <InstallAppButton />
+            </div>
           </header>
           <main className="flex-1">
             <Outlet />

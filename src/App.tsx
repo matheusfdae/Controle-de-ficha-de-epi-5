@@ -1,11 +1,13 @@
 import { lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate, useSearchParams } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import AppLayout from "@/components/AppLayout";
+import { ModuleId, ActionId } from "@/lib/permissions";
 
 // Páginas carregadas sob demanda (code splitting)
 const Login               = lazy(() => import('./pages/Login'));
@@ -62,6 +64,27 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Gate por módulo/ação da matriz de permissões (src/lib/permissions.ts),
+// em vez do isAdmin binário — admin sempre passa (can() já tem esse bypass).
+function RequireModule({ module, action = 'view', children }: {
+  module: ModuleId; action?: ActionId; children: React.ReactNode;
+}) {
+  const { can } = useAuth();
+  if (!can(module, action)) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
+// /nova-ficha é compartilhada por EPI e Uniforme (?tipo=epi|uniforme,
+// default 'epi' — mesma leitura que NovaFicha.tsx faz), então o módulo
+// exigido depende da query string.
+function RequireNovaFicha({ children }: { children: React.ReactNode }) {
+  const { can } = useAuth();
+  const [searchParams] = useSearchParams();
+  const module: ModuleId = searchParams.get('tipo') === 'uniforme' ? 'fichas_uniforme' : 'fichas_epi';
+  if (!can(module, 'create')) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -73,20 +96,20 @@ function AppRoutes() {
         <Route path="/assinar-termo-coletivo/:token" element={<AssinarTermoColetivo />} />
         <Route element={<ProtectedLayout />}>
           <Route path="/"             element={<Dashboard />} />
-          <Route path="/nova-ficha"   element={<AdminRoute><NovaFicha /></AdminRoute>} />
+          <Route path="/nova-ficha"   element={<RequireNovaFicha><NovaFicha /></RequireNovaFicha>} />
           <Route path="/consultar"    element={<ConsultarFichas />} />
           <Route path="/ficha/:id"    element={<VisualizarFicha />} />
           <Route path="/vencimentos"  element={<Vencimentos />} />
           <Route path="/pendentes"    element={<AssinaturasPendentes />} />
           <Route path="/rank-postos"  element={<RankPostos />} />
-          <Route path="/configuracoes" element={<AdminRoute><Configuracoes /></AdminRoute>} />
+          <Route path="/configuracoes" element={<RequireModule module="configuracoes"><Configuracoes /></RequireModule>} />
           <Route path="/usuarios"     element={<AdminRoute><Usuarios /></AdminRoute>} />
           <Route path="/convites"     element={<Convites />} />
-          <Route path="/estoque"      element={<AdminRoute><Estoque /></AdminRoute>} />
-          <Route path="/funcoes"      element={<AdminRoute><Funcoes /></AdminRoute>} />
-          <Route path="/integracao"   element={<AdminRoute><Integracao /></AdminRoute>} />
+          <Route path="/estoque"      element={<RequireModule module="estoque"><Estoque /></RequireModule>} />
+          <Route path="/funcoes"      element={<RequireModule module="funcoes"><Funcoes /></RequireModule>} />
+          <Route path="/integracao"   element={<RequireModule module="integracao"><Integracao /></RequireModule>} />
           <Route path="/termos-coletivos" element={<TermosColetivos />} />
-          <Route path="/termo-coletivo/novo" element={<AdminRoute><TermoColetivoNovo /></AdminRoute>} />
+          <Route path="/termo-coletivo/novo" element={<RequireModule module="termos_coletivos" action="create"><TermoColetivoNovo /></RequireModule>} />
           <Route path="/termo-coletivo/:id" element={<TermoColetivoView />} />
         </Route>
         <Route path="*" element={<NotFound />} />
@@ -96,17 +119,19 @@ function AppRoutes() {
 }
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <AppRoutes />
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ThemeProvider>
 );
 
 export default App;

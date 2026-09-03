@@ -17,6 +17,8 @@ import {
 } from '@/components/ui/select';
 import { Funcao, listFuncoes } from '@/services/estoqueService';
 import BackButton from '@/components/BackButton';
+import PageHeader from '@/components/PageHeader';
+import { useConfirm } from '@/hooks/use-confirm';
 
 interface Colab {
   id: string;
@@ -32,6 +34,7 @@ interface Colab {
 
 export default function Integracao() {
   const navigate = useNavigate();
+  const { confirm, ConfirmDialog } = useConfirm();
   const [colabs, setColabs] = useState<Colab[]>([]);
   const [funcoes, setFuncoes] = useState<Funcao[]>([]);
   const [open, setOpen] = useState(false);
@@ -88,7 +91,7 @@ export default function Integracao() {
   };
 
   const remove = async (id: string) => {
-    if (!confirm('Excluir este colaborador?')) return;
+    if (!(await confirm('Excluir este colaborador?'))) return;
     await supabase.from('colaboradores_integracao').delete().eq('id', id);
     load();
   };
@@ -216,48 +219,46 @@ export default function Integracao() {
     <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-6xl mx-auto space-y-6">
         <BackButton />
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <p className="text-xs uppercase tracking-widest text-muted-foreground">RH • Onboarding</p>
-            <h1 className="text-3xl font-bold tracking-tight">Integração</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Cadastre os novos colaboradores que serão contratados.
-            </p>
-          </div>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button><UserPlus className="h-4 w-4 mr-1" /> Novo colaborador</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Novo Colaborador (Integração)</DialogTitle></DialogHeader>
-              <div className="space-y-3">
-                <div><Label>Nome *</Label>
-                  <Input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} placeholder="Nome completo" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><Label>Matrícula</Label>
-                    <Input value={form.matricula} onChange={e => setForm({ ...form, matricula: e.target.value })} />
+        <PageHeader
+          eyebrow="RH • Onboarding"
+          title="Integração"
+          description="Cadastre os novos colaboradores que serão contratados."
+          actions={
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button><UserPlus className="h-4 w-4 mr-1" /> Novo colaborador</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Novo Colaborador (Integração)</DialogTitle></DialogHeader>
+                <div className="space-y-3">
+                  <div><Label htmlFor="integ-nome">Nome *</Label>
+                    <Input id="integ-nome" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} placeholder="Nome completo" />
                   </div>
-                  <div><Label>Posto</Label>
-                    <Input value={form.posto} onChange={e => setForm({ ...form, posto: e.target.value })} placeholder="Ex.: Parkshopping" />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><Label htmlFor="integ-matricula">Matrícula</Label>
+                      <Input id="integ-matricula" value={form.matricula} onChange={e => setForm({ ...form, matricula: e.target.value })} />
+                    </div>
+                    <div><Label htmlFor="integ-posto">Posto</Label>
+                      <Input id="integ-posto" value={form.posto} onChange={e => setForm({ ...form, posto: e.target.value })} placeholder="Ex.: Parkshopping" />
+                    </div>
+                  </div>
+                  <div><Label htmlFor="integ-funcao">Função</Label>
+                    <Select value={form.funcao_id} onValueChange={v => setForm({ ...form, funcao_id: v })}>
+                      <SelectTrigger id="integ-funcao"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                      <SelectContent>
+                        {funcoes.map(f => <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div><Label htmlFor="integ-admissao">Data prevista de admissão</Label>
+                    <Input id="integ-admissao" type="date" value={form.data_admissao} onChange={e => setForm({ ...form, data_admissao: e.target.value })} />
                   </div>
                 </div>
-                <div><Label>Função</Label>
-                  <Select value={form.funcao_id} onValueChange={v => setForm({ ...form, funcao_id: v })}>
-                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                    <SelectContent>
-                      {funcoes.map(f => <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div><Label>Data prevista de admissão</Label>
-                  <Input type="date" value={form.data_admissao} onChange={e => setForm({ ...form, data_admissao: e.target.value })} />
-                </div>
-              </div>
-              <DialogFooter><Button onClick={handleSave}><Save className="h-4 w-4 mr-1" /> Salvar</Button></DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+                <DialogFooter><Button onClick={handleSave}><Save className="h-4 w-4 mr-1" /> Salvar</Button></DialogFooter>
+              </DialogContent>
+            </Dialog>
+          }
+        />
 
         <div className="grid gap-3">
           {colabs.map(c => (
@@ -447,6 +448,7 @@ export default function Integracao() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog />
     </div>
   );
 }

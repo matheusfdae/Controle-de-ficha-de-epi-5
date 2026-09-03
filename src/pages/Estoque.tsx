@@ -20,6 +20,8 @@ import EstoqueChart from '@/components/EstoqueChart';
 import EstoqueUniformePanel from '@/components/EstoqueUniformePanel';
 import RelatorioMovimentacoes from '@/components/RelatorioMovimentacoes';
 import BackButton from '@/components/BackButton';
+import PageHeader from '@/components/PageHeader';
+import { useConfirm } from '@/hooks/use-confirm';
 
 function EpiPanel() {
   const [epis, setEpis] = useState<EPI[]>([]);
@@ -32,6 +34,7 @@ function EpiPanel() {
   const [tamanhos, setTamanhos] = useState<EPITamanho[]>([]);
   const [novoTam, setNovoTam] = useState('');
   const [novoQtd, setNovoQtd] = useState<number>(0);
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const load = async () => {
     try { setEpis(await listEpis()); } catch (e: any) { toast.error(e.message); }
@@ -89,7 +92,7 @@ function EpiPanel() {
   };
 
   const handleReset = async (epiId: string) => {
-    if (!confirm('Zerar o estoque deste EPI (todos os tamanhos)? Será registrada uma saída.')) return;
+    if (!(await confirm('Zerar o estoque deste EPI (todos os tamanhos)? Será registrada uma saída.'))) return;
     try {
       await resetarEstoqueEpi(epiId);
       toast.success('Estoque resetado'); load();
@@ -106,10 +109,10 @@ function EpiPanel() {
           <DialogContent>
             <DialogHeader><DialogTitle>Novo EPI</DialogTitle></DialogHeader>
             <div className="space-y-3">
-              <div><Label>Nome *</Label><Input value={novoNome} onChange={e => setNovoNome(e.target.value)} /></div>
+              <div><Label htmlFor="epi-nome">Nome *</Label><Input id="epi-nome" value={novoNome} onChange={e => setNovoNome(e.target.value)} /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div><Label>Código</Label><Input value={novoCodigo} onChange={e => setNovoCodigo(e.target.value)} /></div>
-                <div><Label>Nº CA</Label><Input value={novoCa} onChange={e => setNovoCa(e.target.value)} /></div>
+                <div><Label htmlFor="epi-codigo">Código</Label><Input id="epi-codigo" value={novoCodigo} onChange={e => setNovoCodigo(e.target.value)} /></div>
+                <div><Label htmlFor="epi-ca">Nº CA</Label><Input id="epi-ca" value={novoCa} onChange={e => setNovoCa(e.target.value)} /></div>
               </div>
             </div>
             <DialogFooter><Button onClick={handleCreate}><Save className="h-4 w-4 mr-1" /> Salvar</Button></DialogFooter>
@@ -168,17 +171,17 @@ function EpiPanel() {
               </div>
             ))}
             <div className="flex gap-2 items-end pt-2 border-t">
-              <div className="flex-1"><Label className="text-xs">Tamanho</Label>
-                <Input value={novoTam} onChange={e => setNovoTam(e.target.value)} placeholder="P, M, G..." /></div>
-              <div><Label className="text-xs">Quantidade</Label>
-                <Input type="number" min={0} value={novoQtd} onChange={e => setNovoQtd(parseInt(e.target.value) || 0)} className="w-28" /></div>
+              <div className="flex-1"><Label htmlFor="tam-novo" className="text-xs">Tamanho</Label>
+                <Input id="tam-novo" value={novoTam} onChange={e => setNovoTam(e.target.value)} placeholder="P, M, G..." /></div>
+              <div><Label htmlFor="tam-qtd" className="text-xs">Quantidade</Label>
+                <Input id="tam-qtd" type="number" min={0} value={novoQtd} onChange={e => setNovoQtd(parseInt(e.target.value) || 0)} className="w-28" /></div>
               <Button onClick={handleAddTamanho}><Plus className="h-4 w-4" /></Button>
             </div>
           </div>
           <DialogFooter className="flex justify-between">
             <Button variant="destructive" onClick={async () => {
               if (!editing) return;
-              if (!confirm('Excluir este EPI?')) return;
+              if (!(await confirm('Excluir este EPI?'))) return;
               await deleteEpi(editing.id); setEditing(null); load();
             }}>Excluir EPI</Button>
             <Button variant="outline" onClick={() => editing && handleReset(editing.id)}>
@@ -187,6 +190,7 @@ function EpiPanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog />
     </div>
   );
 }
@@ -196,10 +200,7 @@ export default function Estoque() {
     <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-6xl mx-auto space-y-6">
         <BackButton />
-        <div>
-          <p className="text-xs uppercase tracking-widest text-muted-foreground">Gestão</p>
-          <h1 className="text-3xl font-bold tracking-tight">Estoque</h1>
-        </div>
+        <PageHeader eyebrow="Gestão" title="Estoque" />
 
         <EstoqueChart />
 

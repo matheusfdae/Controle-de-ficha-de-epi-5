@@ -505,9 +505,9 @@ export default function NovaFicha() {
               </button>
               <button
                 onClick={finalizarWhatsApp}
-                className="group flex flex-col items-center gap-2 p-4 rounded-lg border bg-card hover:border-[#25D366] hover:bg-[#25D366]/5 transition-colors text-center"
+                className="group flex flex-col items-center gap-2 p-4 rounded-lg border bg-card hover:border-whatsapp hover:bg-whatsapp/5 transition-colors text-center"
               >
-                <MessageCircle className="h-8 w-8 text-[#25D366]" />
+                <MessageCircle className="h-8 w-8 text-whatsapp" />
                 <span className="font-semibold text-sm">Link via WhatsApp</span>
                 <span className="text-[11px] text-muted-foreground">Envia o link para o telefone cadastrado</span>
               </button>

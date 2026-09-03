@@ -13,6 +13,7 @@ import {
 import SignaturePad from '@/components/SignaturePad';
 import { toast } from 'sonner';
 import BackButton from '@/components/BackButton';
+import { useConfirm } from '@/hooks/use-confirm';
 
 export default function Configuracoes() {
   const [config, setConfig] = useState<AppConfig>(getConfig());
@@ -23,6 +24,7 @@ export default function Configuracoes() {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [empresaDialog, setEmpresaDialog] = useState(false);
   const [empresaEdit, setEmpresaEdit] = useState<Partial<Empresa>>({});
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const reloadEmpresas = () => setEmpresas(listEmpresas());
 
@@ -46,8 +48,8 @@ export default function Configuracoes() {
     setEmpresaDialog(false);
     toast.success('Empresa salva');
   };
-  const handleDeleteEmpresa = (id: string) => {
-    if (!confirm('Excluir esta empresa?')) return;
+  const handleDeleteEmpresa = async (id: string) => {
+    if (!(await confirm('Excluir esta empresa?'))) return;
     deleteEmpresa(id);
     reloadEmpresas();
     toast.success('Empresa removida');
@@ -445,6 +447,7 @@ export default function Configuracoes() {
           </TabsContent>
         </Tabs>
       </div>
+      <ConfirmDialog />
     </div>
   );
 }

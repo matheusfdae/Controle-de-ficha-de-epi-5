@@ -17,12 +17,14 @@ import {
   ajustarEstoqueUniforme, resetarEstoqueUniforme,
 } from '@/services/uniformesService';
 import { supabase } from '@/integrations/supabase/client';
+import { useConfirm } from '@/hooks/use-confirm';
 
 export default function EstoqueUniformePanel() {
   const [items, setItems] = useState<Uniforme[]>([]);
   const [search, setSearch] = useState('');
   const [openNovo, setOpenNovo] = useState(false);
   const [editing, setEditing] = useState<Uniforme | null>(null);
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const [form, setForm] = useState<Partial<Uniforme>>({
     nome: '', codigo: '', categoria: 'camisa', genero: 'unissex',
@@ -63,7 +65,7 @@ export default function EstoqueUniformePanel() {
   };
 
   const handleReset = async (id: string) => {
-    if (!confirm('Zerar o estoque deste uniforme? Será registrada uma saída.')) return;
+    if (!(await confirm('Zerar o estoque deste uniforme? Será registrada uma saída.'))) return;
     try { await resetarEstoqueUniforme(id); toast.success('Estoque resetado'); load(); }
     catch (e: any) { toast.error(e.message); }
   };
@@ -120,7 +122,7 @@ export default function EstoqueUniformePanel() {
             <DialogFooter className="flex justify-between">
               {editing && (
                 <Button variant="destructive" onClick={async () => {
-                  if (!confirm('Excluir este uniforme?')) return;
+                  if (!(await confirm('Excluir este uniforme?'))) return;
                   await deleteUniforme(editing.id); setOpenNovo(false); setEditing(null); load();
                 }}>Excluir</Button>
               )}
@@ -160,7 +162,7 @@ export default function EstoqueUniformePanel() {
                     </Button>
                   </div>
                   <Button variant="ghost" size="icon" className="text-destructive"
-                    onClick={async () => { if (confirm('Excluir?')) { await deleteUniforme(u.id); load(); } }}>
+                    onClick={async () => { if (await confirm('Excluir este uniforme?')) { await deleteUniforme(u.id); load(); } }}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -174,6 +176,7 @@ export default function EstoqueUniformePanel() {
           </p>
         )}
       </div>
+      <ConfirmDialog />
     </div>
   );
 }

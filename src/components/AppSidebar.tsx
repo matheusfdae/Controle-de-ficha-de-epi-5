@@ -10,43 +10,48 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ModuleId, ActionId } from '@/lib/permissions';
 
 const baseItems = [
-  { title: 'Dashboard', url: '/', icon: LayoutDashboard, end: true, adminOnly: false },
-  { title: 'Assinar (Tablet)', url: '/pendentes', icon: ClipboardSignature, end: false, adminOnly: false },
-  { title: 'Vencimentos', url: '/vencimentos', icon: CalendarClock, end: false, adminOnly: false },
-  { title: 'Rank por Posto', url: '/rank-postos', icon: Trophy, end: false, adminOnly: false },
+  { title: 'Dashboard', url: '/', icon: LayoutDashboard, end: true },
+  { title: 'Assinar (Tablet)', url: '/pendentes', icon: ClipboardSignature, end: false },
+  { title: 'Vencimentos', url: '/vencimentos', icon: CalendarClock, end: false },
+  { title: 'Rank por Posto', url: '/rank-postos', icon: Trophy, end: false },
 ];
 
-const epiItems = [
-  { title: 'Nova Ficha EPI', url: '/nova-ficha?tipo=epi', icon: FilePlus2, end: false, adminOnly: true },
-  { title: 'Termo Coletivo EPI', url: '/termos-coletivos', icon: FileSignature, end: false, adminOnly: false },
-  { title: 'Consultar Fichas EPI', url: '/consultar?tipo=epi', icon: Search, end: false, adminOnly: false },
+const epiItems: Array<{ title: string; url: string; icon: typeof FilePlus2; end: boolean; module?: ModuleId; action?: ActionId }> = [
+  { title: 'Nova Ficha EPI', url: '/nova-ficha?tipo=epi', icon: FilePlus2, end: false, module: 'fichas_epi', action: 'create' },
+  { title: 'Termo Coletivo EPI', url: '/termos-coletivos', icon: FileSignature, end: false },
+  { title: 'Consultar Fichas EPI', url: '/consultar?tipo=epi', icon: Search, end: false },
 ];
 
-const uniformeItems = [
-  { title: 'Nova Ficha Uniforme', url: '/nova-ficha?tipo=uniforme', icon: FilePlus2, end: false, adminOnly: true },
-  { title: 'Consultar Fichas Uniforme', url: '/consultar?tipo=uniforme', icon: Search, end: false, adminOnly: false },
+const uniformeItems: Array<{ title: string; url: string; icon: typeof FilePlus2; end: boolean; module?: ModuleId; action?: ActionId }> = [
+  { title: 'Nova Ficha Uniforme', url: '/nova-ficha?tipo=uniforme', icon: FilePlus2, end: false, module: 'fichas_uniforme', action: 'create' },
+  { title: 'Consultar Fichas Uniforme', url: '/consultar?tipo=uniforme', icon: Search, end: false },
 ];
 
-const adminItems = [
-  { title: 'Integração', url: '/integracao', icon: UserPlus, end: false },
-  { title: 'Estoque', url: '/estoque', icon: Package, end: false },
-  { title: 'Funções', url: '/funcoes', icon: Briefcase, end: false },
-  { title: 'Usuários', url: '/usuarios', icon: Users, end: false },
-  { title: 'Configurações', url: '/configuracoes', icon: Settings, end: false },
+// "Usuários" fica de fora daqui — continua exclusivo de Admin/RH (isAdmin),
+// não vira controlável pela matriz de permissões.
+const adminItems: Array<{ title: string; url: string; icon: typeof Package; end: boolean; module: ModuleId }> = [
+  { title: 'Integração', url: '/integracao', icon: UserPlus, end: false, module: 'integracao' },
+  { title: 'Estoque', url: '/estoque', icon: Package, end: false, module: 'estoque' },
+  { title: 'Funções', url: '/funcoes', icon: Briefcase, end: false, module: 'funcoes' },
+  { title: 'Configurações', url: '/configuracoes', icon: Settings, end: false, module: 'configuracoes' },
 ];
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const { pathname } = useLocation();
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, can } = useAuth();
 
   const isActive = (path: string, end?: boolean) =>
     end ? pathname === path : pathname === path || pathname.startsWith(path + '/');
 
-  const visibleBase = baseItems.filter(i => !i.adminOnly || isAdmin);
+  const visibleEpiItems = epiItems.filter(i => !i.module || can(i.module, i.action ?? 'view'));
+  const visibleUniformeItems = uniformeItems.filter(i => !i.module || can(i.module, i.action ?? 'view'));
+  const visibleAdminItems = adminItems.filter(i => can(i.module, 'view'));
+  const showAdminSection = isAdmin || visibleAdminItems.length > 0;
 
   return (
     <Sidebar collapsible="icon" className="border-r">
@@ -69,7 +74,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Operacional</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {visibleBase.map(item => (
+              {baseItems.map(item => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={isActive(item.url, item.end)} tooltip={item.title}>
                     <NavLink to={item.url} end={item.end} className="flex items-center gap-2.5">
@@ -87,7 +92,7 @@ export function AppSidebar() {
           <SidebarGroupLabel className="flex items-center gap-1.5"><HardHat className="h-3 w-3" /> EPI</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {epiItems.filter(i => !i.adminOnly || isAdmin).map(item => (
+              {visibleEpiItems.map(item => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={isActive(item.url.split('?')[0], item.end)} tooltip={item.title}>
                     <NavLink to={item.url} end={item.end} className="flex items-center gap-2.5">
@@ -105,7 +110,7 @@ export function AppSidebar() {
           <SidebarGroupLabel className="flex items-center gap-1.5"><Shirt className="h-3 w-3" /> Uniforme</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {uniformeItems.filter(i => !i.adminOnly || isAdmin).map(item => (
+              {visibleUniformeItems.map(item => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={isActive(item.url.split('?')[0], item.end)} tooltip={item.title}>
                     <NavLink to={item.url} end={item.end} className="flex items-center gap-2.5">
@@ -119,12 +124,12 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {isAdmin && (
+        {showAdminSection && (
           <SidebarGroup>
             <SidebarGroupLabel>Administração</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {adminItems.map(item => (
+                {visibleAdminItems.map(item => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive(item.url, item.end)} tooltip={item.title}>
                       <NavLink to={item.url} end={item.end} className="flex items-center gap-2.5">
@@ -134,6 +139,16 @@ export function AppSidebar() {
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
+                {isAdmin && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={isActive('/usuarios', false)} tooltip="Usuários">
+                      <NavLink to="/usuarios" className="flex items-center gap-2.5">
+                        <Users className="h-4 w-4" />
+                        {!collapsed && <span className="text-sm">Usuários</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

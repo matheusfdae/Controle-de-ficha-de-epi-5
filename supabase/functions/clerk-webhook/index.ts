@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
         const nome = [u.first_name, u.last_name].filter(Boolean).join(' ') || email;
 
         const { data: profile, error: profileError } = await admin.from('profiles')
-          .insert({ clerk_user_id: u.id, email, nome_completo: nome, ativo: true })
+          .insert({ id: crypto.randomUUID(), clerk_user_id: u.id, email, nome_completo: nome, ativo: true })
           .select('id').single();
         if (profileError) throw profileError;
 

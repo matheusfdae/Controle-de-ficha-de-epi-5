@@ -9,6 +9,7 @@ import { UserPlus, Mail } from 'lucide-react';
 import { useCanManageInvites } from '@/hooks/useCanManageInvites';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import BackButton from '@/components/BackButton';
 
 type InviteRole = 'edit' | 'view';
 
@@ -51,46 +52,49 @@ export default function Convites() {
   };
 
   return (
-    <div className="max-w-md space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <UserPlus className="h-5 w-5" /> Convidar usuário
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Envia um convite por e-mail (só domínio corporativo) via Clerk.
-        </p>
+    <div className="p-4 lg:p-8 pb-20">
+      <div className="max-w-md mx-auto space-y-6">
+        <BackButton />
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <UserPlus className="h-5 w-5" /> Convidar usuário
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Envia um convite por e-mail (só domínio corporativo) via Clerk.
+          </p>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Mail className="h-4 w-4" /> Novo convite
+            </CardTitle>
+            <CardDescription>A pessoa recebe um e-mail com um link para definir a senha.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">E-mail corporativo</Label>
+                <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="nome@grupo5estrelas.com.br" required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="role">Permissão</Label>
+                <Select value={role} onValueChange={v => setRole(v as InviteRole)}>
+                  <SelectTrigger id="role"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="view">Visualização</SelectItem>
+                    <SelectItem value="edit">Edição</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="departamento">Departamento (opcional)</Label>
+                <Input id="departamento" value={departamento} onChange={e => setDepartamento(e.target.value)} />
+              </div>
+              <Button type="submit" className="w-full" disabled={busy}>Enviar convite</Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Mail className="h-4 w-4" /> Novo convite
-          </CardTitle>
-          <CardDescription>A pessoa recebe um e-mail com um link para definir a senha.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">E-mail corporativo</Label>
-              <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="nome@grupo5estrelas.com.br" required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="role">Permissão</Label>
-              <Select value={role} onValueChange={v => setRole(v as InviteRole)}>
-                <SelectTrigger id="role"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="view">Visualização</SelectItem>
-                  <SelectItem value="edit">Edição</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="departamento">Departamento (opcional)</Label>
-              <Input id="departamento" value={departamento} onChange={e => setDepartamento(e.target.value)} />
-            </div>
-            <Button type="submit" className="w-full" disabled={busy}>Enviar convite</Button>
-          </form>
-        </CardContent>
-      </Card>
     </div>
   );
 }

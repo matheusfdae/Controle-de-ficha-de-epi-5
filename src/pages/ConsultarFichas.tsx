@@ -17,7 +17,9 @@ import {
 } from '@/components/ui/alert-dialog';
 
 export default function ConsultarFichas() {
-  const { isAdmin } = useAuth();
+  const { can } = useAuth();
+  const canCreate = can('fichas_epi', 'create');
+  const canDelete = can('fichas_epi', 'delete');
   const [fichas, setFichas] = useState<EPIFicha[]>([]);
   const [importing, setImporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -66,7 +68,7 @@ export default function ConsultarFichas() {
             <h2 className="text-2xl font-bold tracking-tight text-foreground">Consultar Fichas</h2>
             <p className="text-sm text-muted-foreground">Todas as fichas de EPI cadastradas no sistema.</p>
           </div>
-          {isAdmin && (
+          {canCreate && (
             <div className="flex gap-2 flex-wrap">
               <input
                 ref={fileRef}
@@ -91,7 +93,7 @@ export default function ConsultarFichas() {
           <div className="text-center py-16 space-y-3">
             <ClipboardList className="h-12 w-12 mx-auto text-muted-foreground/40" />
             <p className="text-muted-foreground">Nenhuma ficha encontrada.</p>
-            {isAdmin && <Link to="/nova-ficha"><Button>Criar Nova Ficha</Button></Link>}
+            {canCreate && <Link to="/nova-ficha"><Button>Criar Nova Ficha</Button></Link>}
           </div>
         ) : (
           <div className="space-y-3">
@@ -134,7 +136,7 @@ export default function ConsultarFichas() {
                         <MessageCircle className="h-4 w-4 text-success" />
                       </Button>
                     )}
-                    {isAdmin && (
+                    {canDelete && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="ghost" size="icon" title="Excluir ficha">

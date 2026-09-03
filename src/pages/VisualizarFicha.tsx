@@ -23,7 +23,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 export default function VisualizarFicha() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { can } = useAuth();
+  const canEdit = can('fichas_epi', 'edit');
   const [ficha, setFicha] = useState<EPIFicha | null>(null);
   const [assinaturaColaborador, setAssinaturaColaborador] = useState('');
   const [assinaturaResponsavel, setAssinaturaResponsavel] = useState('');
@@ -128,7 +129,7 @@ export default function VisualizarFicha() {
 
         {/* Ações */}
         <div className="flex flex-wrap gap-2">
-          {!isSigned && isAdmin && (
+          {!isSigned && canEdit && (
             <Dialog onOpenChange={(open) => { if (open) gerarLink(); }}>
               <DialogTrigger asChild>
                 <Button variant="outline">
@@ -155,7 +156,7 @@ export default function VisualizarFicha() {
                   <Button variant="outline" onClick={sendEmail}>
                     <Mail className="h-4 w-4 mr-2" /> Email
                   </Button>
-                  <Button onClick={sendWhatsApp} className="bg-[#25D366] hover:bg-[#20bd5a] text-white">
+                  <Button onClick={sendWhatsApp} className="bg-whatsapp hover:bg-whatsapp-hover text-white">
                     <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp
                   </Button>
                 </DialogFooter>
@@ -165,7 +166,7 @@ export default function VisualizarFicha() {
           <Button variant={isSigned ? 'default' : 'outline'} onClick={() => generatePDF(ficha)}>
             <Download className="h-4 w-4 mr-2" /> Baixar PDF
           </Button>
-          {isAdmin && !editing && (
+          {canEdit && !editing && (
             <Button variant="outline" onClick={() => { setDraft(JSON.parse(JSON.stringify(ficha))); setEditing(true); }}>
               <Pencil className="h-4 w-4 mr-2" /> Editar Ficha
             </Button>
@@ -270,7 +271,7 @@ export default function VisualizarFicha() {
         <FichaOficialView ficha={ficha} />
 
         {/* Assinatura presencial (admin) */}
-        {!isSigned && isAdmin && (
+        {!isSigned && canEdit && (
           <Card>
             <CardHeader><CardTitle className="text-base">Assinatura presencial</CardTitle></CardHeader>
             <CardContent className="space-y-4">

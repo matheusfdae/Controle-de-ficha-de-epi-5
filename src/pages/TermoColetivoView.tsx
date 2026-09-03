@@ -1,21 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Tablet, Link2, CheckCircle2, Copy } from 'lucide-react';
+import { Tablet, Link2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import SignaturePad from '@/components/SignaturePad';
+import BackButton from '@/components/BackButton';
+import { useConfirm } from '@/hooks/use-confirm';
 import { assinarItemColetivo, finalizarTermo, getTermoColetivoFull, gerarTokenTermoItem, TermoColetivoFull } from '@/services/termoColetivoService';
 
 export default function TermoColetivoView() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const [data, setData] = useState<TermoColetivoFull | null>(null);
   const [signing, setSigning] = useState<string | null>(null); // item id
   const [pad, setPad] = useState('');
   const [sequencial, setSequencial] = useState(false);
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const load = async () => {
     if (!id) return;
@@ -66,7 +68,7 @@ export default function TermoColetivoView() {
 
   const finalizar = async () => {
     if (!id) return;
-    if (pendentes.length > 0 && !confirm('Ainda há assinaturas pendentes. Finalizar mesmo assim?')) return;
+    if (pendentes.length > 0 && !(await confirm('Ainda há assinaturas pendentes. Finalizar mesmo assim?'))) return;
     await finalizarTermo(id);
     toast.success('Termo finalizado');
     load();
@@ -77,14 +79,15 @@ export default function TermoColetivoView() {
   const itemAtivo = itens.find(i => i.id === signing);
 
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-4 max-w-7xl">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button variant="ghost" size="sm" onClick={() => navigate(-1)}><ArrowLeft className="h-4 w-4 mr-1" /> Voltar</Button>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={startTablet} disabled={pendentes.length === 0}><Tablet className="h-4 w-4 mr-1" /> Assinar no tablet ({pendentes.length})</Button>
-          <Button variant="default" onClick={finalizar} disabled={termo.status === 'finalizado'}>Finalizar</Button>
+    <div className="p-4 lg:p-8 pb-20">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <BackButton />
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={startTablet} disabled={pendentes.length === 0}><Tablet className="h-4 w-4 mr-1" /> Assinar no tablet ({pendentes.length})</Button>
+            <Button variant="default" onClick={finalizar} disabled={termo.status === 'finalizado'}>Finalizar</Button>
+          </div>
         </div>
-      </div>
 
       <Card>
         <CardHeader className="pb-2">
@@ -176,6 +179,8 @@ export default function TermoColetivoView() {
           )}
         </DialogContent>
       </Dialog>
+      </div>
+      <ConfirmDialog />
     </div>
   );
 }

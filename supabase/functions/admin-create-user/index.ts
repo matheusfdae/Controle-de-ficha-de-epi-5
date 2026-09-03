@@ -62,6 +62,7 @@ Deno.serve(async (req) => {
     const admin = serviceClient();
     const { data: profile, error: profileError } = await admin.from('profiles')
       .insert({
+        id: crypto.randomUUID(),
         clerk_user_id: clerkUser.id,
         email,
         nome_completo: nome,

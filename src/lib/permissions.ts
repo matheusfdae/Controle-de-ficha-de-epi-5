@@ -60,7 +60,7 @@ export const ROLE_PRESETS: Record<RolePreset, PermissionMap> = {
     vencimentos: VIEW, rank: VIEW,
     integracao: ALL, funcoes: CRUD_NO_DEL, usuarios: ALL,
     configuracoes: { view: true, edit: true },
-    estoque: VIEW,
+    estoque: ALL,
   },
   supervisor: {
     ...emptyPermissions(),

@@ -13,6 +13,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import BackButton from '@/components/BackButton';
+import PageHeader from '@/components/PageHeader';
+import { useConfirm } from '@/hooks/use-confirm';
 import {
   Funcao, EPI, FuncaoEPI,
   listFuncoes, upsertFuncao, deleteFuncao, listEpis,
@@ -29,6 +31,7 @@ export default function Funcoes() {
   const [addEpiId, setAddEpiId] = useState('');
   const [addQtd, setAddQtd] = useState(1);
   const [addTam, setAddTam] = useState('');
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const load = async () => {
     try {
@@ -58,22 +61,22 @@ export default function Funcoes() {
     <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-6xl mx-auto space-y-6">
         <BackButton />
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <p className="text-xs uppercase tracking-widest text-muted-foreground">Cargos & EPIs padrão</p>
-            <h1 className="text-3xl font-bold tracking-tight">Funções</h1>
-          </div>
-          <Dialog open={openNova} onOpenChange={setOpenNova}>
-            <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-1" /> Nova função</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Nova Função</DialogTitle></DialogHeader>
-              <div><Label>Nome *</Label><Input value={novoNome} onChange={e => setNovoNome(e.target.value)} placeholder="Ex.: Operador, ASG..." /></div>
-              <DialogFooter><Button onClick={handleCreate}><Save className="h-4 w-4 mr-1" /> Salvar</Button></DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+        <PageHeader
+          eyebrow="Cargos & EPIs padrão"
+          title="Funções"
+          actions={
+            <Dialog open={openNova} onOpenChange={setOpenNova}>
+              <DialogTrigger asChild>
+                <Button><Plus className="h-4 w-4 mr-1" /> Nova função</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Nova Função</DialogTitle></DialogHeader>
+                <div><Label htmlFor="funcao-nome">Nome *</Label><Input id="funcao-nome" value={novoNome} onChange={e => setNovoNome(e.target.value)} placeholder="Ex.: Operador, ASG..." /></div>
+                <DialogFooter><Button onClick={handleCreate}><Save className="h-4 w-4 mr-1" /> Salvar</Button></DialogFooter>
+              </DialogContent>
+            </Dialog>
+          }
+        />
 
         <div className="grid gap-4 md:grid-cols-2">
           {funcoes.map(f => (
@@ -117,26 +120,26 @@ export default function Funcoes() {
               {vinculos.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">Nenhum EPI vinculado.</p>}
             </div>
             <div className="border-t pt-3 space-y-2">
-              <Label className="text-xs">Adicionar EPI</Label>
+              <Label htmlFor="funcao-add-epi" className="text-xs">Adicionar EPI</Label>
               <Select value={addEpiId} onValueChange={setAddEpiId}>
-                <SelectTrigger><SelectValue placeholder="Selecione um EPI" /></SelectTrigger>
+                <SelectTrigger id="funcao-add-epi"><SelectValue placeholder="Selecione um EPI" /></SelectTrigger>
                 <SelectContent>
                   {epis.map(e => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
               <div className="flex gap-2">
-                <div className="flex-1"><Label className="text-xs">Tamanho</Label>
-                  <Input value={addTam} onChange={e => setAddTam(e.target.value)} placeholder="opcional" />
+                <div className="flex-1"><Label htmlFor="funcao-add-tam" className="text-xs">Tamanho</Label>
+                  <Input id="funcao-add-tam" value={addTam} onChange={e => setAddTam(e.target.value)} placeholder="opcional" />
                 </div>
-                <div><Label className="text-xs">Qtd</Label>
-                  <Input type="number" min={1} value={addQtd} onChange={e => setAddQtd(parseInt(e.target.value) || 1)} className="w-24" />
+                <div><Label htmlFor="funcao-add-qtd" className="text-xs">Qtd</Label>
+                  <Input id="funcao-add-qtd" type="number" min={1} value={addQtd} onChange={e => setAddQtd(parseInt(e.target.value) || 1)} className="w-24" />
                 </div>
                 <Button className="self-end" onClick={handleAddVinc}><Plus className="h-4 w-4" /></Button>
               </div>
             </div>
             <DialogFooter className="flex justify-between">
               <Button variant="destructive" onClick={async () => {
-                if (!editing || !confirm('Excluir esta função?')) return;
+                if (!editing || !(await confirm('Excluir esta função?'))) return;
                 await deleteFuncao(editing.id); setEditing(null); load();
               }}>Excluir</Button>
               <Button variant="outline" onClick={() => setEditing(null)}>Fechar</Button>
@@ -144,6 +147,7 @@ export default function Funcoes() {
           </DialogContent>
         </Dialog>
       </div>
+      <ConfirmDialog />
     </div>
   );
 }
