@@ -85,6 +85,16 @@ function RequireNovaFicha({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// /consultar é compartilhada por EPI e Uniforme (?tipo=epi|uniforme,
+// mesmo padrão de RequireNovaFicha acima).
+function RequireConsultar({ children }: { children: React.ReactNode }) {
+  const { can } = useAuth();
+  const [searchParams] = useSearchParams();
+  const module: ModuleId = searchParams.get('tipo') === 'uniforme' ? 'fichas_uniforme' : 'fichas_epi';
+  if (!can(module, 'view')) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -97,20 +107,20 @@ function AppRoutes() {
         <Route element={<ProtectedLayout />}>
           <Route path="/"             element={<Dashboard />} />
           <Route path="/nova-ficha"   element={<RequireNovaFicha><NovaFicha /></RequireNovaFicha>} />
-          <Route path="/consultar"    element={<ConsultarFichas />} />
-          <Route path="/ficha/:id"    element={<VisualizarFicha />} />
-          <Route path="/vencimentos"  element={<Vencimentos />} />
-          <Route path="/pendentes"    element={<AssinaturasPendentes />} />
-          <Route path="/rank-postos"  element={<RankPostos />} />
+          <Route path="/consultar"    element={<RequireConsultar><ConsultarFichas /></RequireConsultar>} />
+          <Route path="/ficha/:id"    element={<RequireModule module="fichas_epi"><VisualizarFicha /></RequireModule>} />
+          <Route path="/vencimentos"  element={<RequireModule module="vencimentos"><Vencimentos /></RequireModule>} />
+          <Route path="/pendentes"    element={<RequireModule module="assinar_tablet"><AssinaturasPendentes /></RequireModule>} />
+          <Route path="/rank-postos"  element={<RequireModule module="rank"><RankPostos /></RequireModule>} />
           <Route path="/configuracoes" element={<RequireModule module="configuracoes"><Configuracoes /></RequireModule>} />
           <Route path="/usuarios"     element={<AdminRoute><Usuarios /></AdminRoute>} />
           <Route path="/convites"     element={<Convites />} />
           <Route path="/estoque"      element={<RequireModule module="estoque"><Estoque /></RequireModule>} />
           <Route path="/funcoes"      element={<RequireModule module="funcoes"><Funcoes /></RequireModule>} />
           <Route path="/integracao"   element={<RequireModule module="integracao"><Integracao /></RequireModule>} />
-          <Route path="/termos-coletivos" element={<TermosColetivos />} />
+          <Route path="/termos-coletivos" element={<RequireModule module="termos_coletivos"><TermosColetivos /></RequireModule>} />
           <Route path="/termo-coletivo/novo" element={<RequireModule module="termos_coletivos" action="create"><TermoColetivoNovo /></RequireModule>} />
-          <Route path="/termo-coletivo/:id" element={<TermoColetivoView />} />
+          <Route path="/termo-coletivo/:id" element={<RequireModule module="termos_coletivos"><TermoColetivoView /></RequireModule>} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

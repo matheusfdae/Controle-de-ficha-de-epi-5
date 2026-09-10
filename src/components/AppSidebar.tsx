@@ -12,11 +12,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ModuleId, ActionId } from '@/lib/permissions';
 
-const baseItems = [
-  { title: 'Dashboard', url: '/', icon: LayoutDashboard, end: true },
-  { title: 'Assinar (Tablet)', url: '/pendentes', icon: ClipboardSignature, end: false },
-  { title: 'Vencimentos', url: '/vencimentos', icon: CalendarClock, end: false },
-  { title: 'Rank por Posto', url: '/rank-postos', icon: Trophy, end: false },
+const baseItems: Array<{ title: string; url: string; icon: typeof LayoutDashboard; end: boolean; module: ModuleId }> = [
+  { title: 'Dashboard', url: '/', icon: LayoutDashboard, end: true, module: 'dashboard' },
+  { title: 'Assinar (Tablet)', url: '/pendentes', icon: ClipboardSignature, end: false, module: 'assinar_tablet' },
+  { title: 'Vencimentos', url: '/vencimentos', icon: CalendarClock, end: false, module: 'vencimentos' },
+  { title: 'Rank por Posto', url: '/rank-postos', icon: Trophy, end: false, module: 'rank' },
 ];
 
 const epiItems: Array<{ title: string; url: string; icon: typeof FilePlus2; end: boolean; module?: ModuleId; action?: ActionId }> = [
@@ -48,6 +48,7 @@ export function AppSidebar() {
   const isActive = (path: string, end?: boolean) =>
     end ? pathname === path : pathname === path || pathname.startsWith(path + '/');
 
+  const visibleBaseItems = baseItems.filter(i => can(i.module, 'view'));
   const visibleEpiItems = epiItems.filter(i => !i.module || can(i.module, i.action ?? 'view'));
   const visibleUniformeItems = uniformeItems.filter(i => !i.module || can(i.module, i.action ?? 'view'));
   const visibleAdminItems = adminItems.filter(i => can(i.module, 'view'));
@@ -74,7 +75,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Operacional</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {baseItems.map(item => (
+              {visibleBaseItems.map(item => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={isActive(item.url, item.end)} tooltip={item.title}>
                     <NavLink to={item.url} end={item.end} className="flex items-center gap-2.5">

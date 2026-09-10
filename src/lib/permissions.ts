@@ -8,7 +8,6 @@ export type ModuleId =
   | 'rank'
   | 'integracao'
   | 'funcoes'
-  | 'usuarios'
   | 'configuracoes'
   | 'assinar_tablet';
 
@@ -32,7 +31,6 @@ export const MODULES: ModuleDef[] = [
   { id: 'rank',             label: 'Rank por Posto',    actions: ['view'] },
   { id: 'integracao',       label: 'Integração',        actions: ['view', 'create', 'edit', 'delete'] },
   { id: 'funcoes',          label: 'Funções',           actions: ['view', 'create', 'edit', 'delete'] },
-  { id: 'usuarios',         label: 'Usuários',          actions: ['view', 'create', 'edit', 'delete'] },
   { id: 'configuracoes',    label: 'Configurações',     actions: ['view', 'edit'] },
 ];
 
@@ -58,7 +56,7 @@ export const ROLE_PRESETS: Record<RolePreset, PermissionMap> = {
     dashboard: VIEW, assinar_tablet: VIEW,
     fichas_epi: ALL, fichas_uniforme: ALL, termos_coletivos: ALL,
     vencimentos: VIEW, rank: VIEW,
-    integracao: ALL, funcoes: CRUD_NO_DEL, usuarios: ALL,
+    integracao: ALL, funcoes: CRUD_NO_DEL,
     configuracoes: { view: true, edit: true },
     estoque: ALL,
   },
