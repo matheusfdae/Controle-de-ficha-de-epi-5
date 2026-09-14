@@ -90,3 +90,23 @@ export async function verifyEditor(req: Request): Promise<{ clerkUserId: string 
 export function randomTempPassword() {
   return crypto.randomUUID().replace(/-/g, '').slice(0, 16) + 'Aa1!';
 }
+
+/**
+ * Módulos da matriz de permissões (espelha MODULES em src/lib/permissions.ts
+ * — duplicado aqui porque Edge Functions não importam código do frontend).
+ * Não inclui "usuarios": gestão de contas continua exclusiva de quem tem
+ * role admin/rh de verdade (ver isAdmin/canManage em verifyCaller), pra não
+ * abrir brecha de autopromoção mesmo com acesso total às demais telas.
+ */
+const FULL_ACCESS_MODULES = [
+  'dashboard', 'assinar_tablet', 'fichas_epi', 'fichas_uniforme',
+  'termos_coletivos', 'estoque', 'vencimentos', 'rank', 'integracao',
+  'funcoes', 'configuracoes',
+];
+
+/** Linhas de user_permissions dando acesso total (ver/criar/editar/excluir) a todos os módulos de negócio. */
+export function fullAccessPermissionRows(userId: string) {
+  return FULL_ACCESS_MODULES.map((module) => ({
+    user_id: userId, module, can_view: true, can_create: true, can_edit: true, can_delete: true,
+  }));
+}

@@ -1,6 +1,6 @@
 // deno-lint-ignore-file
 import { Webhook } from 'npm:svix@1';
-import { serviceClient, json, corsHeaders } from '../_shared/clerk.ts';
+import { serviceClient, json, corsHeaders, fullAccessPermissionRows } from '../_shared/clerk.ts';
 
 const WEBHOOK_SECRET = Deno.env.get('CLERK_WEBHOOK_SECRET')!;
 
@@ -53,6 +53,13 @@ Deno.serve(async (req) => {
         const { error: roleError } = await admin
           .from('user_roles').insert({ user_id: profile.id, role: 'colaborador' });
         if (roleError) throw roleError;
+
+        // Acesso total a todas as telas por padrão (pedido do Matheus em
+        // 2026-09-14) — sem virar role admin de verdade, então continua sem
+        // acesso à gestão de contas (/usuarios).
+        const { error: permError } = await admin
+          .from('user_permissions').insert(fullAccessPermissionRows(profile.id));
+        if (permError) throw permError;
         break;
       }
 

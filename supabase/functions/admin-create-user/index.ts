@@ -1,5 +1,5 @@
 // deno-lint-ignore-file
-import { verifyCaller, serviceClient, clerkClient, randomTempPassword, json, corsHeaders } from '../_shared/clerk.ts';
+import { verifyCaller, serviceClient, clerkClient, randomTempPassword, json, corsHeaders, fullAccessPermissionRows } from '../_shared/clerk.ts';
 
 type Role = 'admin' | 'rh' | 'supervisor' | 'almoxarife' | 'colaborador';
 const ROLES: Role[] = ['admin', 'rh', 'supervisor', 'almoxarife', 'colaborador'];
@@ -80,21 +80,23 @@ Deno.serve(async (req) => {
     const { error: roleError } = await admin.from('user_roles').insert(rolesToInsert);
     if (roleError) throw roleError;
 
-    if (permissions.length > 0) {
-      const rows = permissions
-        .filter((p) => p && p.module)
-        .map((p) => ({
+    // Acesso total a todas as telas por padrão (pedido do Matheus em
+    // 2026-09-14), a menos que quem está criando explicite outra matriz —
+    // sem virar role admin de verdade, então continua sem acesso à gestão
+    // de contas (/usuarios).
+    const rows = permissions.length > 0
+      ? permissions.filter((p) => p && p.module).map((p) => ({
           user_id: userId,
           module: p.module,
           can_view: !!p.can_view,
           can_create: !!p.can_create,
           can_edit: !!p.can_edit,
           can_delete: !!p.can_delete,
-        }));
-      if (rows.length > 0) {
-        const { error: permErr } = await admin.from('user_permissions').insert(rows);
-        if (permErr) throw permErr;
-      }
+        }))
+      : fullAccessPermissionRows(userId);
+    if (rows.length > 0) {
+      const { error: permErr } = await admin.from('user_permissions').insert(rows);
+      if (permErr) throw permErr;
     }
 
     return json({ ok: true, user_id: userId, temp_password: generatedPassword });

@@ -41,7 +41,10 @@ const emptyForm = {
   password: '',
   sendInvite: true,
   role: 'colaborador' as ManageableRole,
-  permissions: ROLE_PRESETS.colaborador,
+  // Acesso total a todas as telas por padrão (pedido do Matheus em
+  // 2026-09-14) — usa o preset de admin só pra marcar tudo na matriz, sem
+  // que o papel em si vire admin (continua sem acesso a /usuarios).
+  permissions: ROLE_PRESETS.admin,
 };
 
 export default function Usuarios() {
