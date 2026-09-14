@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
-import { EPIFicha } from '@/types/epi';
+import { EPIFicha, MotivoEntrega } from '@/types/epi';
 import { loadConfig, AppConfig } from '@/services/configService';
+import { ModeloFicha, resolveModelo } from '@/services/modelosFichaService';
 
 // ===== Constantes de layout =====
 
@@ -10,7 +11,6 @@ const PAGE_H = 210;    // A4 landscape height (mm)
 const CW = PAGE_W - M * 2; // content width
 
 const MIN_TABLE_ROWS = 8;
-const DOC_TITLE = "TERMO DE RECEBIMENTO DE UNIFORME/EPI's - REV -00";
 
 type FillStyle = 'header' | 'light' | 'alt';
 
@@ -22,7 +22,6 @@ const FILL_COLORS: Record<FillStyle, [number, number, number]> = {
 
 // Larguras das 9 colunas da tabela (soma = CW = 281)
 const COL_W = [22, 14, 75, 18, 45, 42, 22, 16, 27] as const;
-const COL_H1 = ['DATA', 'QUANT.', 'DESCRIÇÃO', 'TAM. / Nº', 'POSTO DE SERVIÇO', 'ASSINATURA DO', '', 'DEVOLUÇÃO', ''];
 const COL_H2 = ['ENTREGA', '', '', '', '', 'FUNCIONÁRIO', 'DATA', 'QUANT', 'RECEBIDO POR'];
 
 // ===== Helpers de desenho =====
@@ -72,25 +71,55 @@ function addDataImage(doc: jsPDF, dataUrl: string, x: number, y: number, w: numb
   doc.addImage(dataUrl, imageFormat(dataUrl), x, y, w, h);
 }
 
+const MOTIVO_LETRA: Record<MotivoEntrega, string> = {
+  admissao: 'A',
+  substituicao: 'S',
+  demissao: 'D',
+  perda_extravio: 'P',
+  complemento: 'C',
+};
+
+const MOTIVO_LABEL: Record<MotivoEntrega, string> = {
+  admissao: 'Admissão',
+  substituicao: 'Substituição',
+  perda_extravio: 'Perda/Extravio',
+  demissao: 'Demissão',
+  complemento: 'Complemento',
+};
+
 // ===== Seções do PDF =====
 
-function renderHeader(doc: jsPDF, y: number, config: AppConfig): number {
-  rect(doc, M, y, 40, 16);
-  if (config.logoDataUrl) {
-    try { addDataImage(doc, config.logoDataUrl, M + 2, y + 2, 36, 12); } catch {}
+function drawLogoBox(doc: jsPDF, x: number, y: number, w: number, h: number, config: AppConfig, logoOverride?: string | null) {
+  rect(doc, x, y, w, h);
+  const logo = logoOverride || config.logoDataUrl;
+  if (logo) {
+    try { addDataImage(doc, logo, x + 2, y + 2, w - 4, h - 4); } catch {}
   } else {
     const parts = config.empresaNome.split(' ');
-    text(doc, parts[0] ?? '', M + 20, y + 6,  { bold: true, size: 8, align: 'center' });
-    text(doc, parts.slice(1).join(' '), M + 20, y + 10, { bold: true, size: 7, align: 'center' });
-    text(doc, config.empresaSubtitulo, M + 20, y + 13, { size: 4, align: 'center' });
+    text(doc, parts[0] ?? '', x + w / 2, y + 6,  { bold: true, size: 8, align: 'center' });
+    text(doc, parts.slice(1).join(' '), x + w / 2, y + 10, { bold: true, size: 7, align: 'center' });
+    text(doc, config.empresaSubtitulo, x + w / 2, y + 13, { size: 4, align: 'center' });
+  }
+}
+
+function renderHeader(doc: jsPDF, y: number, config: AppConfig, modelo: ModeloFicha): number {
+  const LOGO_W = 40;
+  const rightLogo = modelo.mostrarSegundoLogo;
+  const titleW = CW - LOGO_W - (rightLogo ? LOGO_W : 0);
+
+  drawLogoBox(doc, M, y, LOGO_W, 16, config, modelo.logoDataUrl);
+
+  rect(doc, M + LOGO_W, y, titleW, 16);
+  text(doc, modelo.tituloDocumento, M + LOGO_W + titleW / 2, y + 9, { bold: true, size: 12, align: 'center' });
+
+  if (rightLogo) {
+    drawLogoBox(doc, M + LOGO_W + titleW, y, LOGO_W, 16, config, modelo.logoDataUrl);
   }
 
-  rect(doc, M + 40, y, CW - 40, 16);
-  text(doc, DOC_TITLE, M + 40 + (CW - 40) / 2, y + 9, { bold: true, size: 12, align: 'center' });
   return y + 16;
 }
 
-function renderEmployeeRows(doc: jsPDF, y: number, ficha: EPIFicha): number {
+function renderEmployeeRowsCompleto(doc: jsPDF, y: number, ficha: EPIFicha): number {
   const ROW_H = 7;
 
   // Linha 1: Nome + Motivos + Turno
@@ -135,7 +164,87 @@ function renderEmployeeRows(doc: jsPDF, y: number, ficha: EPIFicha): number {
   return y;
 }
 
-function renderTermsSection(doc: jsPDF, y: number): number {
+function renderEmployeeRowsCompacto(doc: jsPDF, y: number, ficha: EPIFicha): number {
+  const ROW_H = 7;
+
+  // 4 zonas de coluna alinhadas entre as duas linhas (nome/cargo, siglas/celular,
+  // admissão-motivo/demissão, turno/diurno-noturno) — reproduz o termo em papel.
+  const zoneA = M;                    // NOME COMPLETO / CARGO
+  const zoneB = zoneA + CW * 0.34;    // siglas A-S-D-P-C / CELULAR
+  const zoneC = zoneB + CW * 0.14;    // ADMISSÃO / MOTIVO + DEMISSÃO
+  const zoneD = zoneC + CW * 0.28;    // TURNO / DIURNO + NOTURNO
+  const zoneEnd = zoneD + CW * 0.24;  // == M + CW
+
+  // Linha 1
+  rect(doc, zoneA, y, zoneB - zoneA, ROW_H);
+  text(doc, 'NOME COMPLETO:', zoneA + 1, y + 4.5, { bold: true, size: 7 });
+  text(doc, ficha.nomeFuncionario, zoneA + 34, y + 4.5, { size: 8 });
+
+  rect(doc, zoneB, y, zoneC - zoneB, ROW_H);
+  let mx = zoneB + 2;
+  for (const letra of ['A', 'S', 'D', 'P', 'C']) {
+    doc.setDrawColor(0);
+    doc.rect(mx, y + 1.5, 3, 3);
+    if (MOTIVO_LETRA[ficha.motivo] === letra) text(doc, 'X', mx + 0.6, y + 4, { bold: true, size: 7 });
+    text(doc, letra, mx + 4, y + 4, { bold: true, size: 6 });
+    mx += 7;
+  }
+
+  rect(doc, zoneC, y, zoneD - zoneC, ROW_H);
+  text(doc, 'ADMISSÃO:', zoneC + 2, y + 4.5, { bold: true, size: 6 });
+  line(doc, zoneC + 18, y + ROW_H - 1.5, zoneD - 2, y + ROW_H - 1.5);
+
+  rect(doc, zoneD, y, zoneEnd - zoneD, ROW_H);
+  text(doc, 'TURNO', zoneD + (zoneEnd - zoneD) / 2, y + 4.5, { bold: true, size: 7, align: 'center' });
+  y += ROW_H;
+
+  // Linha 2
+  rect(doc, zoneA, y, zoneB - zoneA, ROW_H);
+  text(doc, 'CARGO:', zoneA + 1, y + 4.5, { bold: true, size: 7 });
+  text(doc, ficha.funcao, zoneA + 16, y + 4.5, { size: 8 });
+
+  rect(doc, zoneB, y, zoneC - zoneB, ROW_H);
+  text(doc, 'CELULAR:', zoneB + 2, y + 4.5, { bold: true, size: 6 });
+  text(doc, ficha.telefone, zoneB + 2, y + 6.8, { size: 7 });
+
+  const zoneCMid = zoneC + (zoneD - zoneC) / 2;
+  rect(doc, zoneC, y, zoneCMid - zoneC, ROW_H);
+  text(doc, 'MOTIVO:', zoneC + 2, y + 4.5, { bold: true, size: 6 });
+  text(doc, MOTIVO_LABEL[ficha.motivo], zoneC + 2, y + 6.8, { size: 6 });
+
+  rect(doc, zoneCMid, y, zoneD - zoneCMid, ROW_H);
+  text(doc, 'DEMISSÃO:', zoneCMid + 2, y + 4.5, { bold: true, size: 6 });
+
+  const zoneDMid = zoneD + (zoneEnd - zoneD) / 2;
+  rect(doc, zoneD, y, zoneDMid - zoneD, ROW_H);
+  doc.rect(zoneD + 2, y + 2, 3, 3);
+  if (ficha.turno === 'diurno') text(doc, 'X', zoneD + 2.6, y + 4.5, { bold: true, size: 7 });
+  text(doc, 'DIURNO:', zoneD + 6.5, y + 4.5, { bold: true, size: 6 });
+
+  rect(doc, zoneDMid, y, zoneEnd - zoneDMid, ROW_H);
+  doc.rect(zoneDMid + 2, y + 2, 3, 3);
+  if (ficha.turno === 'noturno') text(doc, 'X', zoneDMid + 2.6, y + 4.5, { bold: true, size: 7 });
+  text(doc, 'Noturno:', zoneDMid + 6.5, y + 4.5, { bold: true, size: 6 });
+  y += ROW_H;
+
+  return y;
+}
+
+function renderEmployeeRows(doc: jsPDF, y: number, ficha: EPIFicha, modelo: ModeloFicha): number {
+  return modelo.layoutCabecalho === 'compacto'
+    ? renderEmployeeRowsCompacto(doc, y, ficha)
+    : renderEmployeeRowsCompleto(doc, y, ficha);
+}
+
+function renderLegendaMotivos(doc: jsPDF, y: number): number {
+  const H = 6;
+  rect(doc, M, y, CW, H, 'light');
+  const legenda = 'A = ADMISSÃO     S = SUBSTITUIÇÃO     D = DEMISSÃO     P = PERDA/EXTRAVIO     C = COMPLEMENTO';
+  text(doc, legenda, M + CW / 2, y + 4, { bold: true, size: 6.5, align: 'center' });
+  return y + H;
+}
+
+function renderTermsSection(doc: jsPDF, y: number, modelo: ModeloFicha): number {
   rect(doc, M, y, CW, 6, 'header');
   text(doc, 'TERMO DE RESPONSABILIDADE', M + CW / 2, y + 4, { bold: true, size: 8, align: 'center' });
   y += 6;
@@ -146,10 +255,9 @@ function renderTermsSection(doc: jsPDF, y: number): number {
   line(doc, splitX, y, splitX, y + TERMS_H);
 
   // Coluna esquerda: texto do termo
-  const termoText = "Declaro que recebi gratuitamente nesta data os EPI'S (Equipamentos de Proteção Individual) e UNIFORMES discriminado(s) neste T.R (Termo de Responsabilidade), para uso obrigatório e sistemático no trabalho enquanto for colaborador desta empresa. Estou ciente ainda que a guarda e conservação destes equipamentos fiquem sob minha responsabilidade. Tenho conhecimento ainda do texto do Art. 158 Parágrafo Único, Lei 6.514, 22/12/77 que diz: \"Constitui o ato faltoso do empregado, a recusa injustificada ao uso dos EPI's fornecidos pela empresa\". Sendo assim me comprometo a comunicar imediatamente a empresa, quaisquer danos causados nestes equipamentos. Em caso de perda ou extravio ou inutilização proposital, comprometo-me a ressarcir a empresa conforme previsto no Parágrafo 1º do Art. 462 da CLT, inclusive no que couber a título de indenização por rescisão de contrato de trabalho a importância correspondente ao valor do material.";
   doc.setFontSize(6.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(doc.splitTextToSize(termoText, splitX - M - 3), M + 2, y + 4);
+  doc.text(doc.splitTextToSize(modelo.textoTermoResponsabilidade, splitX - M - 3), M + 2, y + 4);
 
   // Coluna direita: Base Legal
   const bx = splitX + 2;
@@ -181,15 +289,35 @@ function renderTermsSection(doc: jsPDF, y: number): number {
   return y + TERMS_H;
 }
 
-function renderDeclaroSection(doc: jsPDF, y: number): number {
-  const declText = 'DECLARO para os devidos fins que experimentei o material fornecido pela empresa, e que estes ficaram adequados conforme o padrão necessário para execução dos meus serviços. Acrescento ainda que estou ciente que: quaisquer ajustes feitos neste material que possam impedir prejudicar limitar ou ainda causar algum dano ao meu serviço ou material são de MINHA responsabilidade.';
+function renderDeclaroSection(doc: jsPDF, y: number, modelo: ModeloFicha): number {
   doc.setFontSize(6);
-  const lines = doc.splitTextToSize(declText, CW - 4);
+  const lines = doc.splitTextToSize(modelo.textoDeclaracao, CW - 4);
   const declH = lines.length * 3 + 4;
   rect(doc, M, y, CW, declH);
   doc.setFont('helvetica', 'normal');
   doc.text(lines, M + 2, y + 3.5);
   return y + declH;
+}
+
+function renderSecaoExtra(doc: jsPDF, y: number, texto: string): number {
+  const H = 20;
+  rect(doc, M, y, CW, H);
+  const textW = CW * 0.62;
+  line(doc, M + textW, y, M + textW, y + H);
+
+  doc.setFontSize(6.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(doc.splitTextToSize(texto, textW - 4), M + 2, y + 4);
+
+  const sigX = M + textW + 4;
+  const sigLineX2 = M + CW - 2;
+  for (let i = 0; i < 3; i++) {
+    const ly = y + 6 + i * 6;
+    text(doc, 'Assinatura:', sigX, ly, { size: 6 });
+    line(doc, sigX + 15, ly, sigLineX2, ly);
+  }
+
+  return y + H;
 }
 
 function renderSignatureRow(doc: jsPDF, y: number, ficha: EPIFicha, config: AppConfig): number {
@@ -198,12 +326,7 @@ function renderSignatureRow(doc: jsPDF, y: number, ficha: EPIFicha, config: AppC
   rect(doc, M,          y, CW / 2, SIG_H);
   rect(doc, M + CW / 2, y, CW / 2, SIG_H);
 
-  // ----- Coluna esquerda: Funcionário -----
-  // Assinatura desenhada ACIMA da linha
-  if (ficha.assinaturaColaborador) {
-    try { doc.addImage(ficha.assinaturaColaborador, 'PNG', M + 10, y + 1, CW / 2 - 20, LINE_Y - y - 1); } catch {}
-  }
-  // Nome digitado também ACIMA da linha (à esquerda, sem cobrir a assinatura)
+  // ----- Coluna esquerda: Funcionário (só o nome impresso, sem a rubrica) -----
   text(doc, ficha.nomeFuncionario, M + CW / 4, LINE_Y - 1, { size: 7, align: 'center' });
   // Linha de assinatura
   line(doc, M + 10, LINE_Y, M + CW / 2 - 10, LINE_Y);
@@ -229,9 +352,11 @@ function renderSignatureRow(doc: jsPDF, y: number, ficha: EPIFicha, config: AppC
   return y + SIG_H;
 }
 
-function renderItemsTable(doc: jsPDF, y: number, ficha: EPIFicha): number {
+function renderItemsTable(doc: jsPDF, y: number, ficha: EPIFicha, modelo: ModeloFicha): number {
   const ROW_H    = 6;
   const HEADER_H = 9;
+  const col4Label = modelo.colunaExtra === 'ca' ? 'C.A' : 'TAM. / Nº';
+  const COL_H1 = ['DATA', 'QUANT.', 'DESCRIÇÃO', col4Label, 'POSTO DE SERVIÇO', 'ASSINATURA DO', '', 'DEVOLUÇÃO', ''];
 
   // Cabeçalho da tabela
   rect(doc, M, y, CW, HEADER_H, 'light');
@@ -272,7 +397,7 @@ function renderItemsTable(doc: jsPDF, y: number, ficha: EPIFicha): number {
           case 0: val = item.dataEntrega ?? ''; break;
           case 1: val = String(item.quantidade); break;
           case 2: val = item.descricao ?? ''; break;
-          case 3: val = item.tamanho ?? ''; break;
+          case 3: val = (modelo.colunaExtra === 'ca' ? item.ca : item.tamanho) ?? ''; break;
           case 4: val = item.postoServico ?? ''; break;
           case 5:
             if (ficha.assinaturaColaborador) {
@@ -330,16 +455,18 @@ function renderFooter(doc: jsPDF, y: number, ficha: EPIFicha): void {
 // ===== Entry point =====
 
 export async function generatePDF(ficha: EPIFicha): Promise<void> {
-  const config = await loadConfig();
+  const [config, modelo] = await Promise.all([loadConfig(), resolveModelo(ficha.modeloId)]);
   const doc = new jsPDF('l', 'mm', 'a4');
 
   let y = M;
-  y = renderHeader(doc, y, config);
-  y = renderEmployeeRows(doc, y, ficha);
-  y = renderTermsSection(doc, y);
-  y = renderDeclaroSection(doc, y);
+  y = renderHeader(doc, y, config, modelo);
+  y = renderEmployeeRows(doc, y, ficha, modelo);
+  y = renderTermsSection(doc, y, modelo);
+  y = renderDeclaroSection(doc, y, modelo);
   y = renderSignatureRow(doc, y, ficha, config);
-  y = renderItemsTable(doc, y, ficha);
+  y = renderItemsTable(doc, y, ficha, modelo);
+  if (modelo.layoutCabecalho === 'compacto') y = renderLegendaMotivos(doc, y);
+  if (modelo.textoSecaoExtra) y = renderSecaoExtra(doc, y, modelo.textoSecaoExtra);
   renderFooter(doc, y, ficha);
 
   doc.save(`ficha-epi-${ficha.nomeFuncionario.replace(/\s+/g, '-').toLowerCase()}.pdf`);

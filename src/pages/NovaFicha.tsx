@@ -18,6 +18,7 @@ import { getConfig, loadConfig } from '@/services/configService';
 import SignaturePad from '@/components/SignaturePad';
 import { Funcao, EPI, listFuncoes, listEpis, listFuncaoEpis } from '@/services/estoqueService';
 import { Empresa, listEmpresas } from '@/services/empresasService';
+import { ModeloFicha, listModelosAtivos } from '@/services/modelosFichaService';
 import { supabase } from '@/integrations/supabase/client';
 import BackButton from '@/components/BackButton';
 
@@ -40,6 +41,7 @@ export default function NovaFicha() {
     empresa: config.empresaNome,
     dataEntrega: today,
     observacoes: '',
+    modeloId: '',
   });
 
   const [itens, setItens] = useState<EPIItem[]>([
@@ -55,12 +57,21 @@ export default function NovaFicha() {
   const [epis, setEpis] = useState<EPI[]>([]);
   const [funcaoId, setFuncaoId] = useState<string>('');
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
+  const [modelos, setModelos] = useState<ModeloFicha[]>([]);
 
   useEffect(() => {
     listFuncoes().then(setFuncoes).catch(() => {});
     listEpis(tipo).then(setEpis).catch(() => {});
     setEmpresas(listEmpresas());
   }, [tipo]);
+
+  useEffect(() => {
+    listModelosAtivos().then(list => {
+      setModelos(list);
+      const padrao = list.find(m => m.padrao) ?? list[0];
+      if (padrao) setForm(prev => ({ ...prev, modeloId: prev.modeloId || padrao.id }));
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -260,6 +271,23 @@ export default function NovaFicha() {
           <h2 className="text-2xl font-bold tracking-tight text-foreground">Nova Ficha de {tipo === 'uniforme' ? 'Uniforme' : 'EPI'}</h2>
           <p className="text-sm text-muted-foreground">Preencha os dados do colaborador e os itens entregues. Ao digitar o nome, os dados anteriores serão sugeridos automaticamente.</p>
         </div>
+
+        {/* Modelo do documento — escolhido antes de preencher o resto */}
+        {modelos.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Modelo do documento</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Select value={form.modeloId} onValueChange={v => updateField('modeloId', v)}>
+                <SelectTrigger id="modelo"><SelectValue placeholder="Selecione o modelo" /></SelectTrigger>
+                <SelectContent>
+                  {modelos.map(m => <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Employee Data */}
         <Card>

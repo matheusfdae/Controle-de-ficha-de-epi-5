@@ -57,6 +57,7 @@ function mapFichaFromDB(ficha: FichaRow, itens: ItemRow[]): EPIFicha {
     criadoEm: ficha.created_at,
     assinadoEm: ficha.data_assinatura_colaborador ?? undefined,
     observacoes: ficha.observacoes ?? undefined,
+    modeloId: ficha.modelo_id ?? undefined,
   };
 }
 
@@ -132,6 +133,7 @@ export async function saveFicha(ficha: EPIFicha): Promise<void> {
     assinatura_supervisor_url: ficha.assinaturaResponsavel ?? null,
     data_assinatura_colaborador: ficha.assinaturaColaborador && ficha.status === 'assinada'
       ? (ficha.assinadoEm ?? new Date().toISOString()) : null,
+    modelo_id: ficha.modeloId || null,
   };
 
   const { error: upErr } = await supabase.from('fichas_epi').upsert(fichaPayload);

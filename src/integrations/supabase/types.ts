@@ -321,6 +321,7 @@ export type Database = {
           id: string
           ip_assinatura: string | null
           matricula_snapshot: string | null
+          modelo_id: string | null
           motivo: string | null
           nome_funcionario: string | null
           numero: number
@@ -348,6 +349,7 @@ export type Database = {
           id?: string
           ip_assinatura?: string | null
           matricula_snapshot?: string | null
+          modelo_id?: string | null
           motivo?: string | null
           nome_funcionario?: string | null
           numero?: number
@@ -375,6 +377,7 @@ export type Database = {
           id?: string
           ip_assinatura?: string | null
           matricula_snapshot?: string | null
+          modelo_id?: string | null
           motivo?: string | null
           nome_funcionario?: string | null
           numero?: number
@@ -405,6 +408,13 @@ export type Database = {
             columns: ["funcao_id"]
             isOneToOne: false
             referencedRelation: "funcoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fichas_epi_modelo_id_fkey"
+            columns: ["modelo_id"]
+            isOneToOne: false
+            referencedRelation: "modelos_ficha"
             referencedColumns: ["id"]
           },
         ]
@@ -474,6 +484,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      modelos_ficha: {
+        Row: {
+          ativo: boolean
+          coluna_extra: string
+          created_at: string
+          id: string
+          layout_cabecalho: string
+          logo_data_url: string | null
+          mostrar_segundo_logo: boolean
+          nome: string
+          padrao: boolean
+          texto_declaracao: string
+          texto_secao_extra: string | null
+          texto_termo_responsabilidade: string
+          titulo_documento: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          coluna_extra?: string
+          created_at?: string
+          id?: string
+          layout_cabecalho?: string
+          logo_data_url?: string | null
+          mostrar_segundo_logo?: boolean
+          nome: string
+          padrao?: boolean
+          texto_declaracao: string
+          texto_secao_extra?: string | null
+          texto_termo_responsabilidade: string
+          titulo_documento: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          coluna_extra?: string
+          created_at?: string
+          id?: string
+          layout_cabecalho?: string
+          logo_data_url?: string | null
+          mostrar_segundo_logo?: boolean
+          nome?: string
+          padrao?: boolean
+          texto_declaracao?: string
+          texto_secao_extra?: string | null
+          texto_termo_responsabilidade?: string
+          titulo_documento?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       fichas_uniforme: {
         Row: {

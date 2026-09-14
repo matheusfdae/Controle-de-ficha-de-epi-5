@@ -26,6 +26,7 @@ const Configuracoes       = lazy(() => import('./pages/Configuracoes'));
 const Usuarios            = lazy(() => import('./pages/Usuarios'));
 const Estoque             = lazy(() => import('./pages/Estoque'));
 const Funcoes             = lazy(() => import('./pages/Funcoes'));
+const ModelosFicha        = lazy(() => import('./pages/ModelosFicha'));
 const Integracao          = lazy(() => import('./pages/Integracao'));
 const TermosColetivos     = lazy(() => import('./pages/TermosColetivos'));
 const TermoColetivoNovo   = lazy(() => import('./pages/TermoColetivoNovo'));
@@ -117,6 +118,7 @@ function AppRoutes() {
           <Route path="/convites"     element={<Convites />} />
           <Route path="/estoque"      element={<RequireModule module="estoque"><Estoque /></RequireModule>} />
           <Route path="/funcoes"      element={<RequireModule module="funcoes"><Funcoes /></RequireModule>} />
+          <Route path="/modelos-ficha" element={<RequireModule module="configuracoes"><ModelosFicha /></RequireModule>} />
           <Route path="/integracao"   element={<RequireModule module="integracao"><Integracao /></RequireModule>} />
           <Route path="/termos-coletivos" element={<RequireModule module="termos_coletivos"><TermosColetivos /></RequireModule>} />
           <Route path="/termo-coletivo/novo" element={<RequireModule module="termos_coletivos" action="create"><TermoColetivoNovo /></RequireModule>} />

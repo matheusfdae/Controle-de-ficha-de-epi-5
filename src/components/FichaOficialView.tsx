@@ -1,6 +1,7 @@
 import { EPIFicha, MotivoEntrega } from '@/types/epi';
 import { ReactNode, useEffect, useState } from 'react';
 import { getConfig, loadConfig } from '@/services/configService';
+import { ModeloFicha, FALLBACK_MODELO, resolveModelo } from '@/services/modelosFichaService';
 
 interface Props {
   ficha: EPIFicha;
@@ -20,77 +21,171 @@ const motivos: { key: MotivoEntrega; label: string }[] = [
   { key: 'complemento', label: 'COMPLEMENTO' },
 ];
 
+const MOTIVO_LETRA: Record<MotivoEntrega, string> = {
+  admissao: 'A',
+  substituicao: 'S',
+  demissao: 'D',
+  perda_extravio: 'P',
+  complemento: 'C',
+};
+
+const MOTIVO_LABEL: Record<MotivoEntrega, string> = {
+  admissao: 'Admissão',
+  substituicao: 'Substituição',
+  perda_extravio: 'Perda/Extravio',
+  demissao: 'Demissão',
+  complemento: 'Complemento',
+};
+
 /**
- * Reproduz fielmente o layout oficial:
- * "TERMO DE RECEBIMENTO DE UNIFORME/EPI's - REV-00"
+ * Reproduz fielmente o layout oficial do modelo escolhido na ficha
+ * (ver src/services/modelosFichaService.ts e src/services/pdfService.ts,
+ * que gera o PDF a partir dos mesmos parâmetros).
  */
 export default function FichaOficialView({ ficha, signMode }: Props) {
   const minRows = 9;
   const rowsToRender = Math.max(ficha.itens.length, minRows);
   const [config, setConfig] = useState(getConfig());
+  const [modelo, setModelo] = useState<ModeloFicha>(FALLBACK_MODELO);
   useEffect(() => {
     let active = true;
     loadConfig().then(cfg => { if (active) setConfig(cfg); });
     return () => { active = false; };
   }, []);
+  useEffect(() => {
+    let active = true;
+    resolveModelo(ficha.modeloId).then(m => { if (active) setModelo(m); });
+    return () => { active = false; };
+  }, [ficha.modeloId]);
   const nomeParts = config.empresaNome.split(' ');
   const linha1 = nomeParts[0] || '';
   const linha2 = nomeParts.slice(1).join(' ') || '';
+  const compacto = modelo.layoutCabecalho === 'compacto';
+
+  const logoSrc = modelo.logoDataUrl || config.logoDataUrl;
+  const logoBox = (
+    <div className="w-40 flex flex-col items-center justify-center border-black p-2 text-center shrink-0">
+      {logoSrc ? (
+        <img src={logoSrc} alt="Logo" className="max-h-14 object-contain" />
+      ) : (
+        <>
+          <div className="font-bold text-sm leading-tight">{linha1}</div>
+          {linha2 && <div className="font-bold text-base leading-tight">{linha2}</div>}
+          <div className="text-[8px] leading-tight">{config.empresaSubtitulo}</div>
+        </>
+      )}
+    </div>
+  );
 
   return (
     <div className="bg-white text-black mx-auto shadow-lg border border-black/40 print:shadow-none print:border-0"
          style={{ width: '100%', maxWidth: 1100, fontFamily: 'Arial, Helvetica, sans-serif', fontSize: 11 }}>
       {/* Header */}
       <div className="flex border-b border-black">
-        <div className="w-40 flex flex-col items-center justify-center border-r border-black p-2 text-center">
-          {config.logoDataUrl ? (
-            <img src={config.logoDataUrl} alt="Logo" className="max-h-14 object-contain" />
-          ) : (
-            <>
-              <div className="font-bold text-sm leading-tight">{linha1}</div>
-              {linha2 && <div className="font-bold text-base leading-tight">{linha2}</div>}
-              <div className="text-[8px] leading-tight">{config.empresaSubtitulo}</div>
-            </>
-          )}
-        </div>
+        <div className="border-r border-black">{logoBox}</div>
         <div className="flex-1 flex items-center justify-center font-bold text-base px-2 py-3 text-center">
-          TERMO DE RECEBIMENTO DE UNIFORME/EPI's - REV -00
+          {modelo.tituloDocumento}
         </div>
+        {modelo.mostrarSegundoLogo && <div className="border-l border-black">{logoBox}</div>}
       </div>
 
-      {/* Nome + motivos + turno */}
-      <div className="flex items-stretch border-b border-black text-[11px]">
-        <div className="flex items-center px-2 py-1 border-r border-black flex-1 min-w-0">
-          <span className="font-bold mr-2 whitespace-nowrap">NOME DO FUNCIONÁRIO:</span>
-          <span className="truncate">{ficha.nomeFuncionario}</span>
-        </div>
-        <div className="flex items-center gap-3 px-3 border-r border-black">
-          {motivos.map(m => (
-            <label key={m.key} className="flex items-center gap-1 text-[10px] font-bold">
-              <span className="inline-flex items-center justify-center w-3 h-3 border border-black text-[9px] leading-none">
-                {ficha.motivo === m.key ? 'X' : ''}
-              </span>
-              {m.label}
-            </label>
-          ))}
-        </div>
-        <div className="flex flex-col px-2 py-1 text-[10px] font-bold justify-center">
-          <span>{ficha.turno === 'diurno' ? '☒' : '☐'} DIURNO</span>
-          <span>{ficha.turno === 'noturno' ? '☒' : '☐'} NOTURNO</span>
-        </div>
-      </div>
+      {compacto ? (
+        <table className="w-full border-collapse text-[11px] border-b border-black" style={{ tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: '34%' }} /><col style={{ width: '14%' }} /><col style={{ width: '14%' }} />
+            <col style={{ width: '14%' }} /><col style={{ width: '12%' }} /><col style={{ width: '12%' }} />
+          </colgroup>
+          <tbody>
+            <tr>
+              <td className="border-r border-black px-2 py-1">
+                <span className="font-bold mr-2 whitespace-nowrap">NOME COMPLETO:</span>
+                <span>{ficha.nomeFuncionario}</span>
+              </td>
+              <td className="border-r border-black px-2 py-1">
+                <div className="flex items-center gap-1.5">
+                  {(['A', 'S', 'D', 'P', 'C'] as const).map(letra => (
+                    <label key={letra} className="flex items-center gap-0.5 text-[10px] font-bold">
+                      <span className="inline-flex items-center justify-center w-3 h-3 border border-black text-[9px] leading-none">
+                        {MOTIVO_LETRA[ficha.motivo] === letra ? 'X' : ''}
+                      </span>
+                      {letra}
+                    </label>
+                  ))}
+                </div>
+              </td>
+              <td colSpan={2} className="border-r border-black px-2 py-1 text-[10px] font-bold whitespace-nowrap">
+                ADMISSÃO: <span className="inline-block w-16 border-b border-black">&nbsp;</span>
+              </td>
+              <td colSpan={2} className="px-2 py-1 text-center text-[11px] font-bold">TURNO</td>
+            </tr>
+            <tr>
+              <td className="border-r border-t border-black px-2 py-1">
+                <span className="font-bold mr-2">CARGO:</span>
+                <span>{ficha.funcao}</span>
+              </td>
+              <td className="border-r border-t border-black px-2 py-1">
+                <span className="font-bold mr-2 text-[10px]">CELULAR:</span>
+                <span className="text-[10px]">{ficha.telefone}</span>
+              </td>
+              <td className="border-r border-t border-black px-2 py-1 text-[10px]">
+                <span className="font-bold mr-1">MOTIVO:</span>
+                {MOTIVO_LABEL[ficha.motivo]}
+              </td>
+              <td className="border-r border-t border-black px-2 py-1 text-[10px] font-bold whitespace-nowrap">
+                DEMISSÃO:
+              </td>
+              <td className="border-r border-t border-black px-2 py-1 text-[10px] font-bold whitespace-nowrap">
+                <span className="inline-flex items-center justify-center w-3 h-3 border border-black text-[9px] leading-none mr-1">
+                  {ficha.turno === 'diurno' ? 'X' : ''}
+                </span>
+                DIURNO:
+              </td>
+              <td className="border-t border-black px-2 py-1 text-[10px] font-bold whitespace-nowrap">
+                <span className="inline-flex items-center justify-center w-3 h-3 border border-black text-[9px] leading-none mr-1">
+                  {ficha.turno === 'noturno' ? 'X' : ''}
+                </span>
+                Noturno:
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      ) : (
+        <>
+          {/* Nome + motivos + turno */}
+          <div className="flex items-stretch border-b border-black text-[11px]">
+            <div className="flex items-center px-2 py-1 border-r border-black flex-1 min-w-0">
+              <span className="font-bold mr-2 whitespace-nowrap">NOME DO FUNCIONÁRIO:</span>
+              <span className="truncate">{ficha.nomeFuncionario}</span>
+            </div>
+            <div className="flex items-center gap-3 px-3 border-r border-black">
+              {motivos.map(m => (
+                <label key={m.key} className="flex items-center gap-1 text-[10px] font-bold">
+                  <span className="inline-flex items-center justify-center w-3 h-3 border border-black text-[9px] leading-none">
+                    {ficha.motivo === m.key ? 'X' : ''}
+                  </span>
+                  {m.label}
+                </label>
+              ))}
+            </div>
+            <div className="flex flex-col px-2 py-1 text-[10px] font-bold justify-center">
+              <span>{ficha.turno === 'diurno' ? '☒' : '☐'} DIURNO</span>
+              <span>{ficha.turno === 'noturno' ? '☒' : '☐'} NOTURNO</span>
+            </div>
+          </div>
 
-      {/* Função + Fone */}
-      <div className="flex border-b border-black text-[11px]">
-        <div className="flex items-center px-2 py-1 border-r border-black flex-1">
-          <span className="font-bold mr-2">FUNÇÃO:</span>
-          <span>{ficha.funcao}</span>
-        </div>
-        <div className="flex items-center px-2 py-1 w-1/2">
-          <span className="font-bold mr-2">FONE:</span>
-          <span>{ficha.telefone}</span>
-        </div>
-      </div>
+          {/* Função + Fone */}
+          <div className="flex border-b border-black text-[11px]">
+            <div className="flex items-center px-2 py-1 border-r border-black flex-1">
+              <span className="font-bold mr-2">FUNÇÃO:</span>
+              <span>{ficha.funcao}</span>
+            </div>
+            <div className="flex items-center px-2 py-1 w-1/2">
+              <span className="font-bold mr-2">FONE:</span>
+              <span>{ficha.telefone}</span>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Termo de Responsabilidade */}
       <div className="bg-gray-300 border-b border-black text-center font-bold py-1 text-[12px]">
@@ -99,7 +194,7 @@ export default function FichaOficialView({ ficha, signMode }: Props) {
 
       <div className="flex border-b border-black">
         <div className="w-[58%] p-2 border-r border-black text-[10px] leading-snug text-justify">
-          Declaro que recebi gratuitamente nesta data os EPI'S (Equipamentos de Proteção Individual) e UNIFORMES discriminado(s) neste T.R (Termo de Responsabilidade), para uso obrigatório e sistemático no trabalho enquanto for colaborador desta empresa. Estou ciente ainda que a guarda e conservação destes equipamentos fiquem sob minha responsabilidade. Tenho conhecimento ainda do texto do Art. 158 Parágrafo Único, Lei 6.514, 22/12/77 que diz: "Constitui o ato faltoso do empregado, a recusa injustificada ao uso dos EPI's fornecidos pela empresa". Sendo assim me comprometo a comunicar imediatamente a empresa, quaisquer danos causados nestes equipamentos. Em caso de perda ou extravio ou inutilização proposital, comprometo-me a ressarcir a empresa conforme previsto no Parágrafo 1º do Art. 462 da CLT, inclusive no que couber a título de indenização por rescisão de contrato de trabalho a importância correspondente ao valor do material.
+          {modelo.textoTermoResponsabilidade}
         </div>
         <div className="w-[42%] p-2 text-[9.5px] leading-snug">
           <p className="font-bold">BASE LEGAL: NR1 Item 1.8 (Cabe ao Empregado)</p>
@@ -116,7 +211,7 @@ export default function FichaOficialView({ ficha, signMode }: Props) {
 
       {/* Declaro adicional */}
       <div className="border-b border-black p-2 text-[10px] leading-snug text-justify">
-        <span className="font-bold">DECLARO</span> para os devidos fins que experimentei o material fornecido pela empresa, e que estes ficaram adequados conforme o padrão necessário para execução dos meus serviços. Acrescento ainda que estou ciente que: quaisquer ajustes feitos neste material que possam impedir prejudicar limitar ou ainda causar algum dano ao meu serviço ou material são de MINHA responsabilidade.
+        <span className="font-bold">DECLARO</span> {modelo.textoDeclaracao.replace(/^DECLARO\s*/i, '')}
       </div>
 
       {/* Assinaturas (linhas) */}
@@ -167,7 +262,7 @@ export default function FichaOficialView({ ficha, signMode }: Props) {
             <th rowSpan={2} className="border border-black px-1 py-1 w-[10%]">DATA ENTREGA</th>
             <th rowSpan={2} className="border border-black px-1 py-1 w-[6%]">QUANT.</th>
             <th rowSpan={2} className="border border-black px-1 py-1 w-[28%]">DESCRIÇÃO</th>
-            <th rowSpan={2} className="border border-black px-1 py-1 w-[7%]">TAM. / Nº</th>
+            <th rowSpan={2} className="border border-black px-1 py-1 w-[7%]">{modelo.colunaExtra === 'ca' ? 'C.A' : 'TAM. / Nº'}</th>
             <th rowSpan={2} className="border border-black px-1 py-1 w-[15%]">POSTO DE SERVIÇO</th>
             <th rowSpan={2} className="border border-black px-1 py-1 w-[12%]">ASSINATURA DO FUNCIONÁRIO</th>
             <th colSpan={3} className="border border-black px-1 py-1">DEVOLUÇÃO</th>
@@ -188,9 +283,9 @@ export default function FichaOficialView({ ficha, signMode }: Props) {
                 <td className="border border-black px-1 text-center">{item ? item.quantidade : ''}</td>
                 <td className="border border-black px-1">
                   {item?.descricao}
-                  {item?.ca ? <span className="text-[9px] text-gray-700"> (CA {item.ca})</span> : null}
+                  {modelo.colunaExtra === 'tamanho' && item?.ca ? <span className="text-[9px] text-gray-700"> (CA {item.ca})</span> : null}
                 </td>
-                <td className="border border-black px-1 text-center">{item?.tamanho || ''}</td>
+                <td className="border border-black px-1 text-center">{(modelo.colunaExtra === 'ca' ? item?.ca : item?.tamanho) || ''}</td>
                 <td className="border border-black px-1 text-center">{item?.postoServico || ''}</td>
                 <td className="border border-black px-1 text-center">
                   {item ? (
@@ -222,6 +317,28 @@ export default function FichaOficialView({ ficha, signMode }: Props) {
           })}
         </tbody>
       </table>
+
+      {compacto && (
+        <div className="bg-gray-100 border-b border-black text-center font-bold py-1 text-[9.5px]">
+          A = ADMISSÃO&nbsp;&nbsp;&nbsp;&nbsp;S = SUBSTITUIÇÃO&nbsp;&nbsp;&nbsp;&nbsp;D = DEMISSÃO&nbsp;&nbsp;&nbsp;&nbsp;P = PERDA/EXTRAVIO&nbsp;&nbsp;&nbsp;&nbsp;C = COMPLEMENTO
+        </div>
+      )}
+
+      {modelo.textoSecaoExtra && (
+        <div className="flex border-b border-black text-[10px]">
+          <div className="w-[62%] p-2 border-r border-black leading-snug text-justify">
+            {modelo.textoSecaoExtra}
+          </div>
+          <div className="w-[38%] p-2 flex flex-col justify-around">
+            {[0, 1, 2].map(i => (
+              <div key={i} className="flex items-center gap-2">
+                <span className="font-bold whitespace-nowrap">Assinatura:</span>
+                <span className="flex-1 border-b border-black">&nbsp;</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Observações */}
       <div className="border-t border-black p-2 text-[10px]" style={{ minHeight: 40 }}>

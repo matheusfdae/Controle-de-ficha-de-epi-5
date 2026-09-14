@@ -42,4 +42,6 @@ export interface EPIFicha {
   criadoEm: string;
   assinadoEm?: string;
   observacoes?: string;
+  /** Modelo de layout do PDF (ver src/services/modelosFichaService.ts) */
+  modeloId?: string;
 }
