@@ -151,6 +151,26 @@ CLERK_SECRET_KEY="sk_..."          # passo 0, item 5
 CLERK_WEBHOOK_SECRET="whsec_..."   # passo 0, item 4
 ```
 
+> **Cuidado — só editar o `.env` não é suficiente.** O `docker-compose.yml`
+> oficial da Supabase lista as variáveis que cada serviço recebe
+> explicitamente em `environment:`; ele não repassa o `.env` inteiro pros
+> containers. Se `CLERK_SECRET_KEY`/`CLERK_WEBHOOK_SECRET` não estiverem
+> **também** no bloco `environment:` do serviço `functions` (mesma
+> indentação das demais variáveis, ex. `VERIFY_JWT`), as functions quebram
+> silenciosamente com "Missing Clerk Secret Key" mesmo com o `.env`
+> correto — foi o que aconteceu em produção por meses antes de ser
+> descoberto. Confira/edite as duas linhas ali antes de reiniciar:
+> ```yaml
+>   functions:
+>     environment:
+>       # ...outras variáveis já existentes (VERIFY_JWT etc.)...
+>       CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
+>       CLERK_WEBHOOK_SECRET: ${CLERK_WEBHOOK_SECRET}
+> ```
+> Um `restart` normal (`sh run.sh restart functions`) **não** recarrega
+> `environment:` alterado no compose — só recriando o container:
+> `docker compose up -d functions`.
+
 Reinicie o serviço de functions para carregar o código novo:
 
 ```bash

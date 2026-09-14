@@ -71,7 +71,14 @@ Referências completas em [SELF_HOSTING.md](../SELF_HOSTING.md) e
   - [ ] `clerk-webhook`
 - [ ] Adicionar ao `.env` da `supabase-project`: `CLERK_SECRET_KEY` e
       `CLERK_WEBHOOK_SECRET` (passo 0)
-- [ ] Reiniciar o serviço: `sh run.sh restart functions`
+- [ ] **Conferir também o bloco `environment:` do serviço `functions` no
+      `docker-compose.yml`** — o `.env` sozinho não é repassado aos
+      containers; se as duas chaves não estiverem listadas lá também, as
+      functions quebram com "Missing Clerk Secret Key" mesmo com o `.env`
+      certo (ver aviso em [SELF_HOSTING.md](../SELF_HOSTING.md#3-deploy-das-edge-functions))
+- [ ] Reiniciar o serviço: `sh run.sh restart functions` (se só editou
+      `.env`) ou `docker compose up -d functions` (se editou
+      `environment:` no compose — `restart` sozinho não recarrega isso)
 
 ## 6. Deploy do frontend
 
