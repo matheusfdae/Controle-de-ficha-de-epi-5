@@ -31,8 +31,16 @@ const CHART_COLORS = {
 };
 
 export default function Dashboard() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, can } = useAuth();
   const [fichas, setFichas] = useState<EPIFicha[]>([]);
+
+  // "Somente leitura" só é verdade quando a matriz de permissões do usuário
+  // não libera nenhuma ação de escrita nos módulos operacionais — isAdmin
+  // sozinho não reflete mais isso, já que colaboradores comuns também podem
+  // ter acesso total às telas de negócio (ver AuthContext#fetchUserData).
+  const hasWriteAccess = isAdmin
+    || can('fichas_epi', 'create') || can('fichas_uniforme', 'create')
+    || can('termos_coletivos', 'create') || can('estoque', 'create');
 
   useEffect(() => {
     seedDemoData();
@@ -118,7 +126,11 @@ export default function Dashboard() {
             <p className="text-xs uppercase tracking-wider opacity-80">Bem-vindo de volta</p>
             <h2 className="text-2xl lg:text-3xl font-bold mt-1">Olá, {user?.nome} 👋</h2>
             <p className="text-sm opacity-90 mt-1.5">
-              {isAdmin ? 'Você tem acesso total ao sistema.' : 'Modo somente leitura — apenas administradores podem alterar dados.'}
+              {isAdmin
+                ? 'Você tem acesso total ao sistema.'
+                : hasWriteAccess
+                  ? 'Você tem acesso às telas operacionais do sistema.'
+                  : 'Modo somente leitura — fale com um administrador para liberar mais acesso.'}
             </p>
           </div>
           <Badge variant="secondary" className="bg-white/15 text-primary-foreground border-white/20 text-xs uppercase tracking-wider">

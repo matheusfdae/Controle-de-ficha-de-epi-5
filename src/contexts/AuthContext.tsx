@@ -2,8 +2,8 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import { useAuth as useClerkAuth, useUser, useClerk } from '@clerk/clerk-react';
 import { supabase } from '@/integrations/supabase/client';
 import {
-  ModuleId, ActionId, PermissionMap, RolePreset,
-  ROLE_PRESETS, emptyPermissions, rowsToPermissions,
+  ModuleId, ActionId, PermissionMap,
+  emptyPermissions, fullAccessPermissions, rowsToPermissions,
 } from '@/lib/permissions';
 
 export type UserRole = 'admin' | 'rh' | 'supervisor' | 'almoxarife' | 'colaborador' | 'operador';
@@ -61,11 +61,13 @@ async function fetchUserData(
     .select('module, can_view, can_create, can_edit, can_delete')
     .eq('user_id', profile.id);
   // Sem linhas customizadas ainda (usuário nunca editado na tela de
-  // permissões) -> cai no preset padrão do cargo, mesma regra de
-  // Usuarios.tsx#startEdit.
+  // permissões, ou conta legada anterior ao backfill de acesso total) ->
+  // acesso total às telas de negócio por padrão (pedido do Matheus em
+  // 2026-09-14), mesma regra de Usuarios.tsx#startEdit e de
+  // fullAccessPermissionRows() nas Edge Functions.
   const permissions = permRows && permRows.length > 0
     ? rowsToPermissions(permRows as any)
-    : (ROLE_PRESETS[role as RolePreset] ?? emptyPermissions());
+    : fullAccessPermissions();
 
   return {
     user: {

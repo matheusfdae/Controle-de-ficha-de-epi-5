@@ -49,8 +49,19 @@ export function emptyPermissions(): PermissionMap {
   }, {} as PermissionMap);
 }
 
+/**
+ * Acesso total a todas as telas de negócio (ver/criar/editar/excluir),
+ * sem virar role admin de verdade — usado como fallback padrão para
+ * qualquer usuário que ainda não tem linhas próprias em user_permissions
+ * (conta legada ou criada antes do backfill). Espelha
+ * fullAccessPermissionRows() em supabase/functions/_shared/clerk.ts.
+ */
+export function fullAccessPermissions(): PermissionMap {
+  return MODULES.reduce((acc, m) => { acc[m.id] = { ...ALL }; return acc; }, {} as PermissionMap);
+}
+
 export const ROLE_PRESETS: Record<RolePreset, PermissionMap> = {
-  admin: MODULES.reduce((acc, m) => { acc[m.id] = { ...ALL }; return acc; }, {} as PermissionMap),
+  admin: fullAccessPermissions(),
   rh: {
     ...emptyPermissions(),
     dashboard: VIEW, assinar_tablet: VIEW,

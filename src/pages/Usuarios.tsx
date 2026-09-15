@@ -21,7 +21,7 @@ import BackButton from '@/components/BackButton';
 import { PermissionsMatrix } from '@/components/PermissionsMatrix';
 import {
   MODULES, ROLE_PRESETS, ROLE_LABELS, ROLE_BADGE_CLASS, RolePreset,
-  PermissionMap, emptyPermissions, permissionsToRows, rowsToPermissions,
+  PermissionMap, emptyPermissions, fullAccessPermissions, permissionsToRows, rowsToPermissions,
 } from '@/lib/permissions';
 
 type ManageableRole = Exclude<RolePreset, never>;
@@ -153,9 +153,12 @@ export default function Usuarios() {
     const { data: perms } = await supabase.from('user_permissions')
       .select('module, can_view, can_create, can_edit, can_delete')
       .eq('user_id', row.id);
+    // Conta sem linhas customizadas (legada, anterior ao acesso total por
+    // padrão) -> mostra a matriz toda marcada, mesma regra do login
+    // (AuthContext#fetchUserData) e do formulário de "Novo Usuário".
     const permMap = perms && perms.length > 0
       ? rowsToPermissions(perms as any)
-      : ROLE_PRESETS[(row.role as ManageableRole) ?? 'colaborador'];
+      : fullAccessPermissions();
     setEditForm({
       nome: row.nome,
       email: row.email || '',
