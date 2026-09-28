@@ -19,7 +19,13 @@ Deno.serve(async (req) => {
     const { data: target } = await admin.from('profiles').select('clerk_user_id').eq('id', user_id).maybeSingle();
     if (!target?.clerk_user_id) return json({ error: 'Usuário não encontrado' }, 404);
 
-    await clerkClient.users.updateUser(target.clerk_user_id, { password: new_password });
+    await clerkClient.users.updateUser(target.clerk_user_id, {
+      password: new_password,
+      // Senha definida por admin e trocada no 1º acesso — as regras de
+      // força/vazamento do Clerk só atrapalham aqui (mesmo tratamento de
+      // admin-resend-invite e admin-create-user).
+      skipPasswordChecks: true,
+    });
 
     if (force_change !== false) {
       await admin.from('profiles').update({ must_change_password: true }).eq('id', user_id);
