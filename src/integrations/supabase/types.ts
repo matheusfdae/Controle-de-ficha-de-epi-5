@@ -208,6 +208,145 @@ export type Database = {
           },
         ]
       }
+      entradas_estoque: {
+        Row: {
+          chave_acesso: string | null
+          created_at: string
+          criado_por: string | null
+          data_emissao: string | null
+          data_entrada: string
+          fornecedor_cnpj: string | null
+          fornecedor_nome: string | null
+          id: string
+          numero_nf: string | null
+          observacao: string | null
+          origem: string
+          serie: string | null
+        }
+        Insert: {
+          chave_acesso?: string | null
+          created_at?: string
+          criado_por?: string | null
+          data_emissao?: string | null
+          data_entrada?: string
+          fornecedor_cnpj?: string | null
+          fornecedor_nome?: string | null
+          id?: string
+          numero_nf?: string | null
+          observacao?: string | null
+          origem?: string
+          serie?: string | null
+        }
+        Update: {
+          chave_acesso?: string | null
+          created_at?: string
+          criado_por?: string | null
+          data_emissao?: string | null
+          data_entrada?: string
+          fornecedor_cnpj?: string | null
+          fornecedor_nome?: string | null
+          id?: string
+          numero_nf?: string | null
+          observacao?: string | null
+          origem?: string
+          serie?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entradas_estoque_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      entradas_estoque_itens: {
+        Row: {
+          codigo_fornecedor: string | null
+          created_at: string
+          descricao_nf: string | null
+          entrada_id: string
+          epi_id: string
+          id: string
+          quantidade: number
+          tamanho: string | null
+          valor_unitario: number | null
+        }
+        Insert: {
+          codigo_fornecedor?: string | null
+          created_at?: string
+          descricao_nf?: string | null
+          entrada_id: string
+          epi_id: string
+          id?: string
+          quantidade: number
+          tamanho?: string | null
+          valor_unitario?: number | null
+        }
+        Update: {
+          codigo_fornecedor?: string | null
+          created_at?: string
+          descricao_nf?: string | null
+          entrada_id?: string
+          epi_id?: string
+          id?: string
+          quantidade?: number
+          tamanho?: string | null
+          valor_unitario?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entradas_estoque_itens_entrada_id_fkey"
+            columns: ["entrada_id"]
+            isOneToOne: false
+            referencedRelation: "entradas_estoque"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entradas_estoque_itens_epi_id_fkey"
+            columns: ["epi_id"]
+            isOneToOne: false
+            referencedRelation: "epis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      epi_codigos_fornecedor: {
+        Row: {
+          codigo_fornecedor: string
+          epi_id: string
+          fornecedor_cnpj: string
+          id: string
+          tamanho: string | null
+          updated_at: string
+        }
+        Insert: {
+          codigo_fornecedor: string
+          epi_id: string
+          fornecedor_cnpj: string
+          id?: string
+          tamanho?: string | null
+          updated_at?: string
+        }
+        Update: {
+          codigo_fornecedor?: string
+          epi_id?: string
+          fornecedor_cnpj?: string
+          id?: string
+          tamanho?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "epi_codigos_fornecedor_epi_id_fkey"
+            columns: ["epi_id"]
+            isOneToOne: false
+            referencedRelation: "epis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       epi_tamanhos: {
         Row: {
           created_at: string
@@ -1277,6 +1416,7 @@ export type Database = {
         Returns: boolean
       }
       progresso_assinatura: { Args: { _ficha_id: string }; Returns: Json }
+      registrar_entrada_estoque: { Args: { _cabecalho: Json; _itens: Json }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "rh" | "supervisor" | "colaborador" | "almoxarife"

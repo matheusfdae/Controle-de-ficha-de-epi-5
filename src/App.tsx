@@ -25,6 +25,7 @@ const RankPostos          = lazy(() => import('./pages/RankPostos'));
 const Configuracoes       = lazy(() => import('./pages/Configuracoes'));
 const Usuarios            = lazy(() => import('./pages/Usuarios'));
 const Estoque             = lazy(() => import('./pages/Estoque'));
+const EntradaEstoque      = lazy(() => import('./pages/EntradaEstoque'));
 const Funcoes             = lazy(() => import('./pages/Funcoes'));
 const ModelosFicha        = lazy(() => import('./pages/ModelosFicha'));
 const Integracao          = lazy(() => import('./pages/Integracao'));
@@ -117,6 +118,7 @@ function AppRoutes() {
           <Route path="/usuarios"     element={<AdminRoute><Usuarios /></AdminRoute>} />
           <Route path="/convites"     element={<Convites />} />
           <Route path="/estoque"      element={<RequireModule module="estoque"><Estoque /></RequireModule>} />
+          <Route path="/estoque/entrada" element={<RequireModule module="estoque" action="create"><EntradaEstoque /></RequireModule>} />
           <Route path="/funcoes"      element={<RequireModule module="funcoes"><Funcoes /></RequireModule>} />
           <Route path="/modelos-ficha" element={<RequireModule module="configuracoes"><ModelosFicha /></RequireModule>} />
           <Route path="/integracao"   element={<RequireModule module="integracao"><Integracao /></RequireModule>} />

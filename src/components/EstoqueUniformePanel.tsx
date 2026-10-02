@@ -18,6 +18,7 @@ import {
 } from '@/services/uniformesService';
 import { supabase } from '@/integrations/supabase/client';
 import { useConfirm } from '@/hooks/use-confirm';
+import EstoqueInput from '@/components/EstoqueInput';
 
 export default function EstoqueUniformePanel() {
   const [items, setItems] = useState<Uniforme[]>([]);
@@ -153,9 +154,7 @@ export default function EstoqueUniformePanel() {
                   <div className="flex items-end gap-2">
                     <div>
                       <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Estoque</Label>
-                      <Input type="number" min={0} value={u.estoque_atual}
-                        onChange={e => handleAdjust(u, parseInt(e.target.value) || 0)}
-                        className="w-24" />
+                      <EstoqueInput value={u.estoque_atual} onCommit={n => handleAdjust(u, n)} className="w-24" />
                     </div>
                     <Button variant="outline" size="sm" onClick={() => handleReset(u.id)} title="Resetar">
                       <RotateCcw className="h-3 w-3 mr-1" /> Reset

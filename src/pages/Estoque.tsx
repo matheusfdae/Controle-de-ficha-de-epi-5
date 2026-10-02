@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Package, Save, RotateCcw } from 'lucide-react';
+import { Plus, Trash2, Package, Save, RotateCcw, PackagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   EPI, EPITamanho, listEpis, upsertEpi, deleteEpi,
@@ -21,6 +21,9 @@ import EstoqueUniformePanel from '@/components/EstoqueUniformePanel';
 import RelatorioMovimentacoes from '@/components/RelatorioMovimentacoes';
 import BackButton from '@/components/BackButton';
 import PageHeader from '@/components/PageHeader';
+import EstoqueInput from '@/components/EstoqueInput';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { useConfirm } from '@/hooks/use-confirm';
 
 function EpiPanel() {
@@ -161,8 +164,7 @@ function EpiPanel() {
             {tamanhos.map(t => (
               <div key={t.id} className="flex gap-2 items-center p-2 rounded border">
                 <Badge variant="outline" className="font-mono">{t.tamanho}</Badge>
-                <Input type="number" min={0} value={t.estoque}
-                  onChange={e => handleUpdateTam(t, parseInt(e.target.value) || 0)} className="w-28" />
+                <EstoqueInput value={t.estoque} onCommit={n => handleUpdateTam(t, n)} />
                 <span className="text-xs text-muted-foreground">unidades</span>
                 <Button size="icon" variant="ghost" className="ml-auto text-destructive"
                   onClick={async () => { await deleteTamanho(t.id); loadTamanhos(editing!.id); load(); }}>
@@ -196,11 +198,18 @@ function EpiPanel() {
 }
 
 export default function Estoque() {
+  const { can } = useAuth();
+  const navigate = useNavigate();
   return (
     <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-6xl mx-auto space-y-6">
         <BackButton />
-        <PageHeader eyebrow="Gestão" title="Estoque" />
+        <PageHeader eyebrow="Gestão" title="Estoque"
+          actions={can('estoque', 'create') && (
+            <Button onClick={() => navigate('/estoque/entrada')}>
+              <PackagePlus className="h-4 w-4 mr-1" /> Registrar entrada
+            </Button>
+          )} />
 
         <EstoqueChart />
 
