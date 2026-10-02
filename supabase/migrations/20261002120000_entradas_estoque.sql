@@ -13,11 +13,12 @@ CREATE TABLE public.entradas_estoque (
   serie text,
   -- Chave de 44 dígitos da NF-e: impede importar a mesma nota duas vezes.
   chave_acesso text UNIQUE CHECK (chave_acesso ~ '^\d{44}$'),
+  fornecedor_id uuid REFERENCES public.fornecedores(id) ON DELETE SET NULL,
   fornecedor_nome text,
   fornecedor_cnpj text,
   data_emissao date,
   data_entrada timestamptz NOT NULL DEFAULT now(),
-  origem text NOT NULL DEFAULT 'manual' CHECK (origem IN ('manual', 'xml_nfe')),
+  origem text NOT NULL DEFAULT 'manual' CHECK (origem IN ('manual', 'xml_nfe', 'pdf_danfe')),
   observacao text,
   criado_por uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now()
@@ -64,7 +65,7 @@ CREATE POLICY "codigos_fornecedor select by permission" ON public.epi_codigos_fo
 
 -- =========================================================
 -- registrar_entrada_estoque(cabecalho, itens)
---   cabecalho: {numero_nf, serie, chave_acesso, fornecedor_nome,
+--   cabecalho: {numero_nf, serie, chave_acesso, fornecedor_id, fornecedor_nome,
 --               fornecedor_cnpj, data_emissao, origem, observacao}
 --   itens: [{epi_id, tamanho, quantidade, descricao_nf,
 --            codigo_fornecedor, valor_unitario}]
@@ -86,6 +87,7 @@ DECLARE
   _cnpj text := NULLIF(regexp_replace(COALESCE(_cabecalho->>'fornecedor_cnpj', ''), '\D', '', 'g'), '');
   _chave text := NULLIF(regexp_replace(COALESCE(_cabecalho->>'chave_acesso', ''), '\D', '', 'g'), '');
   _nf text := NULLIF(trim(_cabecalho->>'numero_nf'), '');
+  _fornecedor uuid := NULLIF(_cabecalho->>'fornecedor_id', '')::uuid;
   _motivo text;
 BEGIN
   IF NOT public.has_permission(_perfil, 'estoque', 'create') THEN
@@ -98,9 +100,13 @@ BEGIN
     RAISE EXCEPTION 'Esta NF-e (chave %) já foi lançada no estoque', _chave;
   END IF;
 
-  INSERT INTO entradas_estoque (numero_nf, serie, chave_acesso, fornecedor_nome, fornecedor_cnpj,
+  IF _fornecedor IS NULL AND _cnpj IS NOT NULL THEN
+    SELECT id INTO _fornecedor FROM fornecedores WHERE cnpj = _cnpj;
+  END IF;
+
+  INSERT INTO entradas_estoque (numero_nf, serie, chave_acesso, fornecedor_id, fornecedor_nome, fornecedor_cnpj,
                                 data_emissao, origem, observacao, criado_por)
-  VALUES (_nf, NULLIF(trim(_cabecalho->>'serie'), ''), _chave,
+  VALUES (_nf, NULLIF(trim(_cabecalho->>'serie'), ''), _chave, _fornecedor,
           NULLIF(trim(_cabecalho->>'fornecedor_nome'), ''), _cnpj,
           NULLIF(_cabecalho->>'data_emissao', '')::date,
           COALESCE(NULLIF(_cabecalho->>'origem', ''), 'manual'),

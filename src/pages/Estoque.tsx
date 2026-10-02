@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import EstoqueChart from '@/components/EstoqueChart';
 import EstoqueUniformePanel from '@/components/EstoqueUniformePanel';
+import FornecedoresPanel from '@/components/FornecedoresPanel';
 import RelatorioMovimentacoes from '@/components/RelatorioMovimentacoes';
 import BackButton from '@/components/BackButton';
 import PageHeader from '@/components/PageHeader';
@@ -214,13 +215,15 @@ export default function Estoque() {
         <EstoqueChart />
 
         <Tabs defaultValue="epis" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-3">
+          <TabsList className="grid w-full max-w-lg grid-cols-4">
             <TabsTrigger value="epis">EPIs</TabsTrigger>
             <TabsTrigger value="uniformes">Uniformes</TabsTrigger>
+            <TabsTrigger value="fornecedores">Fornecedores</TabsTrigger>
             <TabsTrigger value="relatorio">Relatório</TabsTrigger>
           </TabsList>
           <TabsContent value="epis" className="mt-6"><EpiPanel /></TabsContent>
           <TabsContent value="uniformes" className="mt-6"><EstoqueUniformePanel /></TabsContent>
+          <TabsContent value="fornecedores" className="mt-6"><FornecedoresPanel /></TabsContent>
           <TabsContent value="relatorio" className="mt-6"><RelatorioMovimentacoes /></TabsContent>
         </Tabs>
       </div>

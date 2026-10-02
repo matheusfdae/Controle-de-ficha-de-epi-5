@@ -19,7 +19,11 @@ import {
   EntradaCabecalho, EntradaResumo, registrarEntrada, chaveJaLancada,
   listCodigosFornecedor, mapaTamanhos, listUltimasEntradas,
 } from '@/services/entradaEstoqueService';
-import { parseNFeXml, sugerirEpi, casarTamanho, OrigemSugestao } from '@/lib/nfe';
+import { parseNFeXml, sugerirEpi, casarTamanho, OrigemSugestao, NFe } from '@/lib/nfe';
+import { parseDanfe, lerTextoPdf } from '@/lib/danfe';
+import { formatarCnpj, soDigitos } from '@/lib/cnpj';
+import { Fornecedor, listFornecedores } from '@/services/fornecedoresService';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Linha {
   key: string;
@@ -39,7 +43,7 @@ const novaLinha = (): Linha => ({
 });
 
 const cabecalhoVazio = (): EntradaCabecalho => ({
-  numero_nf: '', serie: '', chave_acesso: null, fornecedor_nome: '', fornecedor_cnpj: '',
+  numero_nf: '', serie: '', chave_acesso: null, fornecedor_id: null, fornecedor_nome: '', fornecedor_cnpj: '',
   data_emissao: '', origem: 'manual', observacao: '',
 });
 
@@ -92,11 +96,14 @@ export default function EntradaEstoque() {
   const [linhas, setLinhas] = useState<Linha[]>([novaLinha()]);
   const [ultimas, setUltimas] = useState<EntradaResumo[]>([]);
   const [salvando, setSalvando] = useState(false);
+  const [lendo, setLendo] = useState(false);
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
 
   const carregar = () => {
     listEpis().then(setEpis).catch(e => toast.error(e.message));
     mapaTamanhos().then(setTamanhos).catch(() => {});
     listUltimasEntradas().then(setUltimas).catch(() => {});
+    listFornecedores().then(setFornecedores).catch(() => {});
   };
   useEffect(carregar, []);
 
@@ -104,9 +111,26 @@ export default function EntradaEstoque() {
   const setLinha = (key: string, patch: Partial<Linha>) =>
     setLinhas(ls => ls.map(l => (l.key === key ? { ...l, ...patch } : l)));
 
-  async function importarXml(file: File) {
+  const escolherFornecedor = (id: string) => {
+    const f = fornecedores.find(x => x.id === id);
+    setCab(c => ({ ...c, fornecedor_id: id, fornecedor_nome: f?.nome ?? c.fornecedor_nome, fornecedor_cnpj: f?.cnpj ?? c.fornecedor_cnpj }));
+  };
+
+  async function importarNota(file: File) {
+    setLendo(true);
     try {
-      const nfe = parseNFeXml(await file.text());
+      const ehPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+      let nfe: NFe;
+      if (ehPdf) {
+        const danfe = parseDanfe(await lerTextoPdf(file));
+        // Sem chave legível, o emitente é o CNPJ do documento que está cadastrado.
+        const cnpj = danfe.fornecedor.cnpj
+          ?? danfe.cnpjsNoDocumento.find(c => fornecedores.some(f => f.cnpj === c)) ?? null;
+        nfe = { ...danfe, fornecedor: { nome: null, cnpj } };
+      } else {
+        nfe = parseNFeXml(await file.text());
+      }
+      const fornecedor = fornecedores.find(f => f.cnpj && f.cnpj === soDigitos(nfe.fornecedor.cnpj));
       if (nfe.chave && await chaveJaLancada(nfe.chave)) {
         toast.error(`A NF ${nfe.numero ?? ''} já foi lançada no estoque.`);
         return;
@@ -114,8 +138,10 @@ export default function EntradaEstoque() {
       const memoria = nfe.fornecedor.cnpj ? await listCodigosFornecedor(nfe.fornecedor.cnpj) : [];
       setCab({
         numero_nf: nfe.numero ?? '', serie: nfe.serie ?? '', chave_acesso: nfe.chave,
-        fornecedor_nome: nfe.fornecedor.nome ?? '', fornecedor_cnpj: nfe.fornecedor.cnpj ?? '',
-        data_emissao: nfe.dataEmissao ?? '', origem: 'xml_nfe', observacao: '',
+        fornecedor_id: fornecedor?.id ?? null,
+        fornecedor_nome: fornecedor?.nome ?? nfe.fornecedor.nome ?? '',
+        fornecedor_cnpj: nfe.fornecedor.cnpj ?? '',
+        data_emissao: nfe.dataEmissao ?? '', origem: ehPdf ? 'pdf_danfe' : 'xml_nfe', observacao: '',
       });
       const novas = nfe.itens.map(item => {
         const s = sugerirEpi(item, nfe.fornecedor.cnpj, epis, memoria);
@@ -135,9 +161,15 @@ export default function EntradaEstoque() {
       const semPar = novas.filter(l => !l.epiId).length;
       toast.success(`NF ${nfe.numero ?? ''} lida: ${novas.length} itens` +
         (semPar ? ` — ${semPar} sem correspondência, escolha o item.` : '.'));
+      if (!fornecedor) {
+        toast.warning(`Fornecedor ${formatarCnpj(nfe.fornecedor.cnpj)} não está cadastrado. ` +
+          'Cadastre na aba Fornecedores do Estoque para as próximas notas serem reconhecidas.');
+      }
+      if (ehPdf) toast.info('Nota lida do PDF: confira quantidades e descrições antes de salvar.');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Não foi possível ler o XML');
+      toast.error(e instanceof Error ? e.message : 'Não foi possível ler o arquivo');
     } finally {
+      setLendo(false);
       if (fileRef.current) fileRef.current.value = '';
     }
   }
@@ -189,13 +221,14 @@ export default function EntradaEstoque() {
         <Card className="border-dashed">
           <CardContent className="p-5 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="font-medium">Importar XML da NF-e</p>
-              <p className="text-sm text-muted-foreground">Preenche a nota e os itens automaticamente. Os itens já lançados antes deste fornecedor vêm reconhecidos.</p>
+              <p className="font-medium">Importar nota (PDF do DANFE ou XML da NF-e)</p>
+              <p className="text-sm text-muted-foreground">Preenche a nota e os itens automaticamente. Itens já lançados antes deste fornecedor vêm reconhecidos. PDF escaneado não é lido.</p>
             </div>
-            <input ref={fileRef} type="file" accept=".xml,text/xml,application/xml" className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) importarXml(f); }} />
-            <Button onClick={() => fileRef.current?.click()} disabled={!epis.length}>
-              <FileUp className="h-4 w-4 mr-2" /> Escolher arquivo XML
+            <input ref={fileRef} type="file" accept=".pdf,application/pdf,.xml,text/xml,application/xml" className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) importarNota(f); }} />
+            <Button onClick={() => fileRef.current?.click()} disabled={!epis.length || lendo}>
+              {lendo ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileUp className="h-4 w-4 mr-2" />}
+              Escolher PDF ou XML
             </Button>
           </CardContent>
         </Card>
@@ -210,9 +243,22 @@ export default function EntradaEstoque() {
             <div className="sm:col-span-3"><Label htmlFor="emissao">Data de emissão</Label>
               <Input id="emissao" type="date" value={cab.data_emissao} onChange={e => setCampo('data_emissao', e.target.value)} /></div>
             <div className="sm:col-span-4"><Label htmlFor="forn">Fornecedor</Label>
-              <Input id="forn" value={cab.fornecedor_nome} onChange={e => setCampo('fornecedor_nome', e.target.value)} /></div>
+              <Select value={cab.fornecedor_id ?? ''} onValueChange={escolherFornecedor}>
+                <SelectTrigger id="forn">
+                  <SelectValue placeholder={cab.fornecedor_nome || 'Escolha o fornecedor cadastrado'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {fornecedores.filter(f => f.ativo || f.id === cab.fornecedor_id).map(f => (
+                    <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!cab.fornecedor_id && cab.fornecedor_cnpj && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">CNPJ da nota não cadastrado em Fornecedores.</p>
+              )}
+            </div>
             <div className="sm:col-span-2"><Label htmlFor="cnpj">CNPJ</Label>
-              <Input id="cnpj" value={cab.fornecedor_cnpj} onChange={e => setCampo('fornecedor_cnpj', e.target.value)} /></div>
+              <Input id="cnpj" value={formatarCnpj(cab.fornecedor_cnpj)} onChange={e => setCampo('fornecedor_cnpj', e.target.value)} /></div>
             <div className="sm:col-span-6"><Label htmlFor="obs">Observação</Label>
               <Input id="obs" value={cab.observacao} onChange={e => setCampo('observacao', e.target.value)} /></div>
             {cab.chave_acesso && (

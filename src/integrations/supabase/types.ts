@@ -216,6 +216,7 @@ export type Database = {
           data_emissao: string | null
           data_entrada: string
           fornecedor_cnpj: string | null
+          fornecedor_id: string | null
           fornecedor_nome: string | null
           id: string
           numero_nf: string | null
@@ -230,6 +231,7 @@ export type Database = {
           data_emissao?: string | null
           data_entrada?: string
           fornecedor_cnpj?: string | null
+          fornecedor_id?: string | null
           fornecedor_nome?: string | null
           id?: string
           numero_nf?: string | null
@@ -244,6 +246,7 @@ export type Database = {
           data_emissao?: string | null
           data_entrada?: string
           fornecedor_cnpj?: string | null
+          fornecedor_id?: string | null
           fornecedor_nome?: string | null
           id?: string
           numero_nf?: string | null
@@ -800,6 +803,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      fornecedores: {
+        Row: {
+          ativo: boolean
+          cnpj: string | null
+          created_at: string
+          id: string
+          nicho: string | null
+          nome: string
+          observacao: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cnpj?: string | null
+          created_at?: string
+          id?: string
+          nicho?: string | null
+          nome: string
+          observacao?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cnpj?: string | null
+          created_at?: string
+          id?: string
+          nicho?: string | null
+          nome?: string
+          observacao?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       funcao_epis: {
         Row: {

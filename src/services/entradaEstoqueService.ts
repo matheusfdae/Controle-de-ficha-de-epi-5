@@ -6,10 +6,11 @@ export interface EntradaCabecalho {
   numero_nf: string;
   serie: string;
   chave_acesso: string | null;
+  fornecedor_id: string | null;
   fornecedor_nome: string;
   fornecedor_cnpj: string;
   data_emissao: string;
-  origem: 'manual' | 'xml_nfe';
+  origem: 'manual' | 'xml_nfe' | 'pdf_danfe';
   observacao: string;
 }
 
