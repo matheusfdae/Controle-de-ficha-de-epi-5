@@ -44,7 +44,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     seedDemoData();
-    getFichas().then(setFichas);
+    getFichas({ semAssinaturas: true }).then(setFichas);
   }, []);
 
   const totalFichas = fichas.length;

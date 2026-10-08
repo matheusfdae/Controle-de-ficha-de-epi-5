@@ -25,6 +25,8 @@ export interface EPIItem {
 
 export interface EPIFicha {
   id: string;
+  /** Número sequencial da ficha (fichas_epi.numero). */
+  numero?: number;
   nomeFuncionario: string;
   funcao: string;
   telefone: string;

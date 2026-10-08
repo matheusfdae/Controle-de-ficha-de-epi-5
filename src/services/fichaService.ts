@@ -40,6 +40,7 @@ function mapItemFromDB(row: ItemRow): EPIItem {
 function mapFichaFromDB(ficha: FichaRow, itens: ItemRow[]): EPIFicha {
   return {
     id: ficha.id,
+    numero: ficha.numero ?? undefined,
     nomeFuncionario: ficha.nome_funcionario ?? '',
     funcao: ficha.funcao ?? '',
     telefone: ficha.telefone ?? '',
@@ -68,21 +69,49 @@ export function generateId(): string {
   return crypto.randomUUID();
 }
 
-export async function getFichas(): Promise<EPIFicha[]> {
-  const { data: fichas, error } = await supabase
-    .from('fichas_epi')
-    .select('*')
-    .order('created_at', { ascending: false });
-  if (error) { console.error(error); return []; }
-  if (!fichas?.length) return [];
+// O Supabase devolve no máximo 1000 linhas por consulta: lê em páginas até acabar.
+const PAGINA = 1000;
+async function lerTudo<T>(consulta: (de: number, ate: number) => PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
+  const todas: T[] = [];
+  for (let de = 0; ; de += PAGINA) {
+    const { data, error } = await consulta(de, de + PAGINA - 1);
+    if (error) throw error;
+    todas.push(...(data ?? []));
+    if (!data || data.length < PAGINA) return todas;
+  }
+}
 
-  const ids = fichas.map(f => f.id);
-  const { data: itens } = await supabase
-    .from('fichas_epi_itens')
-    .select('*')
-    .in('ficha_id', ids);
+// Sem as imagens de assinatura (são a maior parte do peso): para listas/contagens.
+const COLUNAS_SEM_ASSINATURA = [
+  'id', 'numero', 'nome_funcionario', 'funcao', 'telefone', 'cpf_snapshot', 'matricula_snapshot', 'motivo', 'turno',
+  'posto_snapshot', 'uf', 'empresa', 'data_entrega', 'status', 'created_at', 'data_assinatura_colaborador',
+  'observacoes', 'modelo_id',
+].join(', ');
 
-  return fichas.map(f => mapFichaFromDB(f, (itens ?? []).filter(i => i.ficha_id === f.id)));
+/**
+ * Todas as fichas visíveis (RLS) com os itens. `semAssinaturas` deixa de fora as
+ * imagens das assinaturas — use em telas que não geram PDF (contagens, mapa, vencimentos).
+ */
+export async function getFichas(opcoes: { semAssinaturas?: boolean } = {}): Promise<EPIFicha[]> {
+  try {
+    const colunas = opcoes.semAssinaturas ? COLUNAS_SEM_ASSINATURA : '*';
+    const fichas = await lerTudo<FichaRow>((de, ate) => supabase
+      .from('fichas_epi').select(colunas)
+      .order('created_at', { ascending: false }).order('id').range(de, ate) as unknown as PromiseLike<{ data: FichaRow[] | null; error: unknown }>);
+    if (!fichas.length) return [];
+    // Itens de todas as fichas visíveis (a RLS de itens segue a da ficha).
+    const itens = await lerTudo<ItemRow>((de, ate) => supabase
+      .from('fichas_epi_itens').select('*').order('id').range(de, ate));
+    const porFicha = new Map<string, ItemRow[]>();
+    for (const i of itens) {
+      const lista = porFicha.get(i.ficha_id);
+      if (lista) lista.push(i); else porFicha.set(i.ficha_id, [i]);
+    }
+    return fichas.map(f => mapFichaFromDB(f, porFicha.get(f.id) ?? []));
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 
 /** Busca autenticada (RLS): usada nas telas internas (VisualizarFicha etc). */
