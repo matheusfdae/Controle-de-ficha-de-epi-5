@@ -30,8 +30,10 @@ MIGRACOES=(
   "20261002110000_fornecedores.sql|SELECT to_regclass('public.fornecedores') IS NOT NULL"
   "20261002120000_entradas_estoque.sql|SELECT to_regclass('public.entradas_estoque') IS NOT NULL"
   "20261005120000_entrada_estoque_duplicidade.sql|SELECT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='trg_entrada_nf_duplicada')"
-  "20261005130000_classificar_epis_uniformes.sql|SELECT false"
-  "20261006100000_estados.sql|SELECT false"
+  # Aplicadas junto com a de estados no deploy de 08/10/2026. NÃO rodar de novo:
+  # reclassificaria o catálogo e devolveria os 4 estados a todos os usuários.
+  "20261005130000_classificar_epis_uniformes.sql|SELECT to_regclass('public.estados') IS NOT NULL"
+  "20261006100000_estados.sql|SELECT to_regclass('public.estados') IS NOT NULL"
 )
 PENDENTES=()
 echo ">>> Migrations:"
@@ -44,7 +46,6 @@ for m in "${MIGRACOES[@]}"; do
     echo "    A APLICAR:   $arq"; PENDENTES+=("$arq")
   fi
 done
-echo "    (classificar_epis_uniformes e estados podem rodar de novo sem estragar nada)"
 
 read -r -p "Seguir com backup + build + migrations + troca do app? Digite SIM: " OK
 [ "$OK" = "SIM" ] || { echo "Cancelado, nada foi feito."; exit 1; }
