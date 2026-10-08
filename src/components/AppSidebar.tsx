@@ -36,6 +36,7 @@ const adminItems: Array<{ title: string; url: string; icon: typeof Package; end:
   { title: 'Integração', url: '/integracao', icon: UserPlus, end: false, module: 'integracao' },
   { title: 'Estoque', url: '/estoque', icon: Package, end: false, module: 'estoque' },
   { title: 'Funções', url: '/funcoes', icon: Briefcase, end: false, module: 'funcoes' },
+  { title: 'Postos', url: '/postos', icon: MapPin, end: false, module: 'configuracoes' },
   { title: 'Modelos de Ficha', url: '/modelos-ficha', icon: FileStack, end: false, module: 'configuracoes' },
   { title: 'Configurações', url: '/configuracoes', icon: Settings, end: false, module: 'configuracoes' },
 ];

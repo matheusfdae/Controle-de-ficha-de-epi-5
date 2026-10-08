@@ -28,7 +28,7 @@ export const MODULES: ModuleDef[] = [
   { id: 'termos_coletivos', label: 'Termos Coletivos',  actions: ['view', 'create', 'edit', 'delete'] },
   { id: 'estoque',          label: 'Estoque',           actions: ['view', 'create', 'edit', 'delete'] },
   { id: 'vencimentos',      label: 'Vencimentos',       actions: ['view'] },
-  { id: 'rank',             label: 'Rank por Posto',    actions: ['view'] },
+  { id: 'rank',             label: 'Fichas por Posto',  actions: ['view'] },
   { id: 'integracao',       label: 'Integração',        actions: ['view', 'create', 'edit', 'delete'] },
   { id: 'funcoes',          label: 'Funções',           actions: ['view', 'create', 'edit', 'delete'] },
   { id: 'configuracoes',    label: 'Configurações',     actions: ['view', 'edit'] },

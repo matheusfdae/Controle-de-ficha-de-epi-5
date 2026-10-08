@@ -34,6 +34,7 @@ MIGRACOES=(
   # reclassificaria o catálogo e devolveria os 4 estados a todos os usuários.
   "20261005130000_classificar_epis_uniformes.sql|SELECT to_regclass('public.estados') IS NOT NULL"
   "20261006100000_estados.sql|SELECT to_regclass('public.estados') IS NOT NULL"
+  "20261008120000_postos.sql|SELECT to_regclass('public.postos') IS NOT NULL"
 )
 PENDENTES=()
 echo ">>> Migrations:"

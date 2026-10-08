@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow,
@@ -11,23 +11,37 @@ import { MapPin, ChevronLeft, Eye, Search } from 'lucide-react';
 import { EPIFicha } from '@/types/epi';
 import { getFichas } from '@/services/fichaService';
 import BackButton from '@/components/BackButton';
+import MapaPostos, { PontoMapa } from '@/components/MapaPostos';
+import { Posto, chavePosto, indicePostos, listPostos } from '@/services/postosService';
 
 export default function RankPostos() {
   const [fichas, setFichas] = useState<EPIFicha[]>([]);
-  const [selecionado, setSelecionado] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  // Vindo do mapa da tela Postos (?posto=...): já abre as fichas daquele posto.
+  const [selecionado, setSelecionado] = useState<string | null>(searchParams.get('posto'));
   const [busca, setBusca] = useState('');
+  const [postos, setPostos] = useState<Posto[]>([]);
 
-  useEffect(() => { getFichas().then(setFichas); }, []);
+  useEffect(() => {
+    getFichas({ semAssinaturas: true }).then(setFichas);
+    listPostos().then(setPostos).catch(() => {});
+  }, []);
+
+  const indice = useMemo(() => indicePostos(postos), [postos]);
 
   const ranking = useMemo(() => {
-    const map = new Map<string, EPIFicha[]>();
+    // Agrupa pelo posto cadastrado (nome ou apelido); sem cadastro, pelo texto da ficha.
+    const map = new Map<string, { cadastro?: Posto; items: EPIFicha[] }>();
     for (const f of fichas) {
-      const posto = (f.posto || '').trim() || 'Sem posto';
-      if (!map.has(posto)) map.set(posto, []);
-      map.get(posto)!.push(f);
+      const texto = (f.posto || '').trim();
+      const cadastro = texto ? indice.get(chavePosto(texto)) : undefined;
+      const posto = cadastro?.nome ?? (texto || 'Sem posto');
+      if (!map.has(posto)) map.set(posto, { cadastro, items: [] });
+      map.get(posto)!.items.push(f);
     }
-    const arr = Array.from(map.entries()).map(([posto, items]) => ({
+    const arr = Array.from(map.entries()).map(([posto, { cadastro, items }]) => ({
       posto,
+      cadastro,
       total: items.length,
       assinadas: items.filter(i => i.status === 'assinada').length,
       pendentes: items.filter(i => i.status !== 'assinada').length,
@@ -36,16 +50,25 @@ export default function RankPostos() {
     }));
     arr.sort((a, b) => b.total - a.total);
     return arr;
-  }, [fichas]);
+  }, [fichas, indice]);
 
   const filtrado = ranking.filter(r => r.posto.toLowerCase().includes(busca.toLowerCase()));
   const detalhes = selecionado ? ranking.find(r => r.posto === selecionado) : null;
+
+  const pontos: PontoMapa[] = useMemo(() => filtrado
+    .filter(r => r.cadastro?.latitude != null && r.cadastro?.longitude != null)
+    .map(r => ({
+      chave: r.posto, nome: r.posto, latitude: r.cadastro!.latitude!, longitude: r.cadastro!.longitude!,
+      peso: r.total, detalhe: `${r.total} fichas · ${r.assinadas} assinadas · ${r.pendentes} pendentes`,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    })), [ranking, busca]);
+  const semLocal = filtrado.filter(r => r.cadastro?.latitude == null).length;
 
   const soma = (campo: 'total' | 'assinadas' | 'pendentes') => filtrado.reduce((s, r) => s + r[campo], 0);
 
   return (
     <div className="p-4 lg:p-8 pb-20">
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div className="max-w-7xl mx-auto space-y-6">
         <BackButton />
 
         {!detalhes && (
@@ -69,6 +92,17 @@ export default function RankPostos() {
                 />
               </div>
             </div>
+
+            {pontos.length > 0 && (
+              <div className="space-y-1">
+                <MapaPostos pontos={pontos} onSelecionar={setSelecionado} />
+                {semLocal > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {semLocal} posto(s) sem localização não aparecem no mapa — complete em Administração → Postos.
+                  </p>
+                )}
+              </div>
+            )}
 
             {filtrado.length === 0 ? (
               <Card><CardContent className="py-10 text-center text-muted-foreground">

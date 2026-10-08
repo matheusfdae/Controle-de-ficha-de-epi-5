@@ -1010,6 +1010,46 @@ export type Database = {
         }
         Relationships: []
       }
+      postos: {
+        Row: {
+          apelidos: string[]
+          ativo: boolean
+          created_at: string
+          endereco: string | null
+          id: string
+          latitude: number | null
+          longitude: number | null
+          nome: string
+          nome_chave: string
+          uf: string
+          updated_at: string
+        }
+        Insert: {
+          apelidos?: string[]
+          ativo?: boolean
+          created_at?: string
+          endereco?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          nome: string
+          uf?: string
+          updated_at?: string
+        }
+        Update: {
+          apelidos?: string[]
+          ativo?: boolean
+          created_at?: string
+          endereco?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          nome?: string
+          uf?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           clerk_user_id: string | null
