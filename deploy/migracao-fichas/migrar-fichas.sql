@@ -53,11 +53,31 @@ UNION ALL SELECT '  só existem na produção', count(*) FROM public.fichas_epi 
               AND NOT EXISTS (SELECT 1 FROM d_fichas d WHERE lower(trim(d.nome_funcionario)) = lower(trim(p.nome_funcionario))
                                                          AND d.data_entrega = p.data_entrega);
 
--- Ficha do Cloud que já está na produção (mesmo id) não é copiada de novo.
+-- Ficha que já está na produção não é copiada de novo: nem pelo mesmo id,
+-- nem pelo mesmo funcionário + data de entrega (a mesma ficha vinda de outra
+-- base, com outro id).
+CREATE TEMP TABLE ja_na_producao AS
+SELECT d.id FROM d_fichas d
+WHERE d.id IN (SELECT id FROM public.fichas_epi)
+   OR EXISTS (SELECT 1 FROM public.fichas_epi p
+              WHERE lower(trim(p.nome_funcionario)) = lower(trim(d.nome_funcionario))
+                AND p.data_entrega = d.data_entrega);
 CREATE TEMP TABLE sel_fichas AS
 SELECT * FROM d_fichas
 WHERE (nome_funcionario IS NULL OR nome_funcionario !~* '^\s*teste\M')
-  AND id NOT IN (SELECT id FROM public.fichas_epi);
+  AND id NOT IN (SELECT id FROM ja_na_producao);
+-- Estado da ficha pelo final do posto ("GUARANTA DO NORTE/MT" -> MT);
+-- posto sem estado reconhecível -> DF.
+CREATE TEMP TABLE uf_ficha AS
+SELECT id, COALESCE(substring(upper(trim(posto_snapshot)) FROM '[/ -](DF|GO|MT|SP)$'), 'DF') AS uf
+FROM sel_fichas;
+
+-- Número já usado na produção: a ficha recebe o próximo número livre.
+CREATE TEMP TABLE renumerar AS
+SELECT s.id FROM sel_fichas s WHERE EXISTS (SELECT 1 FROM public.fichas_epi p WHERE p.numero = s.numero);
+SELECT setval(pg_get_serial_sequence('public.fichas_epi', 'numero'),
+              GREATEST((SELECT COALESCE(max(numero), 0) FROM public.fichas_epi),
+                       (SELECT COALESCE(max(numero), 0) FROM sel_fichas), 1)) AS proximo_numero_base;
 
 -- ---------- Colaboradores: casa por e-mail, depois por CPF ----------
 CREATE TEMP TABLE map_prof AS
@@ -160,14 +180,18 @@ INSERT INTO public.fichas_epi (id, numero, colaborador_id, data_entrega, data_de
                                data_assinatura_colaborador, data_assinatura_supervisor, ip_assinatura,
                                nome_funcionario, funcao, funcao_id, telefone, cpf_snapshot,
                                matricula_snapshot, posto_snapshot, empresa, motivo, turno,
-                               created_at, updated_at)
-SELECT f.id, f.numero, mc.prod_id, f.data_entrega, f.data_devolucao, f.status, f.observacoes,
+                               created_at, updated_at, uf)
+SELECT f.id,
+       CASE WHEN f.id IN (SELECT id FROM renumerar)
+            THEN nextval(pg_get_serial_sequence('public.fichas_epi', 'numero')) ELSE f.numero END,
+       mc.prod_id, f.data_entrega, f.data_devolucao, f.status, f.observacoes,
        mcr.prod_id, f.assinatura_colaborador_url, f.assinatura_supervisor_url,
        f.data_assinatura_colaborador, f.data_assinatura_supervisor, f.ip_assinatura,
        f.nome_funcionario, f.funcao, mf.prod_id, f.telefone, f.cpf_snapshot,
        f.matricula_snapshot, f.posto_snapshot, f.empresa, f.motivo, f.turno,
-       f.created_at, f.updated_at
+       f.created_at, f.updated_at, u.uf
 FROM sel_fichas f
+JOIN uf_ficha u ON u.id = f.id
 -- Ficha criada pela Nova Ficha não tem colaborador_id (só o nome no texto): fica vazio igual.
 LEFT JOIN map_prof mc ON mc.dev_id = f.colaborador_id
 LEFT JOIN map_prof mcr ON mcr.dev_id = f.criado_por
@@ -191,9 +215,12 @@ SELECT setval(pg_get_serial_sequence('public.fichas_epi', 'numero'),
               GREATEST((SELECT COALESCE(max(numero), 0) FROM public.fichas_epi), 1));
 
 -- ---------- Conferência ----------
-SELECT 'fichas no dev (total)' AS item, count(*) AS qtd FROM d_fichas
+SELECT 'fichas na origem (total)' AS item, count(*) AS qtd FROM d_fichas
 UNION ALL SELECT 'fichas de teste deixadas de fora', count(*) FROM d_fichas WHERE nome_funcionario ~* '^\s*teste\M'
-UNION ALL SELECT 'fichas do Cloud que já estão na produção', count(*) FROM d_fichas WHERE id IN (SELECT id FROM public.fichas_epi)
+UNION ALL SELECT 'já estavam na produção (mesmo id)', count(*) FROM ja_na_producao j
+            WHERE j.id IN (SELECT id FROM public.fichas_epi) AND j.id NOT IN (SELECT id FROM sel_fichas)
+UNION ALL SELECT 'já estavam na produção (mesmo funcionário + data)', count(*) FROM ja_na_producao j
+            WHERE j.id NOT IN (SELECT id FROM public.fichas_epi)
 UNION ALL SELECT 'fichas a copiar', count(*) FROM sel_fichas
 UNION ALL SELECT '  sem colaborador vinculado (normal na Nova Ficha)', count(*) FROM sel_fichas WHERE colaborador_id IS NULL
 UNION ALL SELECT '  assinadas', count(*) FROM sel_fichas WHERE status = 'assinada'
@@ -205,14 +232,26 @@ UNION ALL SELECT 'colaboradores já existentes (e-mail/CPF)', count(*) FROM map_
               AND m.dev_id NOT IN (SELECT id FROM prof_da_ficha)
 UNION ALL SELECT 'colaboradores criados (cadastro do Cloud)', count(*) FROM prof_inserir
 UNION ALL SELECT 'colaboradores criados (dados da ficha)', count(*) FROM prof_da_ficha
-UNION ALL SELECT 'fichas do Cloud que NÃO entraram (conferir!)', count(*) FROM sel_fichas
+UNION ALL SELECT 'fichas selecionadas que NÃO entraram (conferir!)', count(*) FROM sel_fichas
             WHERE id NOT IN (SELECT id FROM public.fichas_epi)
-UNION ALL SELECT 'nº de ficha repetido com as que já estavam na produção', count(*) FROM sel_fichas s
-            WHERE EXISTS (SELECT 1 FROM public.fichas_epi p WHERE p.numero = s.numero AND p.id <> s.id)
+UNION ALL SELECT 'renumeradas (nº já usado na produção)', count(*) FROM renumerar
 UNION ALL SELECT 'itens digitados à mão no Cloud (sem catálogo, normal)', count(*) FROM d_itens
             WHERE epi_id IS NULL AND ficha_id IN (SELECT id FROM sel_fichas)
 UNION ALL SELECT 'itens de catálogo criados', count(*) FROM epi_inserir
 UNION ALL SELECT 'funções criadas', count(*) FROM funcao_inserir;
+
+\echo ''
+\echo '=== Fichas a copiar, por estado (pelo posto) ==='
+SELECT u.uf, count(*) AS fichas,
+       string_agg(DISTINCT CASE WHEN u.uf = 'DF' AND f.posto_snapshot !~* '[/ -]DF\s*$' THEN NULLIF(trim(f.posto_snapshot), '') END, ' | ')
+         FILTER (WHERE u.uf = 'DF') AS postos_sem_estado_no_nome
+FROM uf_ficha u JOIN sel_fichas f ON f.id = u.id GROUP BY u.uf ORDER BY u.uf;
+
+\echo ''
+\echo '=== As 400 que JÁ estão na produção (todas marcadas DF), pelo posto seriam ==='
+SELECT COALESCE(substring(upper(trim(posto_snapshot)) FROM '[/ -](DF|GO|MT|SP)$'), 'DF (sem estado no posto)') AS uf_pelo_posto,
+       count(*) AS fichas
+FROM public.fichas_epi WHERE id NOT IN (SELECT id FROM sel_fichas) GROUP BY 1 ORDER BY 1;
 
 SELECT 'Fichas de teste deixadas de fora:' AS aviso, nome_funcionario, created_at::date
 FROM d_fichas WHERE nome_funcionario ~* '^\s*teste\M' ORDER BY created_at;

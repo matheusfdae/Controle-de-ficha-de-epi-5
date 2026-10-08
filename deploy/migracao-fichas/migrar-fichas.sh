@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Copia as fichas do Supabase Cloud antigo ("dev") para o banco da produção.
-#   ./migrar-fichas.sh ensaio    -> mostra o que seria copiado e desfaz tudo
-#   ./migrar-fichas.sh aplicar   -> backup da produção + cópia de verdade
+#   ./migrar-fichas.sh ensaio  [backup.json]  -> mostra o que seria copiado e desfaz tudo
+#   ./migrar-fichas.sh aplicar [backup.json]  -> backup da produção + cópia de verdade
+# Com backup.json (exportação do app do Lovable: {"tabelas": {"fichas_epi": [...], ...}})
+# os dados vêm do arquivo; sem ele, da API REST do Cloud.
 #
 # A VM não sai pela porta 5432 (firewall), então os dados vêm pela API REST
 # do Cloud (HTTPS/443) com a chave secreta do projeto (Supabase -> Project
@@ -30,11 +32,25 @@ limpar() {
 }
 trap limpar EXIT
 
+ARQUIVO="${2:-}"
+mkdir -p "$DADOS"
+if [ -n "$ARQUIVO" ]; then
+echo ">>> Lendo $ARQUIVO ..."
+ARQUIVO="$ARQUIVO" DADOS="$DADOS" python3 - <<'PY'
+import json, os
+d = json.load(open(os.environ['ARQUIVO'], encoding='utf-8'))['tabelas']
+for tabela in ['profiles', 'fichas_epi', 'fichas_epi_itens', 'epis', 'funcoes']:
+    linhas = d.get(tabela, [])
+    with open(f"{os.environ['DADOS']}/{tabela}.ndjson", 'w', encoding='utf-8') as f:
+        for linha in linhas:
+            f.write(json.dumps(linha, ensure_ascii=False, separators=(',', ':')) + '\n')
+    print(f'    {tabela}: {len(linhas)} linhas')
+PY
+else
 read -r -s -p "Cole a chave secreta (service_role) do projeto Cloud e aperte Enter (NÃO aparece na tela): " SB_KEY; echo
 [ -n "$SB_KEY" ] || { echo "Chave vazia."; exit 1; }
 
 echo ">>> Baixando do Cloud..."
-mkdir -p "$DADOS"
 SB_KEY="$SB_KEY" CLOUD_URL="$CLOUD_URL" DADOS="$DADOS" python3 - <<'PY'
 import json, os, sys, urllib.request, urllib.error
 key, base, dest = os.environ['SB_KEY'], os.environ['CLOUD_URL'] + '/rest/v1/', os.environ['DADOS']
@@ -59,6 +75,7 @@ for tabela in ['profiles', 'fichas_epi', 'fichas_epi_itens', 'epis', 'funcoes']:
     print(f'    {tabela}: {len(linhas)} linhas')
 PY
 unset SB_KEY
+fi
 
 docker exec "$DB_CONTAINER" mkdir -p "$DADOS_CT"
 docker cp "$DADOS/." "$DB_CONTAINER:$DADOS_CT/"
