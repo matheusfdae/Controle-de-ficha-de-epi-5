@@ -54,6 +54,7 @@ export async function upsertEpi(epi: Partial<EPI>): Promise<EPI> {
     ca_numero: epi.ca_numero,
     estoque_minimo: epi.estoque_minimo ?? 5,
   };
+  if (epi.tipo) payload.tipo = epi.tipo;
   if (epi.id) payload.id = epi.id;
   const { data, error } = await supabase.from('epis').upsert(payload).select().single();
   if (error) throw error;
@@ -90,7 +91,7 @@ export async function deleteTamanho(id: string) {
 }
 
 /** Zera o estoque de todos os tamanhos do EPI e registra movimentação. */
-export async function resetarEstoqueEpi(epiId: string) {
+export async function resetarEstoqueEpi(epiId: string, tipo: ItemTipo = 'epi') {
   const { data: tams } = await supabase.from('epi_tamanhos').select('*').eq('epi_id', epiId);
   const total = (tams || []).reduce((s: number, t: any) => s + (t.estoque || 0), 0);
   if (tams && tams.length) {
@@ -99,18 +100,18 @@ export async function resetarEstoqueEpi(epiId: string) {
   await supabase.from('epis').update({ estoque_atual: 0 }).eq('id', epiId);
   if (total > 0) {
     await supabase.from('movimentacoes_estoque').insert({
-      tipo_item: 'epi', item_id: epiId, tipo_mov: 'saida', quantidade: total, motivo: 'Reset de estoque',
+      tipo_item: tipo, item_id: epiId, tipo_mov: 'saida', quantidade: total, motivo: 'Reset de estoque',
     });
   }
 }
 
 /** Ajusta o estoque de um tamanho específico e registra movimentação. */
-export async function ajustarEstoqueTamanho(t: EPITamanho, novoEstoque: number) {
+export async function ajustarEstoqueTamanho(t: EPITamanho, novoEstoque: number, tipo: ItemTipo = 'epi') {
   const delta = novoEstoque - (t.estoque || 0);
   await supabase.from('epi_tamanhos').update({ estoque: novoEstoque }).eq('id', t.id);
   if (delta !== 0) {
     await supabase.from('movimentacoes_estoque').insert({
-      tipo_item: 'epi', item_id: t.epi_id, tipo_mov: delta > 0 ? 'entrada' : 'saida',
+      tipo_item: tipo, item_id: t.epi_id, tipo_mov: delta > 0 ? 'entrada' : 'saida',
       quantidade: Math.abs(delta), motivo: `Ajuste manual (${t.tamanho})`,
     });
   }

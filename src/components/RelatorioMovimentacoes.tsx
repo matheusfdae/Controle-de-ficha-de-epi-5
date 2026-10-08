@@ -61,14 +61,16 @@ export default function RelatorioMovimentacoes() {
       // resolver nomes
       const epiIds = Array.from(new Set(list.filter(m => m.tipo_item === 'epi').map(m => m.item_id)));
       const uniIds = Array.from(new Set(list.filter(m => m.tipo_item === 'uniforme').map(m => m.item_id)));
+      // Uniforme hoje é epis.tipo = 'uniforme'; a tabela uniformes é só de lançamentos antigos.
+      const todosIds = Array.from(new Set([...epiIds, ...uniIds]));
       const [{ data: epis }, { data: unis }] = await Promise.all([
-        epiIds.length ? supabase.from('epis').select('id,nome,codigo').in('id', epiIds) : Promise.resolve({ data: [] as any[] }),
+        todosIds.length ? supabase.from('epis').select('id,nome,codigo').in('id', todosIds) : Promise.resolve({ data: [] as any[] }),
         uniIds.length ? supabase.from('uniformes').select('id,nome,codigo').in('id', uniIds) : Promise.resolve({ data: [] as any[] }),
       ]);
       const mapE = new Map((epis || []).map((x: any) => [x.id, x]));
       const mapU = new Map((unis || []).map((x: any) => [x.id, x]));
       list.forEach(m => {
-        const ref = m.tipo_item === 'epi' ? mapE.get(m.item_id) : mapU.get(m.item_id);
+        const ref = mapE.get(m.item_id) ?? mapU.get(m.item_id);
         m.item_nome = ref?.nome || '—';
         m.item_codigo = ref?.codigo || null;
       });

@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Package, Save, RotateCcw, PackagePlus } from 'lucide-react';
+import { Plus, Trash2, Package, Shirt, Save, RotateCcw, PackagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  EPI, EPITamanho, listEpis, upsertEpi, deleteEpi,
+  EPI, EPITamanho, ItemTipo, listEpis, upsertEpi, deleteEpi,
   listTamanhos, upsertTamanho, deleteTamanho,
   resetarEstoqueEpi, ajustarEstoqueTamanho,
 } from '@/services/estoqueService';
@@ -15,9 +15,11 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import EstoqueChart from '@/components/EstoqueChart';
-import EstoqueUniformePanel from '@/components/EstoqueUniformePanel';
 import FornecedoresPanel from '@/components/FornecedoresPanel';
 import RelatorioMovimentacoes from '@/components/RelatorioMovimentacoes';
 import BackButton from '@/components/BackButton';
@@ -27,7 +29,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useConfirm } from '@/hooks/use-confirm';
 
-function EpiPanel() {
+// EPIs e uniformes são a mesma tabela (epis.tipo), a mesma que as fichas usam.
+const ROTULO: Record<ItemTipo, { item: string; Icone: typeof Package }> = {
+  epi: { item: 'EPI', Icone: Package },
+  uniforme: { item: 'Uniforme', Icone: Shirt },
+};
+
+function ItemPanel({ tipo }: { tipo: ItemTipo }) {
+  const r = ROTULO[tipo];
   const [epis, setEpis] = useState<EPI[]>([]);
   const [search, setSearch] = useState('');
   const [openNovo, setOpenNovo] = useState(false);
@@ -41,12 +50,12 @@ function EpiPanel() {
   const { confirm, ConfirmDialog } = useConfirm();
 
   const load = async () => {
-    try { setEpis(await listEpis()); } catch (e: any) { toast.error(e.message); }
+    try { setEpis(await listEpis(tipo)); } catch (e: any) { toast.error(e.message); }
   };
 
   useEffect(() => {
     load();
-    const channel = supabase.channel('estoque-changes')
+    const channel = supabase.channel(`estoque-changes-${tipo}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'epis' }, () => load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'epi_tamanhos' }, (payload: any) => {
         load();
@@ -73,10 +82,10 @@ function EpiPanel() {
   const handleCreate = async () => {
     if (!novoNome.trim()) return toast.error('Informe o nome');
     try {
-      await upsertEpi({ nome: novoNome, codigo: novoCodigo || null, ca_numero: novoCa || null, categoria: 'protecao_cabeca' as any });
+      await upsertEpi({ nome: novoNome, codigo: novoCodigo || null, ca_numero: novoCa || null, categoria: 'protecao_cabeca', tipo });
       setOpenNovo(false); setNovoNome(''); setNovoCodigo(''); setNovoCa('');
       load();
-      toast.success('EPI cadastrado');
+      toast.success(`${r.item} cadastrado`);
     } catch (e: any) { toast.error(e.message); }
   };
 
@@ -91,14 +100,14 @@ function EpiPanel() {
   };
 
   const handleUpdateTam = async (t: EPITamanho, estoque: number) => {
-    try { await ajustarEstoqueTamanho(t, estoque); await loadTamanhos(t.epi_id); load(); }
+    try { await ajustarEstoqueTamanho(t, estoque, tipo); await loadTamanhos(t.epi_id); load(); }
     catch (e: any) { toast.error(e.message); }
   };
 
   const handleReset = async (epiId: string) => {
-    if (!(await confirm('Zerar o estoque deste EPI (todos os tamanhos)? Será registrada uma saída.'))) return;
+    if (!(await confirm(`Zerar o estoque deste ${r.item} (todos os tamanhos)? Será registrada uma saída.`))) return;
     try {
-      await resetarEstoqueEpi(epiId);
+      await resetarEstoqueEpi(epiId, tipo);
       toast.success('Estoque resetado'); load();
       if (editing?.id === epiId) loadTamanhos(epiId);
     } catch (e: any) { toast.error(e.message); }
@@ -107,11 +116,11 @@ function EpiPanel() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Input placeholder="Buscar EPI..." value={search} onChange={e => setSearch(e.target.value)} className="max-w-sm" />
+        <Input placeholder={`Buscar ${r.item.toLowerCase()}...`} value={search} onChange={e => setSearch(e.target.value)} className="max-w-sm" />
         <Dialog open={openNovo} onOpenChange={setOpenNovo}>
-          <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-1" /> Cadastrar EPI</Button></DialogTrigger>
+          <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-1" /> Cadastrar {r.item}</Button></DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Novo EPI</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Novo {r.item}</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <div><Label htmlFor="epi-nome">Nome *</Label><Input id="epi-nome" value={novoNome} onChange={e => setNovoNome(e.target.value)} /></div>
               <div className="grid grid-cols-2 gap-3">
@@ -124,39 +133,52 @@ function EpiPanel() {
         </Dialog>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {filtered.map(epi => {
-          const st = status(epi);
-          return (
-            <Card key={epi.id} className="hover:border-primary/50 transition-colors">
-              <CardContent className="p-5">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="cursor-pointer flex-1" onClick={() => { setEditing(epi); loadTamanhos(epi.id); }}>
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{epi.codigo || '—'}</p>
-                    <h3 className="font-bold text-lg leading-tight">{epi.nome}</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">CA {epi.ca_numero || '—'}</p>
-                  </div>
-                  <Badge variant={st.tone === 'destructive' ? 'destructive' : 'secondary'}>{st.label}</Badge>
-                </div>
-                <div className="flex justify-between items-end gap-3">
-                  <Button variant="outline" size="sm" onClick={() => handleReset(epi.id)}>
-                    <RotateCcw className="h-3 w-3 mr-1" /> Reset
-                  </Button>
-                  <div className="text-right">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Estoque total</p>
-                    <p className="text-3xl font-bold">{epi.estoque_atual}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-        {filtered.length === 0 && (
-          <p className="text-center text-muted-foreground py-12 col-span-full">
-            <Package className="h-10 w-10 mx-auto mb-2 opacity-40" /> Nenhum EPI cadastrado.
-          </p>
-        )}
-      </div>
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{r.item}</TableHead>
+                <TableHead className="hidden sm:table-cell">Código</TableHead>
+                <TableHead className="hidden sm:table-cell">CA</TableHead>
+                <TableHead className="text-right">Estoque</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="w-0" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map(epi => {
+                const st = status(epi);
+                return (
+                  <TableRow key={epi.id} className="cursor-pointer"
+                    onClick={() => { setEditing(epi); loadTamanhos(epi.id); }}>
+                    <TableCell className="font-medium">{epi.nome}</TableCell>
+                    <TableCell className="hidden sm:table-cell text-muted-foreground">{epi.codigo || '—'}</TableCell>
+                    <TableCell className="hidden sm:table-cell text-muted-foreground">{epi.ca_numero || '—'}</TableCell>
+                    <TableCell className="text-right font-bold tabular-nums">{epi.estoque_atual}</TableCell>
+                    <TableCell>
+                      <Badge variant={st.tone === 'destructive' ? 'destructive' : 'secondary'}>{st.label}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="outline" size="sm"
+                        onClick={(ev) => { ev.stopPropagation(); handleReset(epi.id); }}>
+                        <RotateCcw className="h-3 w-3 mr-1" /> Reset
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-12">
+                    <r.Icone className="h-10 w-10 mx-auto mb-2 opacity-40" /> Nenhum {r.item} cadastrado.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent className="max-w-lg">
@@ -184,9 +206,9 @@ function EpiPanel() {
           <DialogFooter className="flex justify-between">
             <Button variant="destructive" onClick={async () => {
               if (!editing) return;
-              if (!(await confirm('Excluir este EPI?'))) return;
+              if (!(await confirm(`Excluir este ${r.item}?`))) return;
               await deleteEpi(editing.id); setEditing(null); load();
-            }}>Excluir EPI</Button>
+            }}>Excluir {r.item}</Button>
             <Button variant="outline" onClick={() => editing && handleReset(editing.id)}>
               <RotateCcw className="h-4 w-4 mr-1" /> Resetar estoque
             </Button>
@@ -221,8 +243,8 @@ export default function Estoque() {
             <TabsTrigger value="fornecedores">Fornecedores</TabsTrigger>
             <TabsTrigger value="relatorio">Relatório</TabsTrigger>
           </TabsList>
-          <TabsContent value="epis" className="mt-6"><EpiPanel /></TabsContent>
-          <TabsContent value="uniformes" className="mt-6"><EstoqueUniformePanel /></TabsContent>
+          <TabsContent value="epis" className="mt-6"><ItemPanel tipo="epi" /></TabsContent>
+          <TabsContent value="uniformes" className="mt-6"><ItemPanel tipo="uniforme" /></TabsContent>
           <TabsContent value="fornecedores" className="mt-6"><FornecedoresPanel /></TabsContent>
           <TabsContent value="relatorio" className="mt-6"><RelatorioMovimentacoes /></TabsContent>
         </Tabs>
