@@ -43,11 +43,43 @@ export async function registrarEntrada(cabecalho: EntradaCabecalho, itens: Entra
   return data as string;
 }
 
-export async function chaveJaLancada(chave: string): Promise<boolean> {
-  const { count, error } = await supabase
-    .from('entradas_estoque').select('id', { count: 'exact', head: true }).eq('chave_acesso', chave);
+export interface NotaLancada {
+  id: string;
+  numero_nf: string | null;
+  fornecedor_nome: string | null;
+  data_entrada: string;
+}
+
+/** "000123" e "123" são a mesma NF (e a mesma série); texto livre fica como está. */
+export function normalizarNumeroNf(valor: string | null | undefined): string {
+  const v = (valor ?? '').trim();
+  return /^\d+$/.test(v) ? String(Number(v)) : v;
+}
+
+/**
+ * Entrada já registrada para esta nota: pela chave de acesso quando houver;
+ * sem chave (nota digitada, PDF escaneado), por CNPJ do emitente + número + série.
+ */
+export async function buscarNotaLancada(
+  cab: Pick<EntradaCabecalho, 'chave_acesso' | 'fornecedor_cnpj' | 'numero_nf' | 'serie'>,
+): Promise<NotaLancada | null> {
+  const chave = (cab.chave_acesso ?? '').replace(/\D/g, '');
+  const cnpj = cab.fornecedor_cnpj.replace(/\D/g, '');
+  const numero = normalizarNumeroNf(cab.numero_nf);
+  let query = supabase.from('entradas_estoque').select('id, numero_nf, fornecedor_nome, data_entrada');
+  if (chave.length === 44) {
+    query = query.eq('chave_acesso', chave);
+  } else if (cnpj.length === 14 && numero) {
+    query = query.eq('fornecedor_cnpj', cnpj).eq('numero_nf', numero);
+    const serie = normalizarNumeroNf(cab.serie);
+    // Lançamento antigo sem série também conta: na dúvida, avisa.
+    if (/^\d+$/.test(serie)) query = query.or(`serie.is.null,serie.eq.${serie}`);
+  } else {
+    return null;
+  }
+  const { data, error } = await query.limit(1).maybeSingle();
   if (error) throw error;
-  return (count ?? 0) > 0;
+  return data;
 }
 
 export async function listCodigosFornecedor(cnpj: string): Promise<CodigoFornecedor[]> {

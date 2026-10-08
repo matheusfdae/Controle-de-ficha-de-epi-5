@@ -9,15 +9,15 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from '@/components/ui/command';
-import { Check, ChevronsUpDown, FileUp, Loader2, PackagePlus, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, Check, ChevronsUpDown, FileUp, Loader2, PackagePlus, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import BackButton from '@/components/BackButton';
 import PageHeader from '@/components/PageHeader';
 import { EPI, listEpis } from '@/services/estoqueService';
 import {
-  EntradaCabecalho, EntradaResumo, registrarEntrada, chaveJaLancada,
-  listCodigosFornecedor, mapaTamanhos, listUltimasEntradas,
+  EntradaCabecalho, EntradaResumo, NotaLancada, registrarEntrada, buscarNotaLancada,
+  normalizarNumeroNf, listCodigosFornecedor, mapaTamanhos, listUltimasEntradas,
 } from '@/services/entradaEstoqueService';
 import { parseNFeXml, sugerirEpi, casarTamanho, OrigemSugestao, NFe } from '@/lib/nfe';
 import { parseDanfe, lerTextoPdf } from '@/lib/danfe';
@@ -98,6 +98,23 @@ export default function EntradaEstoque() {
   const [salvando, setSalvando] = useState(false);
   const [lendo, setLendo] = useState(false);
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
+  const [duplicada, setDuplicada] = useState<NotaLancada | null>(null);
+  const topoRef = useRef<HTMLDivElement>(null);
+
+  // Rechecado a cada mudança da chave, CNPJ, número ou série (importada ou digitada).
+  useEffect(() => {
+    let cancelado = false;
+    const t = setTimeout(() => {
+      buscarNotaLancada(cab)
+        .then(nota => { if (!cancelado) setDuplicada(nota); })
+        .catch(() => { if (!cancelado) setDuplicada(null); });
+    }, 400);
+    return () => { cancelado = true; clearTimeout(t); };
+  }, [cab.chave_acesso, cab.fornecedor_cnpj, cab.numero_nf, cab.serie]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (duplicada) topoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [duplicada]);
 
   const carregar = () => {
     listEpis().then(setEpis).catch(e => toast.error(e.message));
@@ -131,10 +148,8 @@ export default function EntradaEstoque() {
         nfe = parseNFeXml(await file.text());
       }
       const fornecedor = fornecedores.find(f => f.cnpj && f.cnpj === soDigitos(nfe.fornecedor.cnpj));
-      if (nfe.chave && await chaveJaLancada(nfe.chave)) {
-        toast.error(`A NF ${nfe.numero ?? ''} já foi lançada no estoque.`);
-        return;
-      }
+      // Nota duplicada é carregada mesmo assim (para conferir), com o aviso
+      // vermelho no topo e o botão de salvar bloqueado.
       const memoria = nfe.fornecedor.cnpj ? await listCodigosFornecedor(nfe.fornecedor.cnpj) : [];
       setCab({
         numero_nf: nfe.numero ?? '', serie: nfe.serie ?? '', chave_acesso: nfe.chave,
@@ -185,13 +200,19 @@ export default function EntradaEstoque() {
   const totalUnidades = linhas.reduce((s, l) => s + (Number(l.quantidade.replace(',', '.')) || 0), 0);
 
   async function salvar() {
+    if (duplicada) {
+      toast.error('Esta nota já foi lançada no estoque.');
+      return;
+    }
     if (problemas.some(Boolean)) {
       toast.error('Corrija os itens destacados antes de salvar.');
       return;
     }
     setSalvando(true);
     try {
-      await registrarEntrada(cab, linhas.map(l => ({
+      await registrarEntrada({
+        ...cab, numero_nf: normalizarNumeroNf(cab.numero_nf), serie: normalizarNumeroNf(cab.serie),
+      }, linhas.map(l => ({
         epi_id: l.epiId,
         tamanho: l.tamanho.trim() || null,
         quantidade: Number(l.quantidade.replace(',', '.')),
@@ -212,7 +233,21 @@ export default function EntradaEstoque() {
 
   return (
     <div className="p-4 lg:p-8 pb-20">
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div ref={topoRef} className="max-w-5xl mx-auto space-y-6 scroll-mt-4">
+        {duplicada && (
+          <div role="alert"
+            className="flex items-start gap-3 rounded-lg border-2 border-destructive bg-destructive/10 p-4 text-destructive">
+            <AlertTriangle className="h-6 w-6 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-lg font-bold">NOTA DUPLICADA</p>
+              <p className="text-sm font-medium">
+                {duplicada.numero_nf ? `A NF ${duplicada.numero_nf}` : 'Esta nota'}
+                {duplicada.fornecedor_nome ? ` de ${duplicada.fornecedor_nome}` : ''} já foi lançada no estoque
+                em {new Date(duplicada.data_entrada).toLocaleDateString('pt-BR')}. Ela não pode ser lançada de novo.
+              </p>
+            </div>
+          </div>
+        )}
         <BackButton />
         <PageHeader eyebrow="Estoque" title="Registrar entrada"
           description="Lance a nota inteira de uma vez: importe o XML da NF-e ou digite os itens do DANFE. As quantidades são SOMADAS ao estoque."
@@ -318,7 +353,7 @@ export default function EntradaEstoque() {
           <p className="text-sm text-muted-foreground">
             Total: <span className="font-semibold text-foreground">{totalUnidades}</span> unidades em {linhas.length} itens
           </p>
-          <Button size="lg" onClick={salvar} disabled={salvando}>
+          <Button size="lg" onClick={salvar} disabled={salvando || !!duplicada}>
             {salvando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <PackagePlus className="h-4 w-4 mr-2" />}
             Dar entrada no estoque
           </Button>
