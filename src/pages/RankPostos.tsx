@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Trophy, MapPin, ChevronLeft, Eye, Search } from 'lucide-react';
+import { MapPin, ChevronLeft, Eye, Search } from 'lucide-react';
 import { EPIFicha } from '@/types/epi';
 import { getFichas } from '@/services/fichaService';
 import BackButton from '@/components/BackButton';
@@ -38,8 +41,7 @@ export default function RankPostos() {
   const filtrado = ranking.filter(r => r.posto.toLowerCase().includes(busca.toLowerCase()));
   const detalhes = selecionado ? ranking.find(r => r.posto === selecionado) : null;
 
-  const medalha = (i: number) =>
-    i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
+  const soma = (campo: 'total' | 'assinadas' | 'pendentes') => filtrado.reduce((s, r) => s + r[campo], 0);
 
   return (
     <div className="p-4 lg:p-8 pb-20">
@@ -51,10 +53,10 @@ export default function RankPostos() {
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                  <Trophy className="h-6 w-6 text-primary" /> Ranking por Posto
+                  <MapPin className="h-6 w-6 text-primary" /> Fichas por Posto
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Postos de trabalho ordenados pelo número de fichas emitidas. Clique em um posto para ver as fichas.
+                  Quantidade de fichas de cada posto. Clique em um posto para ver as fichas.
                 </p>
               </div>
               <div className="relative w-full sm:w-64">
@@ -73,40 +75,43 @@ export default function RankPostos() {
                 Nenhum posto encontrado.
               </CardContent></Card>
             ) : (
-              <div className="grid gap-3">
-                {filtrado.map((r, i) => (
-                  <Card
-                    key={r.posto}
-                    className="hover:border-primary/60 hover:shadow-md transition cursor-pointer"
-                    onClick={() => setSelecionado(r.posto)}
-                  >
-                    <CardContent className="p-4 flex items-center gap-4">
-                      <div className="text-2xl font-bold w-12 text-center">{medalha(i)}</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 font-semibold text-foreground truncate">
-                          <MapPin className="h-4 w-4 text-primary shrink-0" />
-                          {r.posto}
-                        </div>
-                        <div className="flex gap-2 flex-wrap mt-1">
-                          <Badge variant="secondary">{r.colaboradores} colaborador(es)</Badge>
-                          <Badge variant="outline" className="text-green-700 border-green-700/50">
-                            {r.assinadas} assinada(s)
-                          </Badge>
-                          {r.pendentes > 0 && (
-                            <Badge variant="outline" className="text-amber-700 border-amber-700/50">
-                              {r.pendentes} pendente(s)
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-3xl font-bold text-primary">{r.total}</div>
-                        <div className="text-[10px] uppercase text-muted-foreground">fichas</div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+              <Card>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Posto</TableHead>
+                        <TableHead className="text-right">Fichas</TableHead>
+                        <TableHead className="text-right hidden sm:table-cell">Assinadas</TableHead>
+                        <TableHead className="text-right hidden sm:table-cell">Pendentes</TableHead>
+                        <TableHead className="text-right hidden md:table-cell">Colaboradores</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filtrado.map(r => (
+                        <TableRow key={r.posto} className="cursor-pointer" onClick={() => setSelecionado(r.posto)}>
+                          <TableCell className="font-medium">{r.posto}</TableCell>
+                          <TableCell className="text-right font-bold tabular-nums">{r.total}</TableCell>
+                          <TableCell className="text-right tabular-nums hidden sm:table-cell">{r.assinadas}</TableCell>
+                          <TableCell className="text-right tabular-nums hidden sm:table-cell">
+                            {r.pendentes > 0 ? <span className="text-amber-700 dark:text-amber-400">{r.pendentes}</span> : 0}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums hidden md:table-cell">{r.colaboradores}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                    <TableFooter>
+                      <TableRow>
+                        <TableCell>Total ({filtrado.length} postos)</TableCell>
+                        <TableCell className="text-right tabular-nums">{soma('total')}</TableCell>
+                        <TableCell className="text-right tabular-nums hidden sm:table-cell">{soma('assinadas')}</TableCell>
+                        <TableCell className="text-right tabular-nums hidden sm:table-cell">{soma('pendentes')}</TableCell>
+                        <TableCell className="hidden md:table-cell" />
+                      </TableRow>
+                    </TableFooter>
+                  </Table>
+                </CardContent>
+              </Card>
             )}
           </>
         )}
@@ -114,7 +119,7 @@ export default function RankPostos() {
         {detalhes && (
           <>
             <Button variant="ghost" size="sm" onClick={() => setSelecionado(null)}>
-              <ChevronLeft className="h-4 w-4 mr-1" /> Voltar ao ranking
+              <ChevronLeft className="h-4 w-4 mr-1" /> Voltar à lista de postos
             </Button>
             <Card>
               <CardHeader>

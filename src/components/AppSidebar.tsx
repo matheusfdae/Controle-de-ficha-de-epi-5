@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, FilePlus2, Search, CalendarClock, Settings, ShieldCheck, LogOut, Users, Package, Briefcase, UserPlus, ClipboardSignature, HardHat, Shirt, FileSignature, Trophy, FileStack,
+  LayoutDashboard, FilePlus2, Search, CalendarClock, Settings, ShieldCheck, LogOut, Users, Package, Briefcase, UserPlus, ClipboardSignature, HardHat, Shirt, FileSignature, MapPin, FileStack,
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -16,7 +16,7 @@ const baseItems: Array<{ title: string; url: string; icon: typeof LayoutDashboar
   { title: 'Dashboard', url: '/', icon: LayoutDashboard, end: true, module: 'dashboard' },
   { title: 'Assinar (Tablet)', url: '/pendentes', icon: ClipboardSignature, end: false, module: 'assinar_tablet' },
   { title: 'Vencimentos', url: '/vencimentos', icon: CalendarClock, end: false, module: 'vencimentos' },
-  { title: 'Rank por Posto', url: '/rank-postos', icon: Trophy, end: false, module: 'rank' },
+  { title: 'Fichas por Posto', url: '/rank-postos', icon: MapPin, end: false, module: 'rank' },
 ];
 
 const epiItems: Array<{ title: string; url: string; icon: typeof FilePlus2; end: boolean; module?: ModuleId; action?: ActionId }> = [
