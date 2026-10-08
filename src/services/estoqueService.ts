@@ -20,6 +20,7 @@ export interface EPITamanho {
   tamanho: string;
   estoque: number;
   estoque_minimo: number;
+  uf: string;
 }
 
 export interface Funcao {
@@ -66,23 +67,25 @@ export async function deleteEpi(id: string) {
   if (error) throw error;
 }
 
-// Tamanhos / estoque
-export async function listTamanhos(epiId: string): Promise<EPITamanho[]> {
+// Tamanhos / estoque — sempre de um estado (UF). Item sem tamanho usa 'ÚNICO'.
+export const TAMANHO_UNICO = 'ÚNICO';
+
+export async function listTamanhos(epiId: string, uf: string): Promise<EPITamanho[]> {
   const { data, error } = await supabase
-    .from('epi_tamanhos').select('*').eq('epi_id', epiId).order('tamanho');
+    .from('epi_tamanhos').select('*').eq('epi_id', epiId).eq('uf', uf).order('tamanho');
   if (error) throw error;
   return (data || []) as EPITamanho[];
 }
 
-export async function upsertTamanho(t: Partial<EPITamanho> & { epi_id: string; tamanho: string }) {
-  const { error } = await supabase.from('epi_tamanhos').upsert({
-    id: t.id,
-    epi_id: t.epi_id,
-    tamanho: t.tamanho,
-    estoque: t.estoque ?? 0,
-    estoque_minimo: t.estoque_minimo ?? 0,
-  }, { onConflict: 'epi_id,tamanho' });
+/** Saldo por item no estado (ou em todos os estados que o usuário vê, com uf = null). */
+export async function totaisPorItem(uf: string | null): Promise<Record<string, number>> {
+  let q = supabase.from('epi_tamanhos').select('epi_id, estoque');
+  if (uf) q = q.eq('uf', uf);
+  const { data, error } = await q;
   if (error) throw error;
+  const totais: Record<string, number> = {};
+  for (const t of data ?? []) totais[t.epi_id] = (totais[t.epi_id] ?? 0) + t.estoque;
+  return totais;
 }
 
 export async function deleteTamanho(id: string) {
@@ -90,31 +93,28 @@ export async function deleteTamanho(id: string) {
   if (error) throw error;
 }
 
-/** Zera o estoque de todos os tamanhos do EPI e registra movimentação. */
-export async function resetarEstoqueEpi(epiId: string, tipo: ItemTipo = 'epi') {
-  const { data: tams } = await supabase.from('epi_tamanhos').select('*').eq('epi_id', epiId);
-  const total = (tams || []).reduce((s: number, t: any) => s + (t.estoque || 0), 0);
-  if (tams && tams.length) {
-    await supabase.from('epi_tamanhos').update({ estoque: 0 }).eq('epi_id', epiId);
-  }
-  await supabase.from('epis').update({ estoque_atual: 0 }).eq('id', epiId);
-  if (total > 0) {
-    await supabase.from('movimentacoes_estoque').insert({
-      tipo_item: tipo, item_id: epiId, tipo_mov: 'saida', quantidade: total, motivo: 'Reset de estoque',
-    });
-  }
+/** Define o saldo de um tamanho no estado (cria o tamanho se não existir) e registra a movimentação. */
+export async function ajustarEstoque(epiId: string, uf: string, tamanho: string, novoEstoque: number, motivo?: string) {
+  const { error } = await supabase.rpc('ajustar_estoque', {
+    _epi_id: epiId, _uf: uf, _tamanho: tamanho, _novo: novoEstoque, _motivo: motivo,
+  });
+  if (error) throw new Error(error.message);
 }
 
-/** Ajusta o estoque de um tamanho específico e registra movimentação. */
-export async function ajustarEstoqueTamanho(t: EPITamanho, novoEstoque: number, tipo: ItemTipo = 'epi') {
-  const delta = novoEstoque - (t.estoque || 0);
-  await supabase.from('epi_tamanhos').update({ estoque: novoEstoque }).eq('id', t.id);
-  if (delta !== 0) {
-    await supabase.from('movimentacoes_estoque').insert({
-      tipo_item: tipo, item_id: t.epi_id, tipo_mov: delta > 0 ? 'entrada' : 'saida',
-      quantidade: Math.abs(delta), motivo: `Ajuste manual (${t.tamanho})`,
-    });
-  }
+/** Zera o estoque do item (todos os tamanhos) no estado e registra a saída. */
+export async function resetarEstoqueEpi(epiId: string, uf: string) {
+  const { error } = await supabase.rpc('resetar_estoque', { _epi_id: epiId, _uf: uf });
+  if (error) throw new Error(error.message);
+}
+
+export async function transferirEstoque(t: {
+  epiId: string; tamanho: string; ufOrigem: string; ufDestino: string; quantidade: number; observacao?: string;
+}) {
+  const { error } = await supabase.rpc('transferir_estoque', {
+    _epi_id: t.epiId, _tamanho: t.tamanho, _uf_origem: t.ufOrigem, _uf_destino: t.ufDestino,
+    _quantidade: t.quantidade, _observacao: t.observacao || undefined,
+  });
+  if (error) throw new Error(error.message);
 }
 
 // Funções
@@ -167,7 +167,7 @@ export interface MovimentacaoDia {
   saidas: number;
 }
 
-export async function listMovimentacoes(diasAtras: number): Promise<MovimentacaoDia[]> {
+export async function listMovimentacoes(diasAtras: number, uf: string | null = null): Promise<MovimentacaoDia[]> {
   const desde = new Date();
   desde.setDate(desde.getDate() - diasAtras);
   desde.setHours(0, 0, 0, 0);
@@ -176,6 +176,7 @@ export async function listMovimentacoes(diasAtras: number): Promise<Movimentacao
     .from('movimentacoes_estoque')
     .select('tipo_mov, quantidade, data_mov')
     .gte('data_mov', desde.toISOString())
+    .match(uf ? { uf } : {})
     .order('data_mov', { ascending: true });
   if (error) { console.error(error); return []; }
 

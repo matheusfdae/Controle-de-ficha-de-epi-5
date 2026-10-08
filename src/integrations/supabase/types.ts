@@ -208,6 +208,18 @@ export type Database = {
           },
         ]
       }
+      estados: {
+        Row: { nome: string; uf: string }
+        Insert: { nome: string; uf: string }
+        Update: { nome?: string; uf?: string }
+        Relationships: []
+      }
+      user_estados: {
+        Row: { uf: string; user_id: string }
+        Insert: { uf: string; user_id: string }
+        Update: { uf?: string; user_id?: string }
+        Relationships: []
+      }
       entradas_estoque: {
         Row: {
           chave_acesso: string | null
@@ -223,6 +235,7 @@ export type Database = {
           observacao: string | null
           origem: string
           serie: string | null
+          uf: string
         }
         Insert: {
           chave_acesso?: string | null
@@ -238,6 +251,7 @@ export type Database = {
           observacao?: string | null
           origem?: string
           serie?: string | null
+          uf: string
         }
         Update: {
           chave_acesso?: string | null
@@ -253,6 +267,7 @@ export type Database = {
           observacao?: string | null
           origem?: string
           serie?: string | null
+          uf?: string
         }
         Relationships: [
           {
@@ -359,6 +374,7 @@ export type Database = {
           id: string
           tamanho: string
           updated_at: string
+          uf: string
         }
         Insert: {
           created_at?: string
@@ -368,6 +384,7 @@ export type Database = {
           id?: string
           tamanho: string
           updated_at?: string
+          uf: string
         }
         Update: {
           created_at?: string
@@ -377,6 +394,7 @@ export type Database = {
           id?: string
           tamanho?: string
           updated_at?: string
+          uf?: string
         }
         Relationships: [
           {
@@ -473,6 +491,7 @@ export type Database = {
           telefone: string | null
           turno: string | null
           updated_at: string
+          uf: string
         }
         Insert: {
           assinatura_colaborador_url?: string | null
@@ -501,6 +520,7 @@ export type Database = {
           telefone?: string | null
           turno?: string | null
           updated_at?: string
+          uf: string
         }
         Update: {
           assinatura_colaborador_url?: string | null
@@ -529,6 +549,7 @@ export type Database = {
           telefone?: string | null
           turno?: string | null
           updated_at?: string
+          uf?: string
         }
         Relationships: [
           {
@@ -918,6 +939,7 @@ export type Database = {
           responsavel_id: string | null
           tipo_item: Database["public"]["Enums"]["tipo_item"]
           tipo_mov: Database["public"]["Enums"]["tipo_mov"]
+          uf: string
         }
         Insert: {
           created_at?: string
@@ -930,6 +952,7 @@ export type Database = {
           responsavel_id?: string | null
           tipo_item: Database["public"]["Enums"]["tipo_item"]
           tipo_mov: Database["public"]["Enums"]["tipo_mov"]
+          uf: string
         }
         Update: {
           created_at?: string
@@ -942,6 +965,7 @@ export type Database = {
           responsavel_id?: string | null
           tipo_item?: Database["public"]["Enums"]["tipo_item"]
           tipo_mov?: Database["public"]["Enums"]["tipo_mov"]
+          uf?: string
         }
         Relationships: [
           {
@@ -988,6 +1012,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          clerk_user_id: string | null
           ativo: boolean
           cargo: string | null
           cpf: string | null
@@ -1007,6 +1032,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          clerk_user_id?: string | null
           ativo?: boolean
           cargo?: string | null
           cpf?: string | null
@@ -1026,6 +1052,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          clerk_user_id?: string | null
           ativo?: boolean
           cargo?: string | null
           cpf?: string | null
@@ -1452,6 +1479,19 @@ export type Database = {
         Returns: boolean
       }
       progresso_assinatura: { Args: { _ficha_id: string }; Returns: Json }
+      ajustar_estoque: {
+        Args: { _epi_id: string; _motivo?: string; _novo: number; _tamanho: string; _uf: string }
+        Returns: undefined
+      }
+      pode_acessar_uf: { Args: { _uf: string }; Returns: boolean }
+      resetar_estoque: { Args: { _epi_id: string; _uf: string }; Returns: undefined }
+      transferir_estoque: {
+        Args: {
+          _epi_id: string; _observacao?: string; _quantidade: number
+          _tamanho: string; _uf_destino: string; _uf_origem: string
+        }
+        Returns: undefined
+      }
       registrar_entrada_estoque: { Args: { _cabecalho: Json; _itens: Json }; Returns: string }
     }
     Enums: {

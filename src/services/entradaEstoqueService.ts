@@ -12,6 +12,8 @@ export interface EntradaCabecalho {
   data_emissao: string;
   origem: 'manual' | 'xml_nfe' | 'pdf_danfe';
   observacao: string;
+  /** Estado que está recebendo a nota. */
+  uf: string;
 }
 
 export interface EntradaItem {
@@ -29,6 +31,7 @@ export interface EntradaResumo {
   fornecedor_nome: string | null;
   data_entrada: string;
   origem: string;
+  uf: string;
   itens: number;
   unidades: number;
 }
@@ -103,13 +106,13 @@ export async function mapaTamanhos(): Promise<Record<string, string[]>> {
 export async function listUltimasEntradas(limite = 10): Promise<EntradaResumo[]> {
   const { data, error } = await supabase
     .from('entradas_estoque')
-    .select('id, numero_nf, fornecedor_nome, data_entrada, origem, entradas_estoque_itens(quantidade)')
+    .select('id, numero_nf, fornecedor_nome, data_entrada, origem, uf, entradas_estoque_itens(quantidade)')
     .order('data_entrada', { ascending: false })
     .limit(limite);
   if (error) throw error;
   return (data ?? []).map(e => ({
     id: e.id, numero_nf: e.numero_nf, fornecedor_nome: e.fornecedor_nome,
-    data_entrada: e.data_entrada, origem: e.origem,
+    data_entrada: e.data_entrada, origem: e.origem, uf: e.uf,
     itens: e.entradas_estoque_itens.length,
     unidades: e.entradas_estoque_itens.reduce((s, i) => s + i.quantidade, 0),
   }));

@@ -11,6 +11,7 @@ import { generatePDF } from '@/services/pdfService';
 import { useAuth } from '@/contexts/AuthContext';
 import { importFichasFromExcel, downloadTemplateExcel } from '@/services/importFichasService';
 import BackButton from '@/components/BackButton';
+import EstadoSelect, { TODOS_ESTADOS, useEstadoLembrado } from '@/components/EstadoSelect';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -23,6 +24,9 @@ export default function ConsultarFichas() {
   const [fichas, setFichas] = useState<EPIFicha[]>([]);
   const [importing, setImporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [uf, setUf] = useEstadoLembrado('consultar-fichas', true);
+  const visiveis = uf === TODOS_ESTADOS ? fichas : fichas.filter(f => f.uf === uf);
+  const ufImportacao = uf === TODOS_ESTADOS ? '' : uf;
 
   const reload = () => getFichas().then(setFichas);
 
@@ -40,7 +44,7 @@ export default function ConsultarFichas() {
     try {
       for (const file of list) {
         try {
-          const r = await importFichasFromExcel(file);
+          const r = await importFichasFromExcel(file, ufImportacao);
           totalOk += r.sucesso;
           totalErr += r.erros.length;
           if (r.erros.length) falhas.push(`${file.name}: ${r.erros.length} erro(s)`);
@@ -66,8 +70,9 @@ export default function ConsultarFichas() {
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-foreground">Consultar Fichas</h2>
-            <p className="text-sm text-muted-foreground">Todas as fichas de EPI cadastradas no sistema.</p>
+            <p className="text-sm text-muted-foreground">Fichas de EPI e uniforme dos estados que você acessa.</p>
           </div>
+          <EstadoSelect value={uf} onChange={setUf} permitirTodos className="w-48" />
           {canCreate && (
             <div className="flex gap-2 flex-wrap">
               <input
@@ -81,7 +86,9 @@ export default function ConsultarFichas() {
               <Button size="sm" variant="outline" onClick={() => downloadTemplateExcel()}>
                 <FileSpreadsheet className="h-4 w-4 mr-1" /> Modelo Excel
               </Button>
-              <Button size="sm" variant="outline" disabled={importing} onClick={() => fileRef.current?.click()}>
+              <Button size="sm" variant="outline" disabled={importing || !ufImportacao}
+                title={ufImportacao ? `As fichas importadas entram em ${ufImportacao}` : 'Escolha um estado para importar'}
+                onClick={() => fileRef.current?.click()}>
                 <Upload className="h-4 w-4 mr-1" /> {importing ? 'Importando...' : 'Importar Excel (lote)'}
               </Button>
               <Link to="/nova-ficha"><Button size="sm">Nova Ficha</Button></Link>
@@ -89,7 +96,7 @@ export default function ConsultarFichas() {
           )}
         </div>
 
-        {fichas.length === 0 ? (
+        {visiveis.length === 0 ? (
           <div className="text-center py-16 space-y-3">
             <ClipboardList className="h-12 w-12 mx-auto text-muted-foreground/40" />
             <p className="text-muted-foreground">Nenhuma ficha encontrada.</p>
@@ -97,11 +104,13 @@ export default function ConsultarFichas() {
           </div>
         ) : (
           <div className="space-y-3">
-            {fichas.map(ficha => (
+            {visiveis.map(ficha => (
               <Card key={ficha.id} className="hover:shadow-sm transition-shadow">
                 <CardContent className="flex items-center justify-between p-4 gap-4">
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-foreground truncate">{ficha.nomeFuncionario}</p>
+                    <p className="font-medium text-foreground truncate">
+                      <Badge variant="outline" className="mr-2 font-mono">{ficha.uf}</Badge>{ficha.nomeFuncionario}
+                    </p>
                     <p className="text-sm text-muted-foreground">
                       {new Date(ficha.criadoEm).toLocaleDateString('pt-BR')} · {ficha.itens.filter(i => i.recebido).length} itens
                     </p>

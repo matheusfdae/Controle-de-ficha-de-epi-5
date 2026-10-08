@@ -3,18 +3,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { ArrowDown, ArrowUp, Package } from 'lucide-react';
-import { listMovimentacoes, MovimentacaoDia, listEpis } from '@/services/estoqueService';
+import { listMovimentacoes, MovimentacaoDia, totaisPorItem } from '@/services/estoqueService';
 import { supabase } from '@/integrations/supabase/client';
 
-export default function EstoqueChart() {
+/** Movimentações e saldo de um estado. */
+export default function EstoqueChart({ uf }: { uf: string }) {
   const [dias, setDias] = useState<number>(30);
   const [data, setData] = useState<MovimentacaoDia[]>([]);
   const [estoqueTotal, setEstoqueTotal] = useState(0);
 
   const reload = async () => {
-    const [m, epis] = await Promise.all([listMovimentacoes(dias), listEpis()]);
+    const [m, totais] = await Promise.all([listMovimentacoes(dias, uf), totaisPorItem(uf)]);
     setData(m);
-    setEstoqueTotal(epis.reduce((s, e) => s + (e.estoque_atual || 0), 0));
+    setEstoqueTotal(Object.values(totais).reduce((s, n) => s + n, 0));
   };
 
   useEffect(() => {
@@ -22,11 +23,11 @@ export default function EstoqueChart() {
     const channel = supabase
       .channel('estoque-mov-chart')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'movimentacoes_estoque' }, reload)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'epis' }, reload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'epi_tamanhos' }, reload)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dias]);
+  }, [dias, uf]);
 
   const totalEntradas = data.reduce((s, d) => s + d.entradas, 0);
   const totalSaidas = data.reduce((s, d) => s + d.saidas, 0);

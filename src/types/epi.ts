@@ -34,6 +34,8 @@ export interface EPIFicha {
   cpf: string;
   matricula: string;
   posto: string;
+  /** Estado (UF) da ficha: de onde sai o estoque. Fixo depois de criada. */
+  uf: string;
   dataEntrega: string;
   itens: EPIItem[];
   assinaturaColaborador?: string;

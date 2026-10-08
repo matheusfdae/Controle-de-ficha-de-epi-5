@@ -23,6 +23,29 @@ import {
   MODULES, ROLE_PRESETS, ROLE_LABELS, ROLE_BADGE_CLASS, RolePreset,
   PermissionMap, emptyPermissions, fullAccessPermissions, permissionsToRows, rowsToPermissions,
 } from '@/lib/permissions';
+import { Estado, listEstados, listUfsDoUsuario, salvarUfsDoUsuario } from '@/services/estadosService';
+
+/** Checkboxes de estados liberados para o usuário. */
+function EstadosCheckboxes({ todos, value, onChange }: { todos: Estado[]; value: string[]; onChange: (ufs: string[]) => void }) {
+  return (
+    <div>
+      <Label>Estados que pode acessar</Label>
+      <div className="flex flex-wrap gap-4 mt-2">
+        {todos.map(e => (
+          <label key={e.uf} className="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" className="h-4 w-4" checked={value.includes(e.uf)}
+              onChange={ev => onChange(ev.target.checked ? [...value, e.uf].sort() : value.filter(u => u !== e.uf))} />
+            <span className="font-mono">{e.uf}</span>
+            <span className="text-muted-foreground">{e.nome}</span>
+          </label>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground mt-1">
+        Fichas e estoque de outros estados ficam invisíveis para ele (vale também para administrador).
+      </p>
+    </div>
+  );
+}
 
 type ManageableRole = Exclude<RolePreset, never>;
 const ROLE_OPTIONS: ManageableRole[] = ['admin', 'rh', 'supervisor', 'almoxarife', 'colaborador'];
@@ -45,10 +68,11 @@ const emptyForm = {
   // 2026-09-14) — usa o preset de admin só pra marcar tudo na matriz, sem
   // que o papel em si vire admin (continua sem acesso a /usuarios).
   permissions: ROLE_PRESETS.admin,
+  ufs: [] as string[],
 };
 
 export default function Usuarios() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, refreshUser } = useAuth();
   const [users, setUsers] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -60,7 +84,10 @@ export default function Usuarios() {
   const [editing, setEditing] = useState<Row | null>(null);
   const [editForm, setEditForm] = useState({
     nome: '', email: '', role: 'colaborador' as ManageableRole, permissions: emptyPermissions(),
+    ufs: [] as string[],
   });
+  const [estados, setEstados] = useState<Estado[]>([]);
+  const [ufsPorUsuario, setUfsPorUsuario] = useState<Record<string, string[]>>({});
   const [pwdTarget, setPwdTarget] = useState<Row | null>(null);
   const [pwdValue, setPwdValue] = useState('');
 
@@ -68,6 +95,10 @@ export default function Usuarios() {
     setLoading(true);
     const { data: profiles } = await supabase.from('profiles').select('id, email, nome_completo, ativo');
     const { data: roles } = await supabase.from('user_roles').select('user_id, role');
+    const { data: ufs } = await supabase.from('user_estados').select('user_id, uf').order('uf');
+    const mapa: Record<string, string[]> = {};
+    for (const r of ufs ?? []) (mapa[r.user_id] ??= []).push(r.uf);
+    setUfsPorUsuario(mapa);
     const rows: Row[] = (profiles || []).map((p: any) => {
       const userRoles = (roles || []).filter((r: any) => r.user_id === p.id).map((r: any) => r.role);
       const role: UserRole =
@@ -82,7 +113,11 @@ export default function Usuarios() {
     setLoading(false);
   };
 
-  useEffect(() => { if (isAdmin) load(); }, [isAdmin]);
+  useEffect(() => {
+    if (!isAdmin) return;
+    load();
+    listEstados().then(setEstados).catch(() => {});
+  }, [isAdmin]);
 
   if (!isAdmin) {
     return (
@@ -117,6 +152,9 @@ export default function Usuarios() {
       toast.error('Preencha nome e e-mail corporativo'); return;
     }
     if (!form.email.includes('@')) { toast.error('E-mail inválido'); return; }
+    if (form.ufs.length === 0) {
+      toast.error('Marque ao menos um estado'); return;
+    }
     if (!form.sendInvite && form.password.length < 6) {
       toast.error('Senha manual precisa de pelo menos 6 caracteres'); return;
     }
@@ -136,6 +174,11 @@ export default function Usuarios() {
     if (error || (data as any)?.error) {
       toast.error((data as any)?.error || error?.message || 'Falha ao criar usuário');
       return;
+    }
+    const novoId = (data as { user_id?: string })?.user_id;
+    if (novoId) {
+      try { await salvarUfsDoUsuario(novoId, form.ufs); }
+      catch (e: any) { toast.error(`Usuário criado, mas os estados não foram salvos: ${e.message}`); }
     }
     if (form.sendInvite) {
       toast.success(`Convite enviado para ${form.email}. O usuário definirá a senha pelo link do e-mail.`);
@@ -164,6 +207,7 @@ export default function Usuarios() {
       email: row.email || '',
       role: (ROLE_OPTIONS.includes(row.role as ManageableRole) ? row.role : 'colaborador') as ManageableRole,
       permissions: permMap,
+      ufs: await listUfsDoUsuario(row.id).catch(() => []),
     });
   };
 
@@ -173,9 +217,6 @@ export default function Usuarios() {
       const novoEmail = (editForm.email || '').trim().toLowerCase();
       if (!novoEmail || !novoEmail.includes('@')) {
         toast.error('E-mail inválido'); return;
-      }
-      if (editing.id === user?.id && user?.role === 'admin' && editForm.role !== 'admin') {
-        toast.error('Você não pode tirar o seu próprio papel de Administrador.'); return;
       }
       // Se o e-mail mudou, atualiza via edge function (auth + profile)
       if (novoEmail !== (editing.email || '').toLowerCase()) {
@@ -203,6 +244,14 @@ export default function Usuarios() {
         .eq('user_id', editing.id).in('role', elevated.filter(r => r !== editForm.role) as any);
       if (delErr) throw delErr;
 
+      if (editing.id === user?.id && user?.role === 'admin' && editForm.role !== 'admin') {
+        toast.error('Você não pode tirar o seu próprio papel de Administrador.'); return;
+      }
+      if (editForm.ufs.length === 0) {
+        toast.error('Marque ao menos um estado'); return;
+      }
+      await salvarUfsDoUsuario(editing.id, editForm.ufs);
+
       // Substitui todas as permissões
       await supabase.from('user_permissions').delete().eq('user_id', editing.id);
       const rows = permissionsToRows(editForm.permissions).map(r => ({ ...r, user_id: editing.id }));
@@ -212,6 +261,8 @@ export default function Usuarios() {
       }
 
       toast.success('Usuário atualizado!');
+      // Mudou os próprios estados/papel: recarrega o acesso desta sessão.
+      if (editing.id === user?.id) refreshUser();
       setEditing(null);
       load();
     } catch (error: any) {
@@ -303,6 +354,7 @@ export default function Usuarios() {
                       As permissões vêm marcadas pelo perfil e podem ser ajustadas na próxima aba.
                     </p>
                   </div>
+                  <EstadosCheckboxes todos={estados} value={form.ufs} onChange={ufs => setForm({ ...form, ufs })} />
                   <div className="p-3 rounded-lg border bg-muted/30 space-y-2">
                     <div className="flex items-center gap-2">
                       <input
@@ -374,7 +426,9 @@ export default function Usuarios() {
                       {u.nome}
                       {u.id === user?.id && <span className="text-xs text-muted-foreground ml-1">(você)</span>}
                     </p>
-                    <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {u.email} · {ufsPorUsuario[u.id]?.join(', ') || 'nenhum estado'}
+                    </p>
                   </div>
                   <Badge className={`${badgeClass} border-0`}>{ROLE_LABELS[(u.role as RolePreset)] ?? u.role}</Badge>
                   <Button variant="ghost" size="icon" onClick={() => startEdit(u)} title="Editar">
@@ -473,6 +527,7 @@ export default function Usuarios() {
                     Trocar o papel reaplica as permissões padrão desse perfil.
                   </p>
                 </div>
+                <EstadosCheckboxes todos={estados} value={editForm.ufs} onChange={ufs => setEditForm({ ...editForm, ufs })} />
               </TabsContent>
               <TabsContent value="permissoes" className="pt-3">
                 <PermissionsMatrix

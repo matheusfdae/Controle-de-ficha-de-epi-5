@@ -5,6 +5,7 @@ import {
   ModuleId, ActionId, PermissionMap,
   emptyPermissions, fullAccessPermissions, rowsToPermissions,
 } from '@/lib/permissions';
+import { listUfsDoUsuario } from '@/services/estadosService';
 
 export type UserRole = 'admin' | 'rh' | 'supervisor' | 'almoxarife' | 'colaborador' | 'operador';
 
@@ -25,6 +26,8 @@ interface AuthContextType {
   isAdmin: boolean; // admin OR rh (mantém gating atual)
   permissions: PermissionMap;
   can: (module: ModuleId, action?: ActionId) => boolean;
+  /** Estados (UF) marcados para o usuário em Usuários (vale também para admin). */
+  estados: string[];
   refreshUser: () => Promise<void>;
 }
 
@@ -45,7 +48,7 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 async function fetchUserData(
   clerkUserId: string, fallbackEmail: string,
-): Promise<{ user: User; permissions: PermissionMap } | null> {
+): Promise<{ user: User; permissions: PermissionMap; estados: string[] } | null> {
   const { data: profile } = await supabase
     .from('profiles')
     .select('id, nome_completo, email, must_change_password')
@@ -69,7 +72,11 @@ async function fetchUserData(
     ? rowsToPermissions(permRows as any)
     : fullAccessPermissions();
 
+  // Mesma regra de public.pode_acessar_uf(): só os estados marcados, inclusive para admin.
+  const estados = await listUfsDoUsuario(profile.id).catch(() => []);
+
   return {
+    estados,
     user: {
       id: profile.id,
       username: profile.email ?? fallbackEmail,
@@ -88,12 +95,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { signOut } = useClerk();
   const [user, setUser] = useState<User | null>(null);
   const [permissions, setPermissions] = useState<PermissionMap>(emptyPermissions());
+  const [estados, setEstados] = useState<string[]>([]);
   const [profileLoading, setProfileLoading] = useState(true);
 
   const refreshUser = useCallback(async () => {
     if (!clerkUser) {
       setUser(null);
       setPermissions(emptyPermissions());
+      setEstados([]);
       setProfileLoading(false);
       return;
     }
@@ -101,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await fetchUserData(clerkUser.id, clerkUser.primaryEmailAddress?.emailAddress ?? '');
     setUser(data?.user ?? null);
     setPermissions(data?.permissions ?? emptyPermissions());
+    setEstados(data?.estados ?? []);
     setProfileLoading(false);
   }, [clerkUser]);
 
@@ -129,6 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin: user ? ADMIN_ROLES.includes(user.role) : false,
       permissions,
       can,
+      estados,
       refreshUser,
     }}>
       {children}

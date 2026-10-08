@@ -24,6 +24,7 @@ import { parseDanfe, lerTextoPdf } from '@/lib/danfe';
 import { formatarCnpj, soDigitos } from '@/lib/cnpj';
 import { Fornecedor, listFornecedores } from '@/services/fornecedoresService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import EstadoSelect, { useEstadoLembrado } from '@/components/EstadoSelect';
 
 interface Linha {
   key: string;
@@ -44,7 +45,7 @@ const novaLinha = (): Linha => ({
 
 const cabecalhoVazio = (): EntradaCabecalho => ({
   numero_nf: '', serie: '', chave_acesso: null, fornecedor_id: null, fornecedor_nome: '', fornecedor_cnpj: '',
-  data_emissao: '', origem: 'manual', observacao: '',
+  data_emissao: '', origem: 'manual', observacao: '', uf: '',
 });
 
 const ROTULO_SUGESTAO: Record<OrigemSugestao, string> = {
@@ -99,6 +100,7 @@ export default function EntradaEstoque() {
   const [lendo, setLendo] = useState(false);
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
   const [duplicada, setDuplicada] = useState<NotaLancada | null>(null);
+  const [uf, setUf] = useEstadoLembrado('entrada-estoque');
   const topoRef = useRef<HTMLDivElement>(null);
 
   // Rechecado a cada mudança da chave, CNPJ, número ou série (importada ou digitada).
@@ -156,7 +158,7 @@ export default function EntradaEstoque() {
         fornecedor_id: fornecedor?.id ?? null,
         fornecedor_nome: fornecedor?.nome ?? nfe.fornecedor.nome ?? '',
         fornecedor_cnpj: nfe.fornecedor.cnpj ?? '',
-        data_emissao: nfe.dataEmissao ?? '', origem: ehPdf ? 'pdf_danfe' : 'xml_nfe', observacao: '',
+        data_emissao: nfe.dataEmissao ?? '', origem: ehPdf ? 'pdf_danfe' : 'xml_nfe', observacao: '', uf: '',
       });
       const novas = nfe.itens.map(item => {
         const s = sugerirEpi(item, nfe.fornecedor.cnpj, epis, memoria);
@@ -204,6 +206,10 @@ export default function EntradaEstoque() {
       toast.error('Esta nota já foi lançada no estoque.');
       return;
     }
+    if (!uf) {
+      toast.error('Escolha o estado que está recebendo a nota.');
+      return;
+    }
     if (problemas.some(Boolean)) {
       toast.error('Corrija os itens destacados antes de salvar.');
       return;
@@ -211,7 +217,7 @@ export default function EntradaEstoque() {
     setSalvando(true);
     try {
       await registrarEntrada({
-        ...cab, numero_nf: normalizarNumeroNf(cab.numero_nf), serie: normalizarNumeroNf(cab.serie),
+        ...cab, uf, numero_nf: normalizarNumeroNf(cab.numero_nf), serie: normalizarNumeroNf(cab.serie),
       }, linhas.map(l => ({
         epi_id: l.epiId,
         tamanho: l.tamanho.trim() || null,
@@ -271,6 +277,9 @@ export default function EntradaEstoque() {
         <Card>
           <CardHeader><CardTitle className="text-base">Dados da nota</CardTitle></CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-6">
+            <div className="sm:col-span-2"><Label htmlFor="uf">Estado que recebe *</Label>
+              <EstadoSelect id="uf" value={uf} onChange={setUf} placeholder="Escolha o estado" /></div>
+            <div className="hidden sm:block sm:col-span-4" />
             <div className="sm:col-span-2"><Label htmlFor="nf">Nº da NF</Label>
               <Input id="nf" value={cab.numero_nf} onChange={e => setCampo('numero_nf', e.target.value)} /></div>
             <div><Label htmlFor="serie">Série</Label>
@@ -352,6 +361,7 @@ export default function EntradaEstoque() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">
             Total: <span className="font-semibold text-foreground">{totalUnidades}</span> unidades em {linhas.length} itens
+            {uf && <> · entram no estoque de <span className="font-semibold text-foreground">{uf}</span></>}
           </p>
           <Button size="lg" onClick={salvar} disabled={salvando || !!duplicada}>
             {salvando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <PackagePlus className="h-4 w-4 mr-2" />}
@@ -366,6 +376,7 @@ export default function EntradaEstoque() {
               {ultimas.map(u => (
                 <div key={u.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
                   <div>
+                    <Badge variant="outline" className="mr-2 font-mono">{u.uf}</Badge>
                     <span className="font-medium">{u.numero_nf ? `NF ${u.numero_nf}` : 'Sem nº de NF'}</span>
                     {u.fornecedor_nome && <span className="text-muted-foreground"> · {u.fornecedor_nome}</span>}
                     {u.origem === 'xml_nfe' && <Badge variant="secondary" className="ml-2">XML</Badge>}

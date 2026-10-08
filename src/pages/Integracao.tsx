@@ -19,6 +19,7 @@ import { Funcao, listFuncoes } from '@/services/estoqueService';
 import BackButton from '@/components/BackButton';
 import PageHeader from '@/components/PageHeader';
 import { useConfirm } from '@/hooks/use-confirm';
+import EstadoSelect, { useEstadoLembrado } from '@/components/EstadoSelect';
 
 interface Colab {
   id: string;
@@ -39,6 +40,7 @@ export default function Integracao() {
   const [funcoes, setFuncoes] = useState<Funcao[]>([]);
   const [open, setOpen] = useState(false);
   const [integrating, setIntegrating] = useState<string | null>(null);
+  const [uf, setUf] = useEstadoLembrado('integracao');
   const [form, setForm] = useState({
     nome: '', matricula: '', posto: '', funcao_id: '', data_admissao: '',
   });
@@ -125,6 +127,7 @@ export default function Integracao() {
 
   const confirmarIntegracao = async () => {
     if (!intModalColab) return;
+    if (!uf) { toast.error('Escolha o estado da ficha'); return; }
     const c = intModalColab;
     setIntegrating(c.id);
     try {
@@ -154,6 +157,7 @@ export default function Integracao() {
           funcao_id: c.funcao_id,
           matricula_snapshot: c.matricula,
           posto_snapshot: c.posto,
+          uf,
           motivo: 'admissao',
           status: 'pendente_assinatura',
         }).select().single();
@@ -321,6 +325,10 @@ export default function Integracao() {
           </DialogHeader>
 
           <div className="space-y-6">
+            <div className="max-w-xs">
+              <Label htmlFor="int-uf">Estado da ficha *</Label>
+              <EstadoSelect id="int-uf" value={uf} onChange={setUf} placeholder="Escolha o estado" />
+            </div>
             {/* EPIs da função */}
             <section>
               <h3 className="font-semibold mb-2 text-sm uppercase tracking-wide">EPIs ({intItens.length})</h3>

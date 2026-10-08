@@ -19,6 +19,7 @@ interface Mov {
   quantidade: number;
   motivo: string | null;
   observacao: string | null;
+  uf: string;
   item_nome?: string;
   item_codigo?: string | null;
 }
@@ -32,7 +33,8 @@ const tipoMovLabel: Record<string, { label: string; tone: 'default' | 'destructi
 
 function isoDay(d: Date) { return d.toISOString().split('T')[0]; }
 
-export default function RelatorioMovimentacoes() {
+/** Movimentações de um estado. */
+export default function RelatorioMovimentacoes({ uf }: { uf: string }) {
   const hoje = new Date();
   const inicio = new Date(); inicio.setDate(inicio.getDate() - 30);
 
@@ -50,6 +52,7 @@ export default function RelatorioMovimentacoes() {
       const fromIso = new Date(from + 'T00:00:00').toISOString();
       const toIso = new Date(to + 'T23:59:59').toISOString();
       let q = supabase.from('movimentacoes_estoque').select('*')
+        .eq('uf', uf)
         .gte('data_mov', fromIso).lte('data_mov', toIso)
         .order('data_mov', { ascending: false });
       if (tipoItem !== 'all') q = q.eq('tipo_item', tipoItem);
@@ -80,7 +83,7 @@ export default function RelatorioMovimentacoes() {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [from, to, tipoItem, tipoMov]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [from, to, tipoItem, tipoMov, uf]);
 
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
@@ -113,7 +116,7 @@ export default function RelatorioMovimentacoes() {
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `movimentacoes_${from}_a_${to}.csv`;
+    a.href = url; a.download = `movimentacoes_${uf}_${from}_a_${to}.csv`;
     a.click(); URL.revokeObjectURL(url);
   };
 

@@ -21,6 +21,7 @@ import { Empresa, listEmpresas } from '@/services/empresasService';
 import { ModeloFicha, listModelosAtivos } from '@/services/modelosFichaService';
 import { supabase } from '@/integrations/supabase/client';
 import BackButton from '@/components/BackButton';
+import EstadoSelect, { useEstadoLembrado } from '@/components/EstadoSelect';
 
 export default function NovaFicha() {
   const navigate = useNavigate();
@@ -28,6 +29,7 @@ export default function NovaFicha() {
   const tipo = (searchParams.get('tipo') === 'uniforme' ? 'uniforme' : 'epi') as 'epi' | 'uniforme';
   const today = new Date().toISOString().split('T')[0];
   const [config, setConfig] = useState(getConfig());
+  const [uf, setUf] = useEstadoLembrado('nova-ficha');
 
   const [form, setForm] = useState({
     nomeFuncionario: '',
@@ -143,6 +145,7 @@ export default function NovaFicha() {
   const buildFicha = (asSigned: boolean): EPIFicha => ({
     id: generateId(),
     ...form,
+    uf,
     itens,
     assinaturaColaborador: assinaturaColaborador || undefined,
     assinaturaResponsavel: assinaturaResponsavel || undefined,
@@ -152,6 +155,7 @@ export default function NovaFicha() {
   });
 
   const validateBasics = () => {
+    if (!uf) { toast.error('Escolha o estado da ficha'); return false; }
     if (!form.nomeFuncionario.trim()) { toast.error('Informe o nome do funcionário'); return false; }
     if (!form.dataEntrega) { toast.error('Informe a data de entrega'); return false; }
     if (itens.length === 0) { toast.error('Adicione ao menos um item'); return false; }
@@ -295,6 +299,12 @@ export default function NovaFicha() {
             <CardTitle className="text-base">Dados do Funcionário</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="uf">Estado *</Label>
+              <EstadoSelect id="uf" value={uf} onChange={setUf} placeholder="Escolha o estado" />
+              <p className="text-xs text-muted-foreground mt-1">O estoque sai deste estado. Não muda depois de salvar.</p>
+            </div>
+            <div className="hidden sm:block" />
             <div className="sm:col-span-2">
               <Label htmlFor="nome">Nome do Funcionário *</Label>
               <Input id="nome" value={form.nomeFuncionario}

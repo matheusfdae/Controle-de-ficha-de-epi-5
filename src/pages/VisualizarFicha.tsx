@@ -119,7 +119,7 @@ export default function VisualizarFicha() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-foreground">Ficha de EPI</h2>
-            <p className="text-sm text-muted-foreground">{ficha.nomeFuncionario} · {new Date(ficha.criadoEm).toLocaleDateString('pt-BR')}</p>
+            <p className="text-sm text-muted-foreground">{ficha.nomeFuncionario} · {ficha.uf} · {new Date(ficha.criadoEm).toLocaleDateString('pt-BR')}</p>
           </div>
           <Badge variant={isSigned ? 'default' : 'secondary'}
             className={isSigned ? 'bg-success text-success-foreground' : ''}>

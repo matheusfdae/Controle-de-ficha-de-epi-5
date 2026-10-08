@@ -68,7 +68,8 @@ function cellValue(v: any): any {
   return v;
 }
 
-export async function importFichasFromExcel(file: File): Promise<ImportResult> {
+/** Todas as fichas da planilha entram no estado `uf`. */
+export async function importFichasFromExcel(file: File, uf: string): Promise<ImportResult> {
   const buf = await file.arrayBuffer();
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buf);
@@ -142,6 +143,7 @@ export async function importFichasFromExcel(file: File): Promise<ImportResult> {
       motivo: (first.motivo || 'admissao').toString().toLowerCase() as any,
       turno: (first.turno || 'diurno').toString().toLowerCase() as any,
       posto: (first.posto || '').toString().trim(),
+      uf,
       empresa: (first.empresa || '').toString().trim(),
       dataEntrega: parseDate(first.data_entrega) || new Date().toISOString().split('T')[0],
       itens,
