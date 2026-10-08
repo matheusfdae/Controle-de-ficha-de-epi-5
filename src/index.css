@@ -110,4 +110,61 @@ All colors MUST be HSL.
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', sans-serif;
   }
+
+  /* Fundo azul com "luzes" desfocadas, fixo atrás de tudo (efeito vidro). */
+  body {
+    background-color: hsl(213 60% 95%);
+    background-image:
+      radial-gradient(55rem 38rem at 8% -8%, hsl(213 92% 72% / 0.55), transparent 62%),
+      radial-gradient(48rem 34rem at 100% 4%, hsl(195 90% 68% / 0.40), transparent 60%),
+      radial-gradient(60rem 42rem at 55% 112%, hsl(228 85% 70% / 0.40), transparent 62%),
+      linear-gradient(160deg, hsl(213 75% 97%), hsl(214 65% 91%));
+    background-attachment: fixed;
+  }
+  .dark body {
+    background-color: hsl(222 60% 7%);
+    background-image:
+      radial-gradient(55rem 38rem at 8% -8%, hsl(213 90% 40% / 0.35), transparent 62%),
+      radial-gradient(48rem 34rem at 100% 4%, hsl(195 90% 35% / 0.25), transparent 60%),
+      radial-gradient(60rem 42rem at 55% 112%, hsl(235 80% 40% / 0.30), transparent 62%),
+      linear-gradient(160deg, hsl(222 55% 9%), hsl(224 60% 6%));
+  }
 }
+
+@layer components {
+  /* Vidro azul: cartões, tabelas, caixas. */
+  .vidro {
+    background-color: hsl(0 0% 100% / 0.68);
+    border-color: hsl(0 0% 100% / 0.65);
+    -webkit-backdrop-filter: blur(14px) saturate(150%);
+    backdrop-filter: blur(14px) saturate(150%);
+    box-shadow: 0 10px 30px -14px hsl(213 80% 30% / 0.28), inset 0 1px 0 hsl(0 0% 100% / 0.6);
+  }
+  .dark .vidro {
+    background-color: hsl(222 50% 12% / 0.55);
+    border-color: hsl(213 70% 70% / 0.14);
+    box-shadow: 0 10px 30px -14px hsl(0 0% 0% / 0.6), inset 0 1px 0 hsl(213 70% 80% / 0.06);
+  }
+}
+
+@layer utilities {
+  /* Menu lateral (desktop e celular) em vidro. Atributo + classe: ganha do bg-sidebar. */
+  .bg-sidebar[data-sidebar="sidebar"] {
+    background-color: hsl(0 0% 100% / 0.55);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    backdrop-filter: blur(18px) saturate(150%);
+  }
+  .dark .bg-sidebar[data-sidebar="sidebar"] {
+    background-color: hsl(222 50% 10% / 0.55);
+  }
+}
+
+/* Estrela dos postos no mapa (Leaflet divIcon): sem a caixa branca padrão. */
+.leaflet-div-icon.mapa-postos-estrela {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  filter: drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.45));
+  overflow: visible;
+}
+.leaflet-div-icon.mapa-postos-estrela svg { display: block; }

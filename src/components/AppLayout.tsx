@@ -12,6 +12,9 @@ const titles: Record<string, string> = {
   '/vencimentos': 'Controle de Vencimentos',
   '/configuracoes': 'Configurações',
   '/usuarios': 'Gestão de Usuários',
+  '/rank-postos': 'Fichas por Posto',
+  '/postos': 'Postos',
+  '/estoque': 'Estoque',
 };
 
 export default function AppLayout() {
@@ -22,10 +25,10 @@ export default function AppLayout() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-muted/20">
+      <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="sticky top-0 z-30 h-14 flex items-center gap-2 border-b bg-background/80 backdrop-blur px-4">
+          <header className="sticky top-0 z-30 h-14 flex items-center gap-2 border-b border-white/50 dark:border-white/10 bg-white/45 dark:bg-slate-950/40 backdrop-blur-xl backdrop-saturate-150 px-4">
             <SidebarTrigger />
             <Separator orientation="vertical" className="h-5 mx-1" />
             <h1 className="text-sm font-semibold text-foreground truncate">{title}</h1>
