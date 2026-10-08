@@ -174,6 +174,9 @@ export default function Usuarios() {
       if (!novoEmail || !novoEmail.includes('@')) {
         toast.error('E-mail inválido'); return;
       }
+      if (editing.id === user?.id && user?.role === 'admin' && editForm.role !== 'admin') {
+        toast.error('Você não pode tirar o seu próprio papel de Administrador.'); return;
+      }
       // Se o e-mail mudou, atualiza via edge function (auth + profile)
       if (novoEmail !== (editing.email || '').toLowerCase()) {
         const { data, error } = await supabase.functions.invoke('admin-update-email', {
@@ -187,13 +190,18 @@ export default function Usuarios() {
       const { error: profErr } = await supabase.from('profiles').update({ nome_completo: editForm.nome }).eq('id', editing.id);
       if (profErr) throw profErr;
 
-      // Sincroniza papel: remove os "elevados" e insere apenas o novo (colaborador é sempre garantido)
+      // Sincroniza papel: garante o novo ANTES de remover os outros "elevados"
+      // (colaborador é sempre garantido). Na ordem inversa, um admin editando
+      // a própria conta perdia o admin no delete e o insert era barrado pela RLS.
       const elevated = ['admin', 'rh', 'supervisor', 'almoxarife'];
-      await supabase.from('user_roles').delete().eq('user_id', editing.id).in('role', elevated as any);
       if (editForm.role !== 'colaborador') {
-        const { error } = await supabase.from('user_roles').insert({ user_id: editing.id, role: editForm.role as any });
+        const { error } = await supabase.from('user_roles')
+          .upsert({ user_id: editing.id, role: editForm.role as any }, { onConflict: 'user_id,role', ignoreDuplicates: true });
         if (error) throw error;
       }
+      const { error: delErr } = await supabase.from('user_roles').delete()
+        .eq('user_id', editing.id).in('role', elevated.filter(r => r !== editForm.role) as any);
+      if (delErr) throw delErr;
 
       // Substitui todas as permissões
       await supabase.from('user_permissions').delete().eq('user_id', editing.id);
