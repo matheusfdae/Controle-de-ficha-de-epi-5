@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useUser } from '@clerk/clerk-react';
+import { useReverification, useUser } from '@clerk/clerk-react';
+import { isReverificationCancelledError } from '@clerk/clerk-react/errors';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,7 +15,9 @@ import { toast } from 'sonner';
 // quando um admin definiu uma senha temporária (admin-create-user /
 // admin-set-password / admin-resend-invite). O Clerk exige a senha atual
 // para trocar via user.updatePassword — aqui é a senha temporária que o
-// usuário acabou de usar para logar.
+// usuário acabou de usar para logar. Trocar senha é ação sensível: se o login
+// não for recente, o Clerk responde "Reverification required" e o
+// useReverification abre a confirmação de identidade e repete a chamada.
 export default function ResetPassword() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
@@ -23,6 +26,9 @@ export default function ResetPassword() {
   const { user: clerkUser } = useUser();
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
+  const trocarSenha = useReverification(
+    (dados: { currentPassword: string; newPassword: string }) => clerkUser!.updatePassword(dados),
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +44,7 @@ export default function ResetPassword() {
 
     setBusy(true);
     try {
-      await clerkUser.updatePassword({ currentPassword, newPassword: password });
+      await trocarSenha({ currentPassword, newPassword: password });
       if (user?.id) {
         await supabase.from('profiles').update({ must_change_password: false }).eq('id', user.id);
         await refreshUser();
@@ -46,6 +52,10 @@ export default function ResetPassword() {
       toast.success('Senha atualizada!');
       navigate('/');
     } catch (err: any) {
+      if (isReverificationCancelledError(err)) {
+        toast.error('Confirmação de identidade cancelada. A senha não foi trocada.');
+        return;
+      }
       toast.error(err?.errors?.[0]?.message || err?.message || 'Falha ao atualizar senha');
     } finally {
       setBusy(false);
