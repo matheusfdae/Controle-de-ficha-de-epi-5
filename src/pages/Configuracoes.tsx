@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Building2, PenTool, Image as ImageIcon, Save, Trash2, Upload, Bell, Plus, Pencil, Building, Stamp } from 'lucide-react';
+import { Building2, PenTool, Image as ImageIcon, Save, Trash2, Upload, Bell, Plus, Pencil, Building, Stamp, Eraser } from 'lucide-react';
 import { AppConfig, getConfig, loadConfig, saveConfig } from '@/services/configService';
 import { Empresa, listEmpresas, saveEmpresa, deleteEmpresa } from '@/services/empresasService';
 import {
@@ -14,6 +14,7 @@ import SignaturePad from '@/components/SignaturePad';
 import { toast } from 'sonner';
 import BackButton from '@/components/BackButton';
 import { useConfirm } from '@/hooks/use-confirm';
+import { tirarFundoCarimbo } from '@/lib/carimbo';
 
 export default function Configuracoes() {
   const [config, setConfig] = useState<AppConfig>(getConfig());
@@ -128,7 +129,9 @@ export default function Configuracoes() {
     const reader = new FileReader();
     reader.onload = async () => {
       try {
-        const updated = await saveConfig({ carimboEmpresa: reader.result as string });
+        // Sem fundo: só a tinta do carimbo aparece sobre a assinatura (tela e PDF).
+        const semFundo = await tirarFundoCarimbo(reader.result as string).catch(() => reader.result as string);
+        const updated = await saveConfig({ carimboEmpresa: semFundo });
         setConfig(updated);
         toast.success('Carimbo atualizado!');
       } catch (error: any) {
@@ -136,6 +139,15 @@ export default function Configuracoes() {
       }
     };
     reader.readAsDataURL(file);
+  };
+  const handleTirarFundoCarimbo = async () => {
+    try {
+      const updated = await saveConfig({ carimboEmpresa: await tirarFundoCarimbo(config.carimboEmpresa) });
+      setConfig(updated);
+      toast.success('Fundo do carimbo removido');
+    } catch (error: any) {
+      toast.error(error?.message || 'Falha ao tirar o fundo do carimbo');
+    }
   };
   const handleRemoveCarimbo = async () => {
     try {
@@ -391,6 +403,11 @@ export default function Configuracoes() {
                 </div>
                 <input ref={carimboRef} type="file" accept="image/*" className="hidden" onChange={handleCarimboUpload} />
                 <div className="flex gap-2 justify-end">
+                  {config.carimboEmpresa && (
+                    <Button variant="outline" onClick={handleTirarFundoCarimbo}>
+                      <Eraser className="h-4 w-4 mr-2" /> Tirar o fundo
+                    </Button>
+                  )}
                   {config.carimboEmpresa && (
                     <Button variant="outline" onClick={handleRemoveCarimbo}>
                       <Trash2 className="h-4 w-4 mr-2" /> Remover
