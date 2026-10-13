@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Plus, Trash2, Save, ShieldCheck, Tablet, Monitor, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, ShieldCheck, Tablet, Monitor, MessageCircle, Search, Loader2 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
@@ -18,10 +18,18 @@ import { getConfig, loadConfig } from '@/services/configService';
 import SignaturePad from '@/components/SignaturePad';
 import { Funcao, EPI, listFuncoes, listEpis, listFuncaoEpis } from '@/services/estoqueService';
 import { Empresa, listEmpresas } from '@/services/empresasService';
+import { Posto, listPostos } from '@/services/postosService';
+import { useAuth } from '@/contexts/AuthContext';
+import { empresaPelaMatricula } from '@/lib/empresaPelaMatricula';
+import { chaveSolta, limparNomePosto } from '@/lib/geoPlanilha';
 import { ModeloFicha, listModelosAtivos } from '@/services/modelosFichaService';
 import { supabase } from '@/integrations/supabase/client';
 import BackButton from '@/components/BackButton';
 import EstadoSelect, { useEstadoLembrado } from '@/components/EstadoSelect';
+import {
+  consultarColaboradorSenior, consultarColaboradorSeniorPorCpf, formatCpf, nomePostoTrabalho, SITUACAO_TRABALHANDO,
+  turnoDaEscala,
+} from '@/services/seniorService';
 
 export default function NovaFicha() {
   const navigate = useNavigate();
@@ -30,6 +38,7 @@ export default function NovaFicha() {
   const today = new Date().toISOString().split('T')[0];
   const [config, setConfig] = useState(getConfig());
   const [uf, setUf] = useEstadoLembrado('nova-ficha');
+  const { estados } = useAuth();
 
   const [form, setForm] = useState({
     nomeFuncionario: '',
@@ -40,6 +49,12 @@ export default function NovaFicha() {
     motivo: 'admissao' as MotivoEntrega,
     turno: 'diurno' as Turno,
     posto: '',
+    localSenior: '',
+    centroCustoCodigo: '',
+    centroCusto: '',
+    postoTrabalhoCodigo: '',
+    postoTrabalho: '',
+    escala: '',
     empresa: config.empresaNome,
     dataEntrega: today,
     observacoes: '',
@@ -60,9 +75,13 @@ export default function NovaFicha() {
   const [funcaoId, setFuncaoId] = useState<string>('');
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [modelos, setModelos] = useState<ModeloFicha[]>([]);
+  const [postos, setPostos] = useState<Posto[]>([]);
 
+  useEffect(() => { listPostos().then(setPostos).catch(() => {}); }, []);
+
+  const [funcoesCarregadas, setFuncoesCarregadas] = useState(false);
   useEffect(() => {
-    listFuncoes().then(setFuncoes).catch(() => {});
+    listFuncoes().then(setFuncoes).catch(() => {}).finally(() => setFuncoesCarregadas(true));
     listEpis(tipo).then(setEpis).catch(() => {});
     setEmpresas(listEmpresas());
   }, [tipo]);
@@ -86,10 +105,10 @@ export default function NovaFicha() {
     return () => { active = false; };
   }, []);
 
+  // "Tipo de uniforme" (cadastro de Funções): só preenche os itens. A função do
+  // colaborador é texto próprio, vindo do cargo na Senior.
   const aplicarFuncao = async (id: string) => {
     setFuncaoId(id);
-    const f = funcoes.find(x => x.id === id);
-    if (f) updateField('funcao', f.nome);
     if (!id) return;
     try {
       const vincs = await listFuncaoEpis(id);
@@ -118,6 +137,13 @@ export default function NovaFicha() {
   const updateField = (field: string, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
   };
+
+  // Empresa pela matrícula: 1xxxxxx = MATRIZ, 3xxxxxx = APOIO. Vale para matrícula
+  // digitada, vinda da Senior ou do histórico; a pessoa ainda pode trocar depois.
+  useEffect(() => {
+    const empresa = empresaPelaMatricula(form.matricula);
+    if (empresa) setForm(prev => (prev.empresa === empresa ? prev : { ...prev, empresa }));
+  }, [form.matricula]);
 
   const addItem = () => {
     setItens(prev => [...prev, {
@@ -237,6 +263,90 @@ export default function NovaFicha() {
     complemento: 'Complemento',
   };
 
+  const [seniorBusca, setSeniorBusca] = useState({ por: 'matricula' as 'matricula' | 'cpf', numEmp: '1', numCad: '', cpf: '' });
+  const [buscandoSenior, setBuscandoSenior] = useState(false);
+
+  /**
+   * O "local" da Senior é posto + função ("SEEC- BOMBEIRO BRIGADISTA"): tira a
+   * função e procura no cadastro de postos (nome ou apelido). Sem cadastro,
+   * usa o nome limpo para a pessoa conferir.
+   */
+  function postoDaSenior(local: string | null): { nome: string; uf?: string } | null {
+    if (!local) return null;
+    const limpo = limparNomePosto(local);
+    const chaves = new Set([chaveSolta(limpo), chaveSolta(local)]);
+    const achado = postos.find(p => [p.nome, ...p.apelidos].some(n => chaves.has(chaveSolta(n))));
+    return achado ? { nome: achado.nome, uf: achado.uf } : (limpo ? { nome: limpo } : null);
+  }
+
+  async function buscarNaSenior(direto?: { numEmp: number; numCad: number }) {
+    const busca = direto ? { ...seniorBusca, por: 'matricula' as const } : seniorBusca;
+    const numEmp = direto?.numEmp ?? Number(seniorBusca.numEmp);
+    const numCad = direto?.numCad ?? Number(seniorBusca.numCad);
+    const cpf = seniorBusca.cpf.replace(/\D/g, '');
+    if (busca.por === 'cpf' && cpf.length !== 11) {
+      toast.error('Informe o CPF completo (11 dígitos)');
+      return;
+    }
+    if (busca.por === 'matricula' && (!Number.isInteger(numEmp) || numEmp <= 0 || !Number.isInteger(numCad) || numCad <= 0)) {
+      toast.error('Informe o nº da empresa e o cadastro (matrícula) da Senior');
+      return;
+    }
+    setBuscandoSenior(true);
+    try {
+      const c = busca.por === 'cpf'
+        ? await consultarColaboradorSeniorPorCpf(cpf)
+        : await consultarColaboradorSenior(numEmp, numCad);
+      // Posto: o posto de trabalho da Senior; sem ele, o local.
+      const posto = postoDaSenior(nomePostoTrabalho(c.postoDescricao)) ?? postoDaSenior(c.nomeLocal);
+      const turno = turnoDaEscala(c.escalaNome);
+      setForm(f => ({
+        ...f,
+        nomeFuncionario: c.nome || f.nomeFuncionario,
+        cpf: c.cpf ? formatCpf(c.cpf) : f.cpf,
+        telefone: c.telefone || f.telefone,
+        matricula: String(c.numCad),
+        funcao: c.cargo || f.funcao,
+        posto: posto?.nome ?? f.posto,
+        localSenior: c.nomeLocal ?? '',
+        centroCustoCodigo: c.codCentroCusto ?? '',
+        centroCusto: c.centroCusto ?? '',
+        postoTrabalhoCodigo: c.postoCodigo ?? '',
+        postoTrabalho: c.postoDescricao ?? '',
+        escala: c.escalaNome ?? '',
+        turno: turno ?? f.turno,
+      }));
+      if (posto) {
+        setItens(prev => prev.map(it => (!it.postoServico || it.postoServico === form.posto) ? { ...it, postoServico: posto.nome } : it));
+        if (posto.uf && estados.includes(posto.uf)) setUf(posto.uf);
+      }
+      // Se existir um tipo de uniforme com o mesmo nome do cargo, já escolhe e preenche os itens.
+      const tipoUniforme = c.cargo && funcoes.find(x => x.nome.trim().toLowerCase() === c.cargo!.trim().toLowerCase());
+      if (tipoUniforme) await aplicarFuncao(tipoUniforme.id);
+      if (c.situacao !== null && c.situacao !== SITUACAO_TRABALHANDO) {
+        toast.warning(`Atenção: na Senior este colaborador está "${c.situacaoDescricao || `situação ${c.situacao}`}".`);
+      } else {
+        toast.success(`Dados de ${c.nome} carregados da Senior`);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Falha ao consultar a Senior');
+    } finally {
+      setBuscandoSenior(false);
+    }
+  }
+
+  // Vindo de Colaboradores Senior (?senior_emp=&senior_cad=): já busca na Senior.
+  const buscouDaUrl = useRef(false);
+  useEffect(() => {
+    const numEmp = Number(searchParams.get('senior_emp'));
+    const numCad = Number(searchParams.get('senior_cad'));
+    if (buscouDaUrl.current || !funcoesCarregadas || !numEmp || !numCad) return;
+    buscouDaUrl.current = true;
+    setSeniorBusca(b => ({ ...b, por: 'matricula', numEmp: String(numEmp), numCad: String(numCad) }));
+    buscarNaSenior({ numEmp, numCad });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [funcoesCarregadas, searchParams]);
+
   // Auto-preenche dados quando o nome já existe no histórico
   async function autocompletarPorNome(nome: string) {
     const n = (nome || '').trim();
@@ -305,6 +415,53 @@ export default function NovaFicha() {
               <p className="text-xs text-muted-foreground mt-1">O estoque sai deste estado. Não muda depois de salvar.</p>
             </div>
             <div className="hidden sm:block" />
+            <div className="sm:col-span-2 rounded-lg border border-dashed bg-muted/30 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Label className="text-xs text-muted-foreground">Buscar na Senior por</Label>
+                <div className="inline-flex rounded-md border bg-background p-0.5">
+                  {(['matricula', 'cpf'] as const).map(op => (
+                    <button key={op} type="button"
+                      onClick={() => setSeniorBusca(b => ({ ...b, por: op }))}
+                      className={`px-2.5 py-0.5 text-xs rounded ${seniorBusca.por === op ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+                      {op === 'matricula' ? 'Matrícula' : 'CPF'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-1 flex flex-wrap items-end gap-2">
+                {seniorBusca.por === 'matricula' ? (
+                  <>
+                    <div className="w-24">
+                      <Label htmlFor="senior-emp" className="text-xs">Empresa</Label>
+                      <Input id="senior-emp" inputMode="numeric" value={seniorBusca.numEmp}
+                        onChange={e => setSeniorBusca(b => ({ ...b, numEmp: e.target.value.replace(/\D/g, '') }))} />
+                    </div>
+                    <div className="flex-1 min-w-[8rem]">
+                      <Label htmlFor="senior-cad" className="text-xs">Cadastro</Label>
+                      <Input id="senior-cad" inputMode="numeric" value={seniorBusca.numCad} placeholder="Nº do cadastro"
+                        onChange={e => {
+                          // Na Senior, matrícula 3xxxxxx é da empresa 3 (Apoio); 1/2/6xxxxxx, da empresa 1.
+                          const numCad = e.target.value.replace(/\D/g, '');
+                          const numEmp = numCad.startsWith('3') ? '3' : /^[126]/.test(numCad) ? '1' : null;
+                          setSeniorBusca(b => ({ ...b, numCad, numEmp: numEmp ?? b.numEmp }));
+                        }}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); buscarNaSenior(); } }} />
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex-1 min-w-[10rem]">
+                    <Label htmlFor="senior-cpf" className="text-xs">CPF</Label>
+                    <Input id="senior-cpf" inputMode="numeric" value={seniorBusca.cpf} placeholder="000.000.000-00"
+                      onChange={e => setSeniorBusca(b => ({ ...b, cpf: formatCpf(e.target.value.replace(/\D/g, '').slice(0, 11)) }))}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); buscarNaSenior(); } }} />
+                  </div>
+                )}
+                <Button type="button" variant="secondary" onClick={() => buscarNaSenior()} disabled={buscandoSenior}>
+                  {buscandoSenior ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Search className="h-4 w-4 mr-1" />}
+                  Buscar
+                </Button>
+              </div>
+            </div>
             <div className="sm:col-span-2">
               <Label htmlFor="nome">Nome do Funcionário *</Label>
               <Input id="nome" value={form.nomeFuncionario}
@@ -314,16 +471,19 @@ export default function NovaFicha() {
             </div>
             <div>
               <Label htmlFor="funcao">Função</Label>
-              {funcoes.length > 0 ? (
-                <Select value={funcaoId} onValueChange={aplicarFuncao}>
-                  <SelectTrigger><SelectValue placeholder="Selecione a função (auto-preenche EPIs)" /></SelectTrigger>
-                  <SelectContent>
-                    {funcoes.map(f => <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input id="funcao" value={form.funcao} onChange={e => updateField('funcao', e.target.value)} placeholder="Ex: ASG, Líder ASG" />
-              )}
+              <Input id="funcao" value={form.funcao} onChange={e => updateField('funcao', e.target.value)}
+                placeholder="Cargo do colaborador (vem da Senior)" />
+            </div>
+            <div>
+              <Label htmlFor="tipo-uniforme">Tipo de uniforme</Label>
+              <Select value={funcaoId} onValueChange={aplicarFuncao} disabled={funcoes.length === 0}>
+                <SelectTrigger id="tipo-uniforme">
+                  <SelectValue placeholder={funcoes.length ? 'Selecione (preenche os itens)' : 'Nenhum cadastrado em Funções'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {funcoes.map(f => <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label htmlFor="telefone">Telefone</Label>
@@ -366,6 +526,28 @@ export default function NovaFicha() {
                 updateField('posto', novo);
                 setItens(prev => prev.map(it => (!it.postoServico || it.postoServico === antigo) ? { ...it, postoServico: novo } : it));
               }} placeholder="Posto" />
+            </div>
+            <div className="sm:col-span-2">
+              <Label htmlFor="posto-trabalho">
+                Posto de trabalho (Senior)
+                {form.postoTrabalhoCodigo && <span className="ml-1 font-normal text-muted-foreground">({form.postoTrabalhoCodigo})</span>}
+              </Label>
+              <Input id="posto-trabalho" value={form.postoTrabalho} onChange={e => updateField('postoTrabalho', e.target.value)}
+                placeholder="Vem da Senior" />
+              {form.escala && <p className="text-xs text-muted-foreground mt-1">Escala: {form.escala}</p>}
+            </div>
+            <div>
+              <Label htmlFor="local-senior">Local (Senior)</Label>
+              <Input id="local-senior" value={form.localSenior} onChange={e => updateField('localSenior', e.target.value)}
+                placeholder="Vem da Senior" />
+            </div>
+            <div>
+              <Label htmlFor="centro-custo">
+                Centro de custo
+                {form.centroCustoCodigo && <span className="ml-1 font-normal text-muted-foreground">(código {form.centroCustoCodigo})</span>}
+              </Label>
+              <Input id="centro-custo" value={form.centroCusto} onChange={e => updateField('centroCusto', e.target.value)}
+                placeholder="Vem da Senior" />
             </div>
             <div>
               <Label htmlFor="empresa">Empresa</Label>

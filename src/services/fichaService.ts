@@ -49,6 +49,12 @@ function mapFichaFromDB(ficha: FichaRow, itens: ItemRow[]): EPIFicha {
     motivo: toMotivo(ficha.motivo),
     turno: toTurno(ficha.turno),
     posto: ficha.posto_snapshot ?? '',
+    localSenior: ficha.local_senior ?? '',
+    centroCustoCodigo: ficha.centro_custo_codigo ?? '',
+    centroCusto: ficha.centro_custo ?? '',
+    postoTrabalhoCodigo: ficha.posto_trabalho_codigo ?? '',
+    postoTrabalho: ficha.posto_trabalho ?? '',
+    escala: ficha.escala ?? '',
     uf: ficha.uf,
     empresa: ficha.empresa ?? '',
     dataEntrega: ficha.data_entrega,
@@ -84,7 +90,7 @@ async function lerTudo<T>(consulta: (de: number, ate: number) => PromiseLike<{ d
 // Sem as imagens de assinatura (são a maior parte do peso): para listas/contagens.
 const COLUNAS_SEM_ASSINATURA = [
   'id', 'numero', 'nome_funcionario', 'funcao', 'telefone', 'cpf_snapshot', 'matricula_snapshot', 'motivo', 'turno',
-  'posto_snapshot', 'uf', 'empresa', 'data_entrega', 'status', 'created_at', 'data_assinatura_colaborador',
+  'posto_snapshot', 'local_senior', 'centro_custo_codigo', 'centro_custo', 'posto_trabalho_codigo', 'posto_trabalho', 'escala', 'uf', 'empresa', 'data_entrega', 'status', 'created_at', 'data_assinatura_colaborador',
   'observacoes', 'modelo_id',
 ].join(', ');
 
@@ -165,6 +171,13 @@ export async function saveFicha(ficha: EPIFicha): Promise<void> {
     data_assinatura_colaborador: ficha.assinaturaColaborador && ficha.status === 'assinada'
       ? (ficha.assinadoEm ?? new Date().toISOString()) : null,
     modelo_id: ficha.modeloId || null,
+    // Só grava quando a tela trouxe o campo, para não apagar o que já existe.
+    ...(ficha.localSenior !== undefined && { local_senior: ficha.localSenior || null }),
+    ...(ficha.centroCustoCodigo !== undefined && { centro_custo_codigo: ficha.centroCustoCodigo || null }),
+    ...(ficha.centroCusto !== undefined && { centro_custo: ficha.centroCusto || null }),
+    ...(ficha.postoTrabalhoCodigo !== undefined && { posto_trabalho_codigo: ficha.postoTrabalhoCodigo || null }),
+    ...(ficha.postoTrabalho !== undefined && { posto_trabalho: ficha.postoTrabalho || null }),
+    ...(ficha.escala !== undefined && { escala: ficha.escala || null }),
   };
 
   const { error: upErr } = await supabase.from('fichas_epi').upsert(fichaPayload);

@@ -17,6 +17,7 @@ const baseItems: Array<{ title: string; url: string; icon: typeof LayoutDashboar
   { title: 'Assinar (Tablet)', url: '/pendentes', icon: ClipboardSignature, end: false, module: 'assinar_tablet' },
   { title: 'Vencimentos', url: '/vencimentos', icon: CalendarClock, end: false, module: 'vencimentos' },
   { title: 'Fichas por Posto', url: '/rank-postos', icon: MapPin, end: false, module: 'rank' },
+  { title: 'Colaboradores Senior', url: '/colaboradores', icon: Users, end: false, module: 'colaboradores' },
 ];
 
 const epiItems: Array<{ title: string; url: string; icon: typeof FilePlus2; end: boolean; module?: ModuleId; action?: ActionId }> = [

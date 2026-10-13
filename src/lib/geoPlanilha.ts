@@ -33,6 +33,10 @@ const INICIO_FUNCAO = new RegExp([
   'VIGILANTE', 'VIGIL[AÂ]NCIA', String.raw`\bVIG\b\.?`, 'BOMBEIRO', 'BRIGADISTA', String.raw`\bBRIGADA\b`,
   'PORTEIRO', 'PORTARIA', 'RECEPCIONISTA', 'INSPETOR', String.raw`\bASG\b`, String.raw`\bLIDER\b`,
   'SUPERVISOR', 'CONTROLADOR', 'OPERADOR DE', 'MONITORAMENTO', 'RASTREAMENTO',
+  // funções que aparecem nos postos de trabalho da Senior ("IDP NORTE - AGENTE DE PORTARIA - DIU 12")
+  String.raw`\bAGENTE\b`, String.raw`\bAUXILIAR\b`, String.raw`\bASSISTENTE\b`, String.raw`\bENCARREGAD[OA]\b`,
+  String.raw`\bCOPEIR[OA]\b`, String.raw`\bMOTORISTA\b`, String.raw`\bJARDINEIR[OA]\b`, String.raw`\bZELADOR[A]?\b`,
+  String.raw`\bAUX\b`, String.raw`\bCARREGADOR`,
   // turno/escala quando vem antes da função ("... - 12HRS DIU - S/INTRA")
   String.raw`\b(DIU|NOT|DIURNO|NOTURNO)\b`, String.raw`\b\d{1,2}\s?H(RS)?\b`, String.raw`\b12X36\b`, String.raw`\b5X2\b`,
 ].join('|'), 'i');

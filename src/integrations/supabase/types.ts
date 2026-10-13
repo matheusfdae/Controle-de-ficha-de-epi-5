@@ -68,6 +68,108 @@ export type Database = {
         }
         Relationships: []
       }
+      colaboradores_senior: {
+        Row: {
+          ativo: boolean
+          cargo: string | null
+          centro_custo: string | null
+          cod_cargo: string | null
+          cod_centro_custo: string | null
+          cod_fil: number | null
+          cod_local: string | null
+          cpf: string | null
+          created_at: string
+          data_admissao: string | null
+          data_afastamento: string | null
+          email: string | null
+          empresa_nome: string | null
+          id: string
+          nome: string
+          nome_local: string | null
+          num_cad: number
+          num_emp: number
+          razao_social: string | null
+          sincronizado_em: string
+          situacao: number | null
+          situacao_descricao: string | null
+          telefone: string | null
+          tip_col: number
+          uf: string | null
+          updated_at: string
+          escala_codigo: number | null
+          escala_nome: string | null
+          posto_codigo: string | null
+          posto_descricao: string | null
+          posto_estrutura: number | null
+        }
+        Insert: {
+          ativo?: boolean
+          cargo?: string | null
+          centro_custo?: string | null
+          cod_cargo?: string | null
+          cod_centro_custo?: string | null
+          cod_fil?: number | null
+          cod_local?: string | null
+          cpf?: string | null
+          created_at?: string
+          data_admissao?: string | null
+          data_afastamento?: string | null
+          email?: string | null
+          empresa_nome?: string | null
+          id?: string
+          nome: string
+          nome_local?: string | null
+          num_cad: number
+          num_emp: number
+          razao_social?: string | null
+          sincronizado_em?: string
+          situacao?: number | null
+          situacao_descricao?: string | null
+          telefone?: string | null
+          tip_col: number
+          uf?: string | null
+          updated_at?: string
+          escala_codigo?: number | null
+          escala_nome?: string | null
+          posto_codigo?: string | null
+          posto_descricao?: string | null
+          posto_estrutura?: number | null
+        }
+        Update: {
+          ativo?: boolean
+          cargo?: string | null
+          centro_custo?: string | null
+          cod_cargo?: string | null
+          cod_centro_custo?: string | null
+          cod_fil?: number | null
+          cod_local?: string | null
+          cpf?: string | null
+          created_at?: string
+          data_admissao?: string | null
+          data_afastamento?: string | null
+          email?: string | null
+          empresa_nome?: string | null
+          id?: string
+          nome?: string
+          nome_local?: string | null
+          num_cad?: number
+          num_emp?: number
+          razao_social?: string | null
+          sincronizado_em?: string
+          situacao?: number | null
+          situacao_descricao?: string | null
+          telefone?: string | null
+          tip_col?: number
+          uf?: string | null
+          updated_at?: string
+          escala_codigo?: number | null
+          escala_nome?: string | null
+          posto_codigo?: string | null
+          posto_descricao?: string | null
+          posto_estrutura?: number | null
+        }
+        Relationships: []
+      }
       termo_coletivo_tokens: {
         Row: {
           created_at: string
@@ -495,6 +597,12 @@ export type Database = {
           turno: string | null
           updated_at: string
           uf: string
+          centro_custo: string | null
+          centro_custo_codigo: string | null
+          local_senior: string | null
+          escala: string | null
+          posto_trabalho: string | null
+          posto_trabalho_codigo: string | null
         }
         Insert: {
           assinatura_colaborador_url?: string | null
@@ -524,6 +632,12 @@ export type Database = {
           turno?: string | null
           updated_at?: string
           uf: string
+          centro_custo?: string | null
+          centro_custo_codigo?: string | null
+          local_senior?: string | null
+          escala?: string | null
+          posto_trabalho?: string | null
+          posto_trabalho_codigo?: string | null
         }
         Update: {
           assinatura_colaborador_url?: string | null
@@ -553,6 +667,12 @@ export type Database = {
           turno?: string | null
           updated_at?: string
           uf?: string
+          centro_custo?: string | null
+          centro_custo_codigo?: string | null
+          local_senior?: string | null
+          escala?: string | null
+          posto_trabalho?: string | null
+          posto_trabalho_codigo?: string | null
         }
         Relationships: [
           {
@@ -1527,6 +1647,19 @@ export type Database = {
         Returns: undefined
       }
       pode_acessar_uf: { Args: { _uf: string }; Returns: boolean }
+      pode_sincronizar_senior: { Args: Record<PropertyKey, never>; Returns: boolean }
+      senior_gravar_descricoes: {
+        Args: { _postos: Json; _escalas: Json }
+        Returns: Json
+      }
+      senior_gravar_postos_escalas: {
+        Args: { _empresa: number; _dados: Json }
+        Returns: number
+      }
+      sincronizar_colaboradores_senior: {
+        Args: { _empresas: number[]; _dados: Json }
+        Returns: Json
+      }
       resetar_estoque: { Args: { _epi_id: string; _uf: string }; Returns: undefined }
       transferir_estoque: {
         Args: {

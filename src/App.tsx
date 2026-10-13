@@ -16,6 +16,7 @@ const ResetPassword       = lazy(() => import('./pages/ResetPassword'));
 const Convites            = lazy(() => import('./pages/Convites'));
 const Dashboard           = lazy(() => import('./pages/Dashboard'));
 const NovaFicha           = lazy(() => import('./pages/NovaFicha'));
+const ColaboradoresSenior = lazy(() => import('./pages/ColaboradoresSenior'));
 const ConsultarFichas     = lazy(() => import('./pages/ConsultarFichas'));
 const VisualizarFicha     = lazy(() => import('./pages/VisualizarFicha'));
 const AssinarFicha        = lazy(() => import('./pages/AssinarFicha'));
@@ -114,6 +115,7 @@ function AppRoutes() {
           <Route path="/ficha/:id"    element={<RequireModule module="fichas_epi"><VisualizarFicha /></RequireModule>} />
           <Route path="/vencimentos"  element={<RequireModule module="vencimentos"><Vencimentos /></RequireModule>} />
           <Route path="/pendentes"    element={<RequireModule module="assinar_tablet"><AssinaturasPendentes /></RequireModule>} />
+          <Route path="/colaboradores" element={<RequireModule module="colaboradores"><ColaboradoresSenior /></RequireModule>} />
           <Route path="/rank-postos"  element={<RequireModule module="rank"><RankPostos /></RequireModule>} />
           <Route path="/configuracoes" element={<RequireModule module="configuracoes"><Configuracoes /></RequireModule>} />
           <Route path="/usuarios"     element={<AdminRoute><Usuarios /></AdminRoute>} />

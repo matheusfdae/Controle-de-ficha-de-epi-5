@@ -9,7 +9,8 @@ export type ModuleId =
   | 'integracao'
   | 'funcoes'
   | 'configuracoes'
-  | 'assinar_tablet';
+  | 'assinar_tablet'
+  | 'colaboradores';
 
 export type ActionId = 'view' | 'create' | 'edit' | 'delete';
 
@@ -29,6 +30,7 @@ export const MODULES: ModuleDef[] = [
   { id: 'estoque',          label: 'Estoque',           actions: ['view', 'create', 'edit', 'delete'] },
   { id: 'vencimentos',      label: 'Vencimentos',       actions: ['view'] },
   { id: 'rank',             label: 'Fichas por Posto',  actions: ['view'] },
+  { id: 'colaboradores',    label: 'Colaboradores Senior', actions: ['view', 'edit'] },
   { id: 'integracao',       label: 'Integração',        actions: ['view', 'create', 'edit', 'delete'] },
   { id: 'funcoes',          label: 'Funções',           actions: ['view', 'create', 'edit', 'delete'] },
   { id: 'configuracoes',    label: 'Configurações',     actions: ['view', 'edit'] },

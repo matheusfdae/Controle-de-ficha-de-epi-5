@@ -1,0 +1,21 @@
+# Frontend de homologação (~/epi-homolog na VM). Arquivo próprio em vez do
+# docker-compose.yml da raiz porque aquele fixa a imagem
+# controle-epi-app:latest — buildar a homologação com ele sobrescreveria a
+# tag usada pela produção.
+name: epi-homolog
+
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
+        VITE_SUPABASE_PROJECT_ID: homolog
+        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY}
+    image: controle-epi-app:homolog
+    container_name: epi-homolog-app
+    restart: unless-stopped
+    ports:
+      - "8090:80"

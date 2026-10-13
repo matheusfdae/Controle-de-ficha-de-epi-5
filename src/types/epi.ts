@@ -36,6 +36,14 @@ export interface EPIFicha {
   cpf: string;
   matricula: string;
   posto: string;
+  /** Local do colaborador na Senior (nomLoc), como veio. */
+  localSenior?: string;
+  centroCustoCodigo?: string;
+  centroCusto?: string;
+  /** Posto de trabalho na Senior (código e descrição completa) e escala. */
+  postoTrabalhoCodigo?: string;
+  postoTrabalho?: string;
+  escala?: string;
   /** Estado (UF) da ficha: de onde sai o estoque. Fixo depois de criada. */
   uf: string;
   dataEntrega: string;
