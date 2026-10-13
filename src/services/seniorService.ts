@@ -41,7 +41,7 @@ export function formatCpf(cpf: string | null) {
   return d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : d;
 }
 
-type BuscaSenior = { num_emp: number; tip_col: number; num_cad: number } | { cpf: string };
+type BuscaSenior = { num_emp: number; tip_col: number; num_cad: number } | { cpf: string; sem_posto?: boolean };
 
 async function consultarSenior(busca: BuscaSenior): Promise<ColaboradorSenior> {
   if (import.meta.env.DEV) {
@@ -72,6 +72,6 @@ export function consultarColaboradorSenior(numEmp: number, numCad: number, tipCo
 }
 
 /** Se o CPF tiver mais de um cadastro, o servidor devolve o ativo mais recente. */
-export function consultarColaboradorSeniorPorCpf(cpf: string) {
-  return consultarSenior({ cpf: cpf.replace(/\D/g, '') });
+export function consultarColaboradorSeniorPorCpf(cpf: string, opcoes: { semPosto?: boolean } = {}) {
+  return consultarSenior({ cpf: cpf.replace(/\D/g, ''), sem_posto: opcoes.semPosto });
 }

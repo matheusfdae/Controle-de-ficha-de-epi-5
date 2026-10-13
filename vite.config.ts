@@ -46,7 +46,7 @@ function seniorLocal(env: Record<string, string>): Plugin {
         let texto = "";
         for await (const parte of req) texto += parte;
         try {
-          const { num_emp, tip_col = 1, num_cad, cpf } = JSON.parse(texto || "{}");
+          const { num_emp, tip_col = 1, num_cad, cpf, sem_posto } = JSON.parse(texto || "{}");
           const cfg = { baseUrl, user, password, module: env.SENIOR_WS_MODULE || "rubi" };
           if (cpf !== undefined && !cpfValido(String(cpf))) return responder(400, { error: "CPF inválido" });
           const c = cpf !== undefined
@@ -54,7 +54,7 @@ function seniorLocal(env: Record<string, string>): Plugin {
             : (await consultarColaborador(cfg, { numEmp: Number(num_emp), tipCol: Number(tip_col), numCad: Number(num_cad) }))[0];
           if (!c) return responder(404, { error: "Colaborador não encontrado na Senior" });
           // Posto de trabalho e escala vêm de outra consulta; se falhar, segue sem eles.
-          const posto = await postoEscalaDoColaborador(cfg, c).catch(() => null);
+          const posto = sem_posto ? null : await postoEscalaDoColaborador(cfg, c).catch(() => null);
           responder(200, { colaborador: { ...c, ...posto } });
         } catch (e) {
           if (e instanceof SeniorError) return responder(502, { error: e.message });

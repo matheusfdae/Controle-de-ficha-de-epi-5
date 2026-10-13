@@ -17,16 +17,17 @@ Deno.serve(async (req) => {
     if (!caller) return json({ error: 'Não autenticado' }, 401);
 
     const admin = serviceClient();
-    const pode = async (module: string) =>
-      (await admin.rpc('has_permission', { _user_id: caller.profileId, _module: module, _action: 'create' })).data === true;
-    if (!(await pode('fichas_epi')) && !(await pode('fichas_uniforme'))) {
-      return json({ error: 'Sem permissão para criar fichas' }, 403);
+    const pode = async (module: string, action = 'create') =>
+      (await admin.rpc('has_permission', { _user_id: caller.profileId, _module: module, _action: action })).data === true;
+    // Nova Ficha (quem cria fichas) ou a procura das fichas sem dono em Colaboradores Senior.
+    if (!(await pode('fichas_epi')) && !(await pode('fichas_uniforme')) && !(await pode('colaboradores', 'view'))) {
+      return json({ error: 'Sem permissão para consultar a Senior' }, 403);
     }
 
     const { cfg } = await carregarSenior(serviceClient());
     if (!cfg) return json({ error: 'Integração Senior não configurada no servidor' }, 503);
 
-    const { num_emp, tip_col = 1, num_cad, cpf } = await req.json();
+    const { num_emp, tip_col = 1, num_cad, cpf, sem_posto } = await req.json();
     let c;
     if (cpf !== undefined) {
       if (!cpfValido(String(cpf))) return json({ error: 'CPF inválido' }, 400);
@@ -41,20 +42,12 @@ Deno.serve(async (req) => {
     }
     if (!c) return json({ error: 'Colaborador não encontrado na Senior' }, 404);
 
-    const { error } = await admin.from('colaboradores_senior').upsert({
-      num_emp: c.numEmp, tip_col: c.tipCol, num_cad: c.numCad, nome: c.nome,
-      cpf: c.cpf, telefone: c.telefone, email: c.email, data_admissao: c.dataAdmissao,
-      empresa_nome: c.empresaNome, cod_fil: c.codFil, razao_social: c.razaoSocial,
-      cod_local: c.codLocal, nome_local: c.nomeLocal, cod_cargo: c.codCargo, cargo: c.cargo,
-      cod_centro_custo: c.codCentroCusto, centro_custo: c.centroCusto,
-      situacao: c.situacao, situacao_descricao: c.situacaoDescricao,
-      data_afastamento: c.dataAfastamento, sincronizado_em: new Date().toISOString(),
-    }, { onConflict: 'num_emp,tip_col,num_cad' });
-    // O cache é conveniência: se falhar, a consulta em si continua valendo.
-    if (error) console.error('colaboradores_senior upsert:', error.message);
+    // Não grava em colaboradores_senior: a lista vem da atualização automática
+    // (aqui um demitido achado pelo CPF entraria como ativo).
 
     // Posto de trabalho e escala vêm de outra consulta; se falhar, segue sem eles.
-    const posto = await postoEscalaDoColaborador(cfg, c).catch((e) => {
+    // sem_posto: procura em lote (tela Colaboradores Senior), sem as consultas de posto/escala.
+    const posto = sem_posto ? null : await postoEscalaDoColaborador(cfg, c).catch((e) => {
       console.error('posto/escala:', e?.message ?? e);
       return null;
     });

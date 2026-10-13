@@ -21,6 +21,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import FichasSenior from '@/components/FichasSenior';
 import { formatCpf, nomePostoTrabalho } from '@/services/seniorService';
 import { formatarData } from '@/lib/convocacaoUniforme';
 import { chaveSolta } from '@/lib/geoPlanilha';
@@ -53,7 +54,7 @@ export default function ColaboradoresSenior() {
   const [admAte, setAdmAte] = useState('');
   const [mostrarDesligados, setMostrarDesligados] = useState(false);
   const [pagina, setPagina] = useState(0);
-  const [aba, setAba] = useState<'colaboradores' | 'postos'>('colaboradores');
+  const [aba, setAba] = useState<'colaboradores' | 'postos' | 'fichas'>('colaboradores');
   const [postoSel, setPostoSel] = useState('');
   const [paginaPostos, setPaginaPostos] = useState(0);
 
@@ -170,7 +171,8 @@ export default function ColaboradoresSenior() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" disabled={aba === 'postos' ? !postos.length : !lista.length}
+          <Button variant="outline" size="sm" className={aba === 'fichas' ? 'hidden' : ''}
+            disabled={aba === 'postos' ? !postos.length : !lista.length}
             onClick={() => (aba === 'postos' ? baixarExcelPostos(postos) : baixarExcel(lista, resumo))}>
             <Download className="h-4 w-4 mr-1" /> Baixar Excel
           </Button>
@@ -278,7 +280,11 @@ export default function ColaboradoresSenior() {
       </Card>
 
       <div className="inline-flex rounded-lg border bg-background/60 p-1">
-        {([['colaboradores', `Colaboradores (${lista.length})`], ['postos', `Postos (${postos.filter(p => p.codigo).length})`]] as const)
+        {([
+          ['colaboradores', `Colaboradores (${lista.length})`],
+          ['postos', `Postos (${postos.filter(p => p.codigo).length})`],
+          ['fichas', `Fichas (${fichas.length})`],
+        ] as const)
           .map(([id, rotulo]) => (
             <button key={id} type="button" onClick={() => setAba(id)}
               className={`rounded-md px-4 py-1.5 text-sm transition ${aba === id
@@ -287,6 +293,8 @@ export default function ColaboradoresSenior() {
             </button>
           ))}
       </div>
+
+      {aba === 'fichas' && <FichasSenior fichas={fichas} porFicha={comparacao.porFicha} carregando={carregando} />}
 
       {aba === 'postos' && (
         <TabelaPostos postos={postos} pagina={paginaPostos} setPagina={setPaginaPostos}

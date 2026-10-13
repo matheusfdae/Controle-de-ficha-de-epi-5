@@ -137,6 +137,8 @@ export interface Comparacao {
   fichasSemColaborador: EPIFicha[];
   /** Quantas fichas ligaram por CPF, por matrícula e só pelo nome. */
   ligadasPor: Record<FormaLigacao, number>;
+  /** De quem é cada ficha (id da ficha -> colaborador e como ligou). */
+  porFicha: Map<string, { colaborador: ColaboradorLista; forma: FormaLigacao }>;
 }
 
 const soDigitos = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '');
@@ -165,6 +167,7 @@ export function cruzarComFichas(colaboradores: ColaboradorLista[], fichas: EPIFi
   const fichasDe = new Map<string, EPIFicha[]>();
   const fichasSemColaborador: EPIFicha[] = [];
   const ligadasPor: Record<FormaLigacao, number> = { cpf: 0, matricula: 0, nome: 0 };
+  const porFicha = new Map<string, { colaborador: ColaboradorLista; forma: FormaLigacao }>();
   for (const f of fichas) {
     let c: ColaboradorLista | null | undefined = porCpf.get(chaveCpf(f.cpf));
     let forma: FormaLigacao = 'cpf';
@@ -172,6 +175,7 @@ export function cruzarComFichas(colaboradores: ColaboradorLista[], fichas: EPIFi
     if (!c) { c = porNome.get(chaveSolta(f.nomeFuncionario || '')); forma = 'nome'; }
     if (!c) { fichasSemColaborador.push(f); continue; }
     ligadasPor[forma]++;
+    porFicha.set(f.id, { colaborador: c, forma });
     fichasDe.set(c.id, [...(fichasDe.get(c.id) ?? []), f]);
   }
 
@@ -184,5 +188,5 @@ export function cruzarComFichas(colaboradores: ColaboradorLista[], fichas: EPIFi
       pendentes: lista.filter(f => f.status === 'pendente').length,
     });
   }
-  return { porColaborador, fichasSemColaborador, ligadasPor };
+  return { porColaborador, fichasSemColaborador, ligadasPor, porFicha };
 }
