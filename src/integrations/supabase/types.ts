@@ -1656,8 +1656,12 @@ export type Database = {
         Args: { _empresa: number; _dados: Json }
         Returns: number
       }
+      senior_inativar_ausentes: {
+        Args: { _empresa: number; _desde: string }
+        Returns: number
+      }
       sincronizar_colaboradores_senior: {
-        Args: { _empresas: number[]; _dados: Json }
+        Args: { _empresas: number[]; _dados: Json; _inativar?: boolean }
         Returns: Json
       }
       resetar_estoque: { Args: { _epi_id: string; _uf: string }; Returns: undefined }

@@ -12,7 +12,6 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 PSQL=(docker exec -i supabase-db psql -U postgres -d postgres -X -q -v ON_ERROR_STOP=1)
-FUNCAO_URL="http://localhost:8000/functions/v1/senior-sincronizar-colaboradores"
 URL_PADRAO="https://webp27.seniorcloud.com.br:30361/g5-senior-services"
 
 echo "Usuário de integração da Senior (criado no SGU):"
@@ -52,27 +51,11 @@ SQL
 unset SENHA RESP
 echo ">>> Credenciais gravadas."
 
-# Script que roda as etapas em sequência (cada chamada cabe no limite de 60 s
-# das Edge Functions). Fica fora do repositório porque leva o segredo.
-EXEC="$HOME/.senior-atualizar.sh"
-cat > "$EXEC" <<SH
-#!/usr/bin/env bash
-etapa() { echo "\$(date '+%F %T') \$1 \$2"; curl -s -m 120 -X POST "$FUNCAO_URL" -H 'x-cron-secret: $CRON_SECRET' -H 'Content-Type: application/json' -d "{\"etapa\":\"\$1\",\"empresa\":\${2:-0}}"; echo; }
-etapa colaboradores
-etapa postos 1
-etapa postos 3
-etapa descricoes
-SH
-chmod 700 "$EXEC"
+# Segredo do agendador fora do repositório (só este usuário lê); o script que
+# roda as partes (senior-atualizar.sh) fica no repositório e vem com o deploy.
+( umask 077; printf '%s' "$CRON_SECRET" > "$HOME/.senior-cron-secret" )
+unset CRON_SECRET
+bash deploy/producao/senior-atualizar.sh --instalar
 
-# 6h, 12h e 18h em Brasília (UTC-3) no relógio desta VM.
-OFF="$(date +%z)"
-OFF_H=$(( 10#${OFF:1:2} )); [ "${OFF:0:1}" = "-" ] && OFF_H=$(( -OFF_H ))
-HORAS=""
-for h in 6 12 18; do HORAS="${HORAS:+$HORAS,}$(( (h + 3 + OFF_H + 24) % 24 ))"; done
-LINHA="0 $HORAS * * * $EXEC >> \$HOME/senior-colaboradores.log 2>&1 # senior-colaboradores"
-( crontab -l 2>/dev/null | grep -v '# senior-colaboradores' || true; echo "$LINHA" ) | crontab -
-echo ">>> Agendado: às ${HORAS}h desta VM (= 6h, 12h e 18h de Brasília). Log em ~/senior-colaboradores.log"
-
-echo ">>> Rodando a primeira atualização agora (leva ~2 minutos)..."
-"$EXEC"
+echo ">>> Rodando a primeira atualização agora (leva uns 5 minutos)..."
+bash deploy/producao/senior-atualizar.sh

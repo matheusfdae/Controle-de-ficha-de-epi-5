@@ -20,9 +20,16 @@ export async function listarColaboradoresSenior(): Promise<ColaboradorLista[]> {
 }
 
 type PedidoEtapa =
-  | { etapa: 'colaboradores' }
-  | { etapa: 'postos'; empresa: number }
+  | { etapa: 'colaboradores'; empresa: number; periodo: number }
+  | { etapa: 'postos'; empresa: number; matriculas: number[] }
   | { etapa: 'descricoes'; postos: string[]; escalas: number[] };
+
+/** Mesmas partes do agendador da VM: cada chamada cabe no limite de 60 s. */
+const EMPRESAS = [1, 3];
+const PERIODOS = 3;
+const MATRICULAS_POR_LOTE = 400;
+const POSTOS_POR_LOTE = 300;
+const emLotes = <T,>(l: T[], n: number) => Array.from({ length: Math.ceil(l.length / n) }, (_, i) => l.slice(i * n, (i + 1) * n));
 
 /** Pede uma etapa à Senior (Edge Function na produção; o próprio PC no localhost). */
 async function buscarEtapa<T>(pedido: PedidoEtapa): Promise<T> {
@@ -47,42 +54,72 @@ async function buscarEtapa<T>(pedido: PedidoEtapa): Promise<T> {
 }
 
 /**
- * Atualiza tudo da Senior em 3 etapas (cada chamada cabe no limite de 60 s
- * das Edge Functions): colaboradores, posto/escala de cada um, descrições.
+ * Atualiza tudo da Senior, em partes (as mesmas do agendador da VM):
+ * colaboradores por empresa e período de admissão; desligados só se todas as
+ * partes da empresa deram certo; posto e escala em lotes de matrículas; nomes.
  */
 export async function atualizarDaSenior(
   aviso: (texto: string) => void = () => {},
 ): Promise<{ total: number; inativados: number; postosRecebidos: number; postosGravados: number; escalasGravadas: number }> {
-  aviso('1/3 · Buscando os colaboradores na Senior… (~40 s)');
-  const lista = await buscarEtapa<{ empresas: number[]; dados: Json[] }>({ etapa: 'colaboradores' });
-  if (!lista.dados?.length) throw new Error('A Senior não devolveu colaboradores');
-  const { data, error } = await supabase.rpc('sincronizar_colaboradores_senior', { _empresas: lista.empresas, _dados: lista.dados });
-  if (error) throw new Error(error.message);
-  const r = data as { gravados: number; inativados: number };
+  let total = 0;
+  let inativados = 0;
+  let desde: string | null = null;
+  const matriculas = new Map<number, number[]>();
+
+  for (const empresa of EMPRESAS) {
+    const daEmpresa: number[] = [];
+    for (let periodo = 0; periodo < PERIODOS; periodo++) {
+      aviso(`1/3 · Colaboradores da empresa ${empresa}, parte ${periodo + 1} de ${PERIODOS}…`);
+      const lista = await buscarEtapa<{ dados: { num_cad: number }[] }>({ etapa: 'colaboradores', empresa, periodo });
+      const { data, error } = await supabase.rpc('sincronizar_colaboradores_senior', {
+        _empresas: [empresa], _dados: lista.dados as unknown as Json, _inativar: false,
+      });
+      if (error) throw new Error(error.message);
+      const r = data as { gravados: number; sincronizado_em: string };
+      desde ??= r.sincronizado_em;
+      total += r.gravados;
+      daEmpresa.push(...lista.dados.map(d => d.num_cad));
+    }
+    matriculas.set(empresa, daEmpresa);
+    // Todas as partes da empresa vieram: quem não veio saiu da Senior.
+    const { data: n, error } = await supabase.rpc('senior_inativar_ausentes', { _empresa: empresa, _desde: desde! });
+    if (error) throw new Error(error.message);
+    inativados += n as number;
+  }
 
   const postos = new Set<string>();
   const escalas = new Set<number>();
-  for (const empresa of lista.empresas) {
-    aviso(`2/3 · Postos de trabalho e escalas da empresa ${empresa}… (~50 s)`);
-    const p = await buscarEtapa<{ empresa: number; dados: { posto_estrutura: number | null; posto_codigo: string | null; escala_codigo: number | null }[] }>(
-      { etapa: 'postos', empresa });
-    const { error: e2 } = await supabase.rpc('senior_gravar_postos_escalas', { _empresa: empresa, _dados: p.dados as unknown as Json });
-    if (e2) throw new Error(e2.message);
-    for (const d of p.dados) {
-      if (d.posto_codigo) postos.add(`${d.posto_estrutura}|${d.posto_codigo}`);
-      if (d.escala_codigo) escalas.add(d.escala_codigo);
+  for (const empresa of EMPRESAS) {
+    const lotes = emLotes([...new Set(matriculas.get(empresa) ?? [])].sort((a, b) => a - b), MATRICULAS_POR_LOTE);
+    for (const [i, lote] of lotes.entries()) {
+      aviso(`2/3 · Postos e escalas da empresa ${empresa}, parte ${i + 1} de ${lotes.length}…`);
+      const p = await buscarEtapa<{ dados: { posto_estrutura: number | null; posto_codigo: string | null; escala_codigo: number | null }[] }>(
+        { etapa: 'postos', empresa, matriculas: lote });
+      const { error } = await supabase.rpc('senior_gravar_postos_escalas', { _empresa: empresa, _dados: p.dados as unknown as Json });
+      if (error) throw new Error(error.message);
+      for (const d of p.dados) {
+        if (d.posto_codigo) postos.add(`${d.posto_estrutura}|${d.posto_codigo}`);
+        if (d.escala_codigo) escalas.add(d.escala_codigo);
+      }
     }
   }
 
-  aviso('3/3 · Nomes dos postos e das escalas…');
-  const desc = await buscarEtapa<{ postos: Json; escalas: Json }>({ etapa: 'descricoes', postos: [...postos], escalas: [...escalas] });
-  const { data: d3, error: e3 } = await supabase.rpc('senior_gravar_descricoes', { _postos: desc.postos, _escalas: desc.escalas });
-  if (e3) throw new Error(`Etapa 3 (nomes dos postos): ${e3.message}`);
-  const nomes = d3 as { postos: number; escalas: number } | null;
-  return {
-    total: r.gravados, inativados: r.inativados,
-    postosRecebidos: (desc.postos as unknown[]).length, postosGravados: nomes?.postos ?? 0, escalasGravadas: nomes?.escalas ?? 0,
-  };
+  let postosRecebidos = 0;
+  let postosGravados = 0;
+  let escalasGravadas = 0;
+  const lotesPostos = emLotes([...postos], POSTOS_POR_LOTE);
+  for (const [i, lote] of (lotesPostos.length ? lotesPostos : [[]]).entries()) {
+    aviso(`3/3 · Nomes dos postos e das escalas, parte ${i + 1} de ${Math.max(1, lotesPostos.length)}…`);
+    const desc = await buscarEtapa<{ postos: Json[]; escalas: Json[] }>(
+      { etapa: 'descricoes', postos: lote, escalas: i === 0 ? [...escalas] : [] });
+    const { data, error } = await supabase.rpc('senior_gravar_descricoes', { _postos: desc.postos, _escalas: desc.escalas });
+    if (error) throw new Error(`Etapa 3 (nomes dos postos): ${error.message}`);
+    const nomes = data as { postos: number; escalas: number } | null;
+    postosRecebidos += desc.postos.length;
+    postosGravados += nomes?.postos ?? 0;
+    escalasGravadas += nomes?.escalas ?? 0;
+  }
+  return { total, inativados, postosRecebidos, postosGravados, escalasGravadas };
 }
 
 export interface ResumoFichas {

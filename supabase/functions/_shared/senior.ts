@@ -246,6 +246,25 @@ export function listarColaboradoresEmpresa(cfg: SeniorConfig, numEmp: number, ti
   }, timeoutMs);
 }
 
+/**
+ * Períodos de admissão em que a lista é dividida, para cada chamada caber no
+ * limite de 60 s das Edge Functions (a empresa 1 inteira passa disso na VM).
+ * Somados, cobrem de 1950 até hoje.
+ */
+export function periodosAdmissao(hoje = new Date()): [string, string][] {
+  return [['01/01/1950', '31/12/2021'], ['01/01/2022', '31/12/2024'], ['01/01/2025', dataSenior(hoje)]];
+}
+
+/** Não demitidos de uma empresa admitidos num dos períodos de periodosAdmissao(). */
+export async function listarColaboradoresPeriodo(cfg: SeniorConfig, numEmp: number, periodo: number) {
+  const faixa = periodosAdmissao()[periodo];
+  if (!faixa) throw new SeniorError(`Período ${periodo} inválido`);
+  const lista = await chamarConsulta(cfg, SERVICO_ADMITIDOS, 'ColaboradoresAdmitidos', {
+    numEmp, abrTipCol: '1', iniPer: faixa[0], fimPer: faixa[1],
+  }, 55000);
+  return lista.map(c => ({ ...c, uf: ufDoColaborador(c) }));
+}
+
 /** Lista de todas as empresas, já com o estado; as empresas são buscadas em paralelo. */
 export async function listarTodosColaboradores(cfg: SeniorConfig, empresas = EMPRESAS_SENIOR) {
   const listas = await Promise.all(empresas.map(e => listarColaboradoresEmpresa(cfg, e)));
@@ -348,12 +367,18 @@ export async function postoEscalaDoColaborador(cfg: SeniorConfig, m: Matricula):
   };
 }
 
-/** Posto e escala de todos os não demitidos de uma empresa (~2.200 linhas em ~47 s na empresa 1). */
-export async function postosEscalasDaEmpresa(cfg: SeniorConfig, numEmp: number) {
+/** Matrículas por chamada na etapa de postos (a empresa 1 inteira passa de 60 s na VM). */
+export const MATRICULAS_POR_LOTE = 400;
+
+/** Posto e escala de um lote de matrículas de uma empresa. */
+export async function postosEscalasDaEmpresa(cfg: SeniorConfig, numEmp: number, matriculas: number[]) {
+  const lote = [...new Set(matriculas.filter(n => Number.isInteger(n) && n > 0))];
+  if (!lote.length) return [];
+  if (lote.length > MATRICULAS_POR_LOTE) throw new SeniorError(`Máximo de ${MATRICULAS_POR_LOTE} matrículas por vez`);
   const linhas = await consultarTabela(cfg, 'R034FUN', ['NUMEMP', 'TIPCOL', 'NUMCAD', 'ESTPOS', 'POSTRA', 'CODESC'], [
     { campo: 'NUMEMP', condicao: '=', valor: String(numEmp) },
-    { campo: 'SITAFA', condicao: '<>', valor: '7' },
-  ], 58000);
+    { campo: 'NUMCAD', condicao: 'IN', valor: lote.join(',') },
+  ], 55000);
   return linhas.map(l => ({
     num_emp: Number(l.NUMEMP), tip_col: Number(l.TIPCOL), num_cad: Number(l.NUMCAD),
     posto_estrutura: l.ESTPOS ? Number(l.ESTPOS) : null, posto_codigo: l.POSTRA?.trim() || null,
@@ -393,24 +418,32 @@ export function linhaColaborador(c: ColaboradorSenior & { uf: string | null }) {
 }
 
 export type PedidoEtapa =
-  | { etapa: 'colaboradores' }
-  | { etapa: 'postos'; empresa: number }
+  | { etapa: 'colaboradores'; empresa: number; periodo: number }
+  | { etapa: 'postos'; empresa: number; matriculas: number[] }
   | { etapa: 'descricoes'; postos: string[]; escalas: number[] };
 
+/** Divide uma lista em partes de `tamanho`. */
+export function emLotes<T>(lista: T[], tamanho: number): T[][] {
+  return Array.from({ length: Math.ceil(lista.length / tamanho) }, (_, i) => lista.slice(i * tamanho, (i + 1) * tamanho));
+}
+
 /**
- * Busca na Senior os dados de uma etapa:
- *  1. colaboradores — lista de todos (sincronizar_colaboradores_senior);
- *  2. postos — código do posto e da escala de cada um, por empresa (senior_gravar_postos_escalas);
+ * Busca na Senior os dados de uma etapa (cada chamada cabe em < 60 s):
+ *  1. colaboradores — uma empresa, um período de admissão (sincronizar_colaboradores_senior);
+ *     depois de todos os períodos, senior_inativar_ausentes marca os desligados;
+ *  2. postos — posto e escala de um lote de matrículas (senior_gravar_postos_escalas);
  *  3. descricoes — nome dos postos e escalas usados (senior_gravar_descricoes).
  */
 export async function buscarEtapa(cfg: SeniorConfig, p: PedidoEtapa) {
+  if (p.etapa !== 'descricoes' && !EMPRESAS_SENIOR.includes(p.empresa)) {
+    throw new SeniorError(`Empresa ${p.empresa} fora da lista`);
+  }
   if (p.etapa === 'colaboradores') {
-    const lista = await listarTodosColaboradores(cfg);
-    return { empresas: EMPRESAS_SENIOR, dados: lista.map(linhaColaborador) };
+    const lista = await listarColaboradoresPeriodo(cfg, p.empresa, p.periodo);
+    return { empresa: p.empresa, periodo: p.periodo, dados: lista.map(linhaColaborador) };
   }
   if (p.etapa === 'postos') {
-    if (!EMPRESAS_SENIOR.includes(p.empresa)) throw new SeniorError(`Empresa ${p.empresa} fora da lista`);
-    return { empresa: p.empresa, dados: await postosEscalasDaEmpresa(cfg, p.empresa) };
+    return { empresa: p.empresa, dados: await postosEscalasDaEmpresa(cfg, p.empresa, p.matriculas ?? []) };
   }
   const codigos = [...new Set(p.postos.map(k => k.split('|')[1]).filter(Boolean))];
   const [postos, escalas] = await Promise.all([descreverPostos(cfg, codigos), descreverEscalas(cfg, p.escalas)]);
