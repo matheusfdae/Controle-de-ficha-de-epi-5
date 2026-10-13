@@ -236,6 +236,7 @@ export type Database = {
           origem: string
           serie: string | null
           uf: string
+          motivo: string | null
         }
         Insert: {
           chave_acesso?: string | null
@@ -252,6 +253,7 @@ export type Database = {
           origem?: string
           serie?: string | null
           uf: string
+          motivo?: string | null
         }
         Update: {
           chave_acesso?: string | null
@@ -268,6 +270,7 @@ export type Database = {
           origem?: string
           serie?: string | null
           uf?: string
+          motivo?: string | null
         }
         Relationships: [
           {

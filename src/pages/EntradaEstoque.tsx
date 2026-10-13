@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from '@/components/ui/command';
-import { AlertTriangle, Check, ChevronsUpDown, FileUp, Loader2, PackagePlus, Plus, Trash2 } from 'lucide-react';
+import {
+  AlertTriangle, Check, ChevronsUpDown, ClipboardList, FileText, FileUp, Loader2, PackagePlus, Plus, Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import BackButton from '@/components/BackButton';
@@ -18,6 +20,7 @@ import { EPI, listEpis } from '@/services/estoqueService';
 import {
   EntradaCabecalho, EntradaResumo, NotaLancada, registrarEntrada, buscarNotaLancada,
   normalizarNumeroNf, listCodigosFornecedor, mapaTamanhos, listUltimasEntradas,
+  MOTIVOS_ENTRADA_MANUAL, ROTULO_ORIGEM,
 } from '@/services/entradaEstoqueService';
 import { parseNFeXml, sugerirEpi, casarTamanho, OrigemSugestao, NFe } from '@/lib/nfe';
 import { parseDanfe, lerTextoPdf } from '@/lib/danfe';
@@ -45,8 +48,11 @@ const novaLinha = (): Linha => ({
 
 const cabecalhoVazio = (): EntradaCabecalho => ({
   numero_nf: '', serie: '', chave_acesso: null, fornecedor_id: null, fornecedor_nome: '', fornecedor_cnpj: '',
-  data_emissao: '', origem: 'manual', observacao: '', uf: '',
+  data_emissao: '', origem: 'nf_digitada', observacao: '', uf: '',
 });
+
+type Modo = 'nota' | 'manual';
+const OUTRO_MOTIVO = '__outro__';
 
 const ROTULO_SUGESTAO: Record<OrigemSugestao, string> = {
   memoria: 'lembrado da última nota', ca: 'pelo nº do CA', codigo: 'pelo código', nome: 'pelo nome — confira',
@@ -102,6 +108,13 @@ export default function EntradaEstoque() {
   const [duplicada, setDuplicada] = useState<NotaLancada | null>(null);
   const [uf, setUf] = useEstadoLembrado('entrada-estoque');
   const topoRef = useRef<HTMLDivElement>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const modo: Modo = searchParams.get('modo') === 'manual' ? 'manual' : 'nota';
+  const setModo = (m: Modo) => setSearchParams(m === 'manual' ? { modo: 'manual' } : {}, { replace: true });
+  const [motivoSel, setMotivoSel] = useState('');
+  const [motivoOutro, setMotivoOutro] = useState('');
+  const motivo = motivoSel === OUTRO_MOTIVO ? motivoOutro.trim() : motivoSel;
+  const [filtroHistorico, setFiltroHistorico] = useState<'todas' | 'manual' | 'nota'>('todas');
 
   // Rechecado a cada mudança da chave, CNPJ, número ou série (importada ou digitada).
   useEffect(() => {
@@ -121,10 +134,11 @@ export default function EntradaEstoque() {
   const carregar = () => {
     listEpis().then(setEpis).catch(e => toast.error(e.message));
     mapaTamanhos().then(setTamanhos).catch(() => {});
-    listUltimasEntradas().then(setUltimas).catch(() => {});
     listFornecedores().then(setFornecedores).catch(() => {});
   };
   useEffect(carregar, []);
+  const carregarHistorico = () => { listUltimasEntradas(30, filtroHistorico).then(setUltimas).catch(() => {}); };
+  useEffect(carregarHistorico, [filtroHistorico]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setCampo = (campo: keyof EntradaCabecalho, valor: string) => setCab(c => ({ ...c, [campo]: valor }));
   const setLinha = (key: string, patch: Partial<Linha>) =>
@@ -136,6 +150,7 @@ export default function EntradaEstoque() {
   };
 
   async function importarNota(file: File) {
+    setModo('nota');
     setLendo(true);
     try {
       const ehPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
@@ -202,12 +217,20 @@ export default function EntradaEstoque() {
   const totalUnidades = linhas.reduce((s, l) => s + (Number(l.quantidade.replace(',', '.')) || 0), 0);
 
   async function salvar() {
-    if (duplicada) {
+    if (modo === 'nota' && duplicada) {
       toast.error('Esta nota já foi lançada no estoque.');
       return;
     }
     if (!uf) {
-      toast.error('Escolha o estado que está recebendo a nota.');
+      toast.error(modo === 'manual' ? 'Escolha o estado que está recebendo os itens.' : 'Escolha o estado que está recebendo a nota.');
+      return;
+    }
+    if (modo === 'manual' && !motivo) {
+      toast.error('Informe o motivo da entrada manual.');
+      return;
+    }
+    if (modo === 'nota' && !cab.numero_nf.trim() && !cab.chave_acesso) {
+      toast.error('Informe o número da nota fiscal. Sem nota, use a entrada Manual.');
       return;
     }
     if (problemas.some(Boolean)) {
@@ -216,9 +239,10 @@ export default function EntradaEstoque() {
     }
     setSalvando(true);
     try {
-      await registrarEntrada({
-        ...cab, uf, numero_nf: normalizarNumeroNf(cab.numero_nf), serie: normalizarNumeroNf(cab.serie),
-      }, linhas.map(l => ({
+      const cabecalho: EntradaCabecalho = modo === 'manual'
+        ? { ...cabecalhoVazio(), origem: 'manual', motivo, observacao: cab.observacao, uf }
+        : { ...cab, uf, numero_nf: normalizarNumeroNf(cab.numero_nf), serie: normalizarNumeroNf(cab.serie) };
+      await registrarEntrada(cabecalho, linhas.map(l => ({
         epi_id: l.epiId,
         tamanho: l.tamanho.trim() || null,
         quantidade: Number(l.quantidade.replace(',', '.')),
@@ -226,10 +250,13 @@ export default function EntradaEstoque() {
         codigo_fornecedor: l.codigoFornecedor,
         valor_unitario: l.valorUnitario,
       })));
-      toast.success(`Entrada registrada: ${totalUnidades} unidades em ${linhas.length} itens.`);
+      toast.success(`Entrada ${modo === 'manual' ? 'manual ' : ''}registrada: ${totalUnidades} unidades em ${linhas.length} itens.`);
       setCab(cabecalhoVazio());
       setLinhas([novaLinha()]);
+      setMotivoSel('');
+      setMotivoOutro('');
       carregar();
+      carregarHistorico();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Erro ao registrar a entrada');
     } finally {
@@ -240,7 +267,7 @@ export default function EntradaEstoque() {
   return (
     <div className="p-4 lg:p-8 pb-20">
       <div ref={topoRef} className="max-w-5xl mx-auto space-y-6 scroll-mt-4">
-        {duplicada && (
+        {modo === 'nota' && duplicada && (
           <div role="alert"
             className="flex items-start gap-3 rounded-lg border-2 border-destructive bg-destructive/10 p-4 text-destructive">
             <AlertTriangle className="h-6 w-6 shrink-0 mt-0.5" />
@@ -256,9 +283,58 @@ export default function EntradaEstoque() {
         )}
         <BackButton />
         <PageHeader eyebrow="Estoque" title="Registrar entrada"
-          description="Lance a nota inteira de uma vez: importe o XML da NF-e ou digite os itens do DANFE. As quantidades são SOMADAS ao estoque."
+          description={modo === 'manual'
+            ? 'Entrada sem nota fiscal, item a item (saldo inicial, inventário, devolução...). As quantidades são SOMADAS ao estoque e a entrada fica marcada como MANUAL.'
+            : 'Lance a nota inteira de uma vez: importe o PDF/XML da NF-e ou digite os itens do DANFE. As quantidades são SOMADAS ao estoque.'}
           actions={<Button variant="outline" onClick={() => navigate('/estoque')}>Ver estoque</Button>} />
 
+        <div className="grid gap-3 sm:grid-cols-2">
+          {([
+            ['nota', FileText, 'Por nota fiscal', 'PDF, XML ou nota digitada'],
+            ['manual', ClipboardList, 'Manual (item a item)', 'Sem nota: saldo inicial, inventário, devolução'],
+          ] as const).map(([id, Icone, titulo, detalhe]) => (
+            <button key={id} type="button" onClick={() => setModo(id)}
+              className={cn('flex items-center gap-3 rounded-lg border-2 p-4 text-left transition',
+                modo === id ? 'border-primary bg-primary/5' : 'border-transparent bg-background/60 hover:border-muted-foreground/30')}>
+              <Icone className={cn('h-6 w-6 shrink-0', modo === id ? 'text-primary' : 'text-muted-foreground')} />
+              <span>
+                <span className="block font-medium">{titulo}</span>
+                <span className="block text-xs text-muted-foreground">{detalhe}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {modo === 'manual' && (
+          <Card className="border-amber-300">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                Entrada manual <Badge className="bg-amber-500 hover:bg-amber-500">MANUAL</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-6">
+              <div className="sm:col-span-2"><Label htmlFor="uf-manual">Estado que recebe *</Label>
+                <EstadoSelect id="uf-manual" value={uf} onChange={setUf} placeholder="Escolha o estado" /></div>
+              <div className="sm:col-span-2"><Label htmlFor="motivo">Motivo *</Label>
+                <Select value={motivoSel} onValueChange={setMotivoSel}>
+                  <SelectTrigger id="motivo"><SelectValue placeholder="Por que está entrando?" /></SelectTrigger>
+                  <SelectContent>
+                    {MOTIVOS_ENTRADA_MANUAL.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                    <SelectItem value={OUTRO_MOTIVO}>Outro…</SelectItem>
+                  </SelectContent>
+                </Select></div>
+              {motivoSel === OUTRO_MOTIVO ? (
+                <div className="sm:col-span-2"><Label htmlFor="motivo-outro">Qual motivo? *</Label>
+                  <Input id="motivo-outro" value={motivoOutro} onChange={e => setMotivoOutro(e.target.value)} /></div>
+              ) : <div className="hidden sm:block sm:col-span-2" />}
+              <div className="sm:col-span-6"><Label htmlFor="obs-manual">Observação</Label>
+                <Input id="obs-manual" value={cab.observacao} placeholder="Ex.: devolvido por Fulano, contagem do almoxarifado de 13/10…"
+                  onChange={e => setCampo('observacao', e.target.value)} /></div>
+            </CardContent>
+          </Card>
+        )}
+
+        {modo === 'nota' && (<>
         <Card className="border-dashed">
           <CardContent className="p-5 flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -310,6 +386,7 @@ export default function EntradaEstoque() {
             )}
           </CardContent>
         </Card>
+        </>)}
 
         <Card>
           <CardHeader className="flex-row items-center justify-between space-y-0">
@@ -363,32 +440,53 @@ export default function EntradaEstoque() {
             Total: <span className="font-semibold text-foreground">{totalUnidades}</span> unidades em {linhas.length} itens
             {uf && <> · entram no estoque de <span className="font-semibold text-foreground">{uf}</span></>}
           </p>
-          <Button size="lg" onClick={salvar} disabled={salvando || !!duplicada}>
+          <Button size="lg" onClick={salvar} disabled={salvando || (modo === 'nota' && !!duplicada)}>
             {salvando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <PackagePlus className="h-4 w-4 mr-2" />}
             Dar entrada no estoque
           </Button>
         </div>
 
-        {ultimas.length > 0 && (
-          <Card>
-            <CardHeader><CardTitle className="text-base">Últimas entradas</CardTitle></CardHeader>
-            <CardContent className="divide-y">
-              {ultimas.map(u => (
-                <div key={u.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                  <div>
-                    <Badge variant="outline" className="mr-2 font-mono">{u.uf}</Badge>
-                    <span className="font-medium">{u.numero_nf ? `NF ${u.numero_nf}` : 'Sem nº de NF'}</span>
-                    {u.fornecedor_nome && <span className="text-muted-foreground"> · {u.fornecedor_nome}</span>}
-                    {u.origem === 'xml_nfe' && <Badge variant="secondary" className="ml-2">XML</Badge>}
-                  </div>
-                  <span className="text-muted-foreground">
-                    {u.unidades} un. em {u.itens} itens · {new Date(u.data_entrada).toLocaleDateString('pt-BR')}
-                  </span>
-                </div>
+        <Card>
+          <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0">
+            <CardTitle className="text-base">Últimas entradas</CardTitle>
+            <div className="inline-flex rounded-md border bg-background p-0.5">
+              {([['todas', 'Todas'], ['nota', 'Por nota'], ['manual', 'Manuais']] as const).map(([id, rotulo]) => (
+                <button key={id} type="button" onClick={() => setFiltroHistorico(id)}
+                  className={cn('px-3 py-1 text-xs rounded', filtroHistorico === id
+                    ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>
+                  {rotulo}
+                </button>
               ))}
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          </CardHeader>
+          <CardContent className="divide-y">
+            {ultimas.length === 0 && <p className="py-4 text-sm text-muted-foreground">Nenhuma entrada.</p>}
+            {ultimas.map(u => (
+              <div key={u.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <Badge variant="outline" className="font-mono">{u.uf}</Badge>
+                  {u.origem === 'manual' ? (
+                    <>
+                      <Badge className="bg-amber-500 hover:bg-amber-500">MANUAL</Badge>
+                      <span className="font-medium">{u.motivo || 'Sem motivo'}</span>
+                      {u.observacao && <span className="text-muted-foreground">· {u.observacao}</span>}
+                    </>
+                  ) : (
+                    <>
+                      <Badge className="bg-sky-600 hover:bg-sky-600">NOTA FISCAL</Badge>
+                      <span className="font-medium">{u.numero_nf ? `NF ${u.numero_nf}` : 'Sem nº de NF'}</span>
+                      {u.fornecedor_nome && <span className="text-muted-foreground">· {u.fornecedor_nome}</span>}
+                      <Badge variant="secondary">{ROTULO_ORIGEM[u.origem] ?? u.origem}</Badge>
+                    </>
+                  )}
+                </div>
+                <span className="text-muted-foreground">
+                  {u.unidades} un. em {u.itens} itens · {new Date(u.data_entrada).toLocaleDateString('pt-BR')}
+                </span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

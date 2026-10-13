@@ -2,6 +2,17 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 import type { CodigoFornecedor } from '@/lib/nfe';
 
+export type OrigemEntrada = 'manual' | 'nf_digitada' | 'xml_nfe' | 'pdf_danfe';
+
+export const ROTULO_ORIGEM: Record<OrigemEntrada, string> = {
+  manual: 'Manual', nf_digitada: 'Nota digitada', xml_nfe: 'Nota (XML)', pdf_danfe: 'Nota (PDF)',
+};
+
+export const MOTIVOS_ENTRADA_MANUAL = [
+  'Saldo inicial', 'Ajuste de inventário', 'Devolução de colaborador', 'Doação / brinde',
+  'Compra sem nota', 'Transferência de outra unidade',
+];
+
 export interface EntradaCabecalho {
   numero_nf: string;
   serie: string;
@@ -10,7 +21,10 @@ export interface EntradaCabecalho {
   fornecedor_nome: string;
   fornecedor_cnpj: string;
   data_emissao: string;
-  origem: 'manual' | 'xml_nfe' | 'pdf_danfe';
+  /** manual = sem nota (item a item); nf_digitada = nota digitada à mão; xml_nfe/pdf_danfe = nota importada. */
+  origem: OrigemEntrada;
+  /** Obrigatório na entrada manual (saldo inicial, inventário, devolução...). */
+  motivo?: string;
   observacao: string;
   /** Estado que está recebendo a nota. */
   uf: string;
@@ -30,7 +44,9 @@ export interface EntradaResumo {
   numero_nf: string | null;
   fornecedor_nome: string | null;
   data_entrada: string;
-  origem: string;
+  origem: OrigemEntrada;
+  motivo: string | null;
+  observacao: string | null;
   uf: string;
   itens: number;
   unidades: number;
@@ -103,16 +119,19 @@ export async function mapaTamanhos(): Promise<Record<string, string[]>> {
   return mapa;
 }
 
-export async function listUltimasEntradas(limite = 10): Promise<EntradaResumo[]> {
-  const { data, error } = await supabase
+export async function listUltimasEntradas(limite = 30, tipo: 'todas' | 'manual' | 'nota' = 'todas'): Promise<EntradaResumo[]> {
+  let consulta = supabase
     .from('entradas_estoque')
-    .select('id, numero_nf, fornecedor_nome, data_entrada, origem, uf, entradas_estoque_itens(quantidade)')
+    .select('id, numero_nf, fornecedor_nome, data_entrada, origem, motivo, observacao, uf, entradas_estoque_itens(quantidade)')
     .order('data_entrada', { ascending: false })
     .limit(limite);
+  if (tipo === 'manual') consulta = consulta.eq('origem', 'manual');
+  if (tipo === 'nota') consulta = consulta.neq('origem', 'manual');
+  const { data, error } = await consulta;
   if (error) throw error;
   return (data ?? []).map(e => ({
     id: e.id, numero_nf: e.numero_nf, fornecedor_nome: e.fornecedor_nome,
-    data_entrada: e.data_entrada, origem: e.origem, uf: e.uf,
+    data_entrada: e.data_entrada, origem: e.origem as OrigemEntrada, motivo: e.motivo, observacao: e.observacao, uf: e.uf,
     itens: e.entradas_estoque_itens.length,
     unidades: e.entradas_estoque_itens.reduce((s, i) => s + i.quantidade, 0),
   }));

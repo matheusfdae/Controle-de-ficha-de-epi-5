@@ -339,9 +339,14 @@ export default function Estoque() {
             <div className="flex items-center gap-2">
               <EstadoSelect value={uf} onChange={setUf} className="w-28" />
               {can('estoque', 'create') && (
-                <Button onClick={() => navigate('/estoque/entrada')}>
-                  <PackagePlus className="h-4 w-4 mr-1" /> Registrar entrada
-                </Button>
+                <>
+                  <Button variant="outline" onClick={() => navigate('/estoque/entrada?modo=manual')}>
+                    <PackagePlus className="h-4 w-4 mr-1" /> Entrada manual
+                  </Button>
+                  <Button onClick={() => navigate('/estoque/entrada')}>
+                    <PackagePlus className="h-4 w-4 mr-1" /> Entrada por nota
+                  </Button>
+                </>
               )}
             </div>
           } />
