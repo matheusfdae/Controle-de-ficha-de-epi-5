@@ -455,3 +455,29 @@ export async function buscarEtapa(cfg: SeniorConfig, p: PedidoEtapa) {
     escalas: [...escalas].map(([codigo, nome]) => ({ codigo, nome })),
   };
 }
+
+// ---------- Busca na lista já gravada (colaboradores_senior) ----------
+
+/** Linha da tabela colaboradores_senior (só os campos usados aqui). */
+export interface LinhaListaSenior {
+  num_emp: number; tip_col: number; num_cad: number; nome: string; cpf: string | null;
+  telefone: string | null; email: string | null; data_admissao: string | null; empresa_nome: string | null;
+  cod_fil: number | null; razao_social: string | null; cod_local: string | null; nome_local: string | null;
+  cod_cargo: string | null; cargo: string | null; cod_centro_custo: string | null; centro_custo: string | null;
+  situacao: number | null; situacao_descricao: string | null; data_afastamento: string | null;
+  posto_estrutura: number | null; posto_codigo: string | null; posto_descricao: string | null;
+  escala_codigo: number | null; escala_nome: string | null;
+}
+
+/** Converte a linha gravada no mesmo formato da consulta à Senior (com posto e escala). */
+export function colaboradorDaLista(l: LinhaListaSenior): ColaboradorSenior & PostoEscala {
+  return {
+    numEmp: l.num_emp, tipCol: l.tip_col, numCad: l.num_cad, nome: l.nome, cpf: l.cpf, telefone: l.telefone,
+    email: l.email, dataAdmissao: l.data_admissao, empresaNome: l.empresa_nome, codFil: l.cod_fil,
+    razaoSocial: l.razao_social, cnpj: null, codLocal: l.cod_local, nomeLocal: l.nome_local,
+    codCargo: l.cod_cargo, cargo: l.cargo, codCentroCusto: l.cod_centro_custo, centroCusto: l.centro_custo,
+    situacao: l.situacao, situacaoDescricao: l.situacao_descricao, dataAfastamento: l.data_afastamento,
+    postoEstrutura: l.posto_estrutura, postoCodigo: l.posto_codigo, postoDescricao: l.posto_descricao,
+    escalaCodigo: l.escala_codigo, escalaNome: l.escala_nome,
+  };
+}

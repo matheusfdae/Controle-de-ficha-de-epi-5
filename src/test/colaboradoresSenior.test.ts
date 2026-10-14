@@ -64,3 +64,19 @@ describe('posto de trabalho e escala da Senior', () => {
     expect(turnoDaEscala(null)).toBeNull();
   });
 });
+
+import { colaboradorDaLista, type LinhaListaSenior } from '../../supabase/functions/_shared/senior';
+
+describe('colaboradorDaLista', () => {
+  it('converte a linha gravada no formato da consulta, com posto e escala', () => {
+    const c = colaboradorDaLista({
+      num_emp: 3, tip_col: 1, num_cad: 3009888, nome: 'ADEILTON', cpf: '01234567890', cargo: 'AGENTE DE PORTARIA',
+      situacao: 1, situacao_descricao: 'Trabalhando', posto_estrutura: 103, posto_codigo: 'PO0175',
+      posto_descricao: '0003-0001-IDP NORTE - AGENTE DE PORTARIA', escala_codigo: 8501, escala_nome: '07:00 - 19:00',
+    } as LinhaListaSenior);
+    expect(c).toMatchObject({
+      numEmp: 3, numCad: 3009888, nome: 'ADEILTON', cpf: '01234567890', cargo: 'AGENTE DE PORTARIA',
+      situacaoDescricao: 'Trabalhando', postoCodigo: 'PO0175', escalaNome: '07:00 - 19:00',
+    });
+  });
+});
