@@ -279,7 +279,6 @@ async function baixarExcelConvocacao(lista: ConvocacaoUniforme[], titulo: string
   const ws = wb.addWorksheet('Convocação');
   ws.columns = [
     { header: 'Colaborador', key: 'nome', width: 36 },
-    { header: 'CPF', key: 'cpf', width: 16 },
     { header: 'Matrícula', key: 'matricula', width: 12 },
     { header: 'Função', key: 'funcao', width: 22 },
     { header: 'Posto', key: 'posto', width: 30 },
@@ -293,7 +292,7 @@ async function baixarExcelConvocacao(lista: ConvocacaoUniforme[], titulo: string
   ws.getRow(1).font = { bold: true };
   for (const t of lista) {
     ws.addRow({
-      nome: t.nome, cpf: t.cpf, matricula: t.matricula, funcao: t.funcao, posto: t.posto, uf: t.uf,
+      nome: t.nome, matricula: t.matricula, funcao: t.funcao, posto: t.posto, uf: t.uf,
       ficha: t.fichaNumero ?? '', assinatura: formatarData(t.dataAssinatura), troca: formatarData(t.dataTroca),
       situacao: situacaoTexto(t), itens: t.itens.join(', '),
     });
@@ -311,7 +310,7 @@ function imprimirConvocacao(lista: ConvocacaoUniforme[], titulo: string) {
   const esc = (v: string | number | undefined) =>
     String(v ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
   const linhas = lista.map(t => `<tr>
-    <td>${esc(t.nome)}</td><td>${esc(t.cpf)}</td><td>${esc(t.matricula)}</td><td>${esc(t.funcao)}</td>
+    <td>${esc(t.nome)}</td><td>${esc(t.matricula)}</td><td>${esc(t.funcao)}</td>
     <td>${esc(t.posto)} (${esc(t.uf)})</td><td>${esc(formatarData(t.dataAssinatura))}</td>
     <td>${esc(formatarData(t.dataTroca))}</td><td>${esc(situacaoTexto(t))}</td><td class="ass"></td></tr>`).join('');
   const w = window.open('', '_blank');
@@ -327,7 +326,7 @@ function imprimirConvocacao(lista: ConvocacaoUniforme[], titulo: string) {
     </style></head><body>
     <h1>Convocação para troca de uniforme — ${esc(titulo)}</h1>
     <p>Gerado em ${new Date().toLocaleString('pt-BR')} · ${lista.length} colaborador(es) · troca a cada ${MESES_TROCA} meses da assinatura.</p>
-    <table><thead><tr><th>Colaborador</th><th>CPF</th><th>Matrícula</th><th>Função</th><th>Posto</th>
+    <table><thead><tr><th>Colaborador</th><th>Matrícula</th><th>Função</th><th>Posto</th>
     <th>Assinada em</th><th>Troca em</th><th>Situação</th><th>Assinatura</th></tr></thead>
     <tbody>${linhas}</tbody></table></body></html>`);
   w.document.close();
