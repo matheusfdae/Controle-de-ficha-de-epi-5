@@ -170,6 +170,39 @@ export type Database = {
         }
         Relationships: []
       }
+      email_convocacao_config: {
+        Row: {
+          automatico: boolean
+          destinatarios: string[]
+          dia_semana: number
+          id: number
+          ufs: string[]
+          ultimo_envio_automatico: string | null
+          updated_at: string
+          copia: string[]
+        }
+        Insert: {
+          automatico?: boolean
+          destinatarios?: string[]
+          dia_semana?: number
+          id?: number
+          ufs?: string[]
+          ultimo_envio_automatico?: string | null
+          updated_at?: string
+          copia?: string[]
+        }
+        Update: {
+          automatico?: boolean
+          destinatarios?: string[]
+          dia_semana?: number
+          id?: number
+          ufs?: string[]
+          ultimo_envio_automatico?: string | null
+          updated_at?: string
+          copia?: string[]
+        }
+        Relationships: []
+      }
       termo_coletivo_tokens: {
         Row: {
           created_at: string

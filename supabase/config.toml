@@ -36,3 +36,9 @@ verify_jwt = false
 
 [functions.senior-sincronizar-colaboradores]
 verify_jwt = false
+
+[functions.email-microsoft-login]
+verify_jwt = false
+
+[functions.enviar-convocacao-uniforme]
+verify_jwt = false

@@ -4,7 +4,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Building2, PenTool, Image as ImageIcon, Save, Trash2, Upload, Bell, Plus, Pencil, Building, Stamp, Eraser } from 'lucide-react';
+import { Building2, PenTool, Image as ImageIcon, Save, Trash2, Upload, Bell, Plus, Pencil, Building, Stamp, Eraser, Mail } from 'lucide-react';
+import EmailConvocacaoConfigCard from '@/components/EmailConvocacaoConfigCard';
+import ContaMicrosoftCard from '@/components/ContaMicrosoftCard';
+import { useAuth } from '@/contexts/AuthContext';
 import { AppConfig, getConfig, loadConfig, saveConfig } from '@/services/configService';
 import { Empresa, listEmpresas, saveEmpresa, deleteEmpresa } from '@/services/empresasService';
 import {
@@ -17,6 +20,7 @@ import { useConfirm } from '@/hooks/use-confirm';
 import { tirarFundoCarimbo } from '@/lib/carimbo';
 
 export default function Configuracoes() {
+  const { can } = useAuth();
   const [config, setConfig] = useState<AppConfig>(getConfig());
   const [novaAssinatura, setNovaAssinatura] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -169,16 +173,24 @@ export default function Configuracoes() {
         </div>
 
         <Tabs defaultValue="empresa" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-6 max-w-3xl">
+          <TabsList className="grid w-full grid-cols-7 max-w-4xl">
             <TabsTrigger value="empresa"><Building2 className="h-4 w-4 mr-1.5" />Empresa</TabsTrigger>
             <TabsTrigger value="empresas"><Building className="h-4 w-4 mr-1.5" />Empresas</TabsTrigger>
             <TabsTrigger value="logo"><ImageIcon className="h-4 w-4 mr-1.5" />Logo</TabsTrigger>
             <TabsTrigger value="assinatura"><PenTool className="h-4 w-4 mr-1.5" />Assinatura</TabsTrigger>
             <TabsTrigger value="carimbo"><Stamp className="h-4 w-4 mr-1.5" />Carimbo</TabsTrigger>
             <TabsTrigger value="alertas"><Bell className="h-4 w-4 mr-1.5" />Alertas</TabsTrigger>
+            <TabsTrigger value="email"><Mail className="h-4 w-4 mr-1.5" />E-mail</TabsTrigger>
           </TabsList>
 
           {/* EMPRESA */}
+          <TabsContent value="email">
+            <div className="space-y-4">
+              <ContaMicrosoftCard podeEditar={can('configuracoes', 'edit')} />
+              <EmailConvocacaoConfigCard podeEditar={can('configuracoes', 'edit')} />
+            </div>
+          </TabsContent>
+
           <TabsContent value="empresa">
             <Card>
               <CardHeader>

@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 import EstadoSelect, { TODOS_ESTADOS, useEstadoLembrado } from '@/components/EstadoSelect';
+import EnviarConvocacaoDialog from '@/components/EnviarConvocacaoDialog';
 import { listEpis } from '@/services/estoqueService';
 import {
   ConvocacaoUniforme, DIAS_AVISO, MESES_TROCA, calcularTrocasUniforme, criarClassificador, formatarData, situacaoTexto,
@@ -198,6 +199,7 @@ function UniformesPanel() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <EnviarConvocacaoDialog uf={uf} convocados={[...vencidos, ...proximos]} />
               <Button variant="outline" size="sm" disabled={!lista.length} onClick={() => baixarExcelConvocacao(lista, titulo)}>
                 <Download className="h-4 w-4 mr-1" /> Baixar Excel
               </Button>

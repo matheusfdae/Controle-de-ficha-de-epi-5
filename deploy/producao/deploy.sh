@@ -35,6 +35,7 @@ MIGRACOES=(
   "20261005130000_classificar_epis_uniformes.sql|SELECT to_regclass('public.estados') IS NOT NULL"
   "20261006100000_estados.sql|SELECT to_regclass('public.estados') IS NOT NULL"
   "20261008120000_postos.sql|SELECT to_regclass('public.postos') IS NOT NULL"
+  "20261008130000_email_convocacao.sql|SELECT to_regclass('public.email_convocacao_config') IS NOT NULL"
   "20260929120000_colaboradores_senior.sql|SELECT to_regclass('public.colaboradores_senior') IS NOT NULL"
   "20261009120000_colaboradores_senior_lista.sql|SELECT EXISTS (SELECT 1 FROM pg_proc WHERE proname='senior_gravar_descricoes')"
   "20261013120000_entrada_manual.sql|SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='entradas_estoque' AND column_name='motivo')"
