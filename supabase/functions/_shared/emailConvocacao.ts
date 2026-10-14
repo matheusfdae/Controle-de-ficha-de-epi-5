@@ -15,7 +15,7 @@ export function montarEmail(lista: ConvocacaoUniforme[], ufs: string[]) {
   const hoje = dataBrasilia(new Date());
   const vencidos = lista.filter(t => t.situacao === 'vencido').length;
   const linhas = lista.map(t => `<tr>
-      <td>${esc(t.nome)}</td><td>${esc(t.cpf)}</td><td>${esc(t.matricula)}</td><td>${esc(t.funcao)}</td>
+      <td>${esc(t.nome)}</td><td>${esc(t.matricula)}</td><td>${esc(t.funcao)}</td>
       <td>${esc(t.posto)}</td><td>${esc(t.uf)}</td><td>${esc(formatarData(t.dataAssinatura))}</td>
       <td>${esc(formatarData(t.dataTroca))}</td>
       <td style="color:${t.situacao === 'vencido' ? '#b91c1c' : '#b45309'};font-weight:600">${esc(situacaoTexto(t))}</td></tr>`).join('');
@@ -27,17 +27,17 @@ export function montarEmail(lista: ConvocacaoUniforme[], ufs: string[]) {
       Troca a cada ${MESES_TROCA} meses, contados da assinatura da última ficha de uniforme.</p>
     ${lista.length === 0 ? '<p>Nenhum colaborador para convocar.</p>' : `
     <table cellspacing="0" cellpadding="6" style="border-collapse:collapse;border:1px solid #cbd5e1;font-size:12px">
-      <thead><tr><th ${th}>Colaborador</th><th ${th}>CPF</th><th ${th}>Matrícula</th><th ${th}>Função</th>
+      <thead><tr><th ${th}>Colaborador</th><th ${th}>Matrícula</th><th ${th}>Função</th>
       <th ${th}>Posto</th><th ${th}>UF</th><th ${th}>Assinada em</th><th ${th}>Troca em</th><th ${th}>Situação</th></tr></thead>
       <tbody>${linhas}</tbody></table>`}
     <p style="color:#64748b;font-size:11px;margin-top:16px">Enviado automaticamente pelo sistema de Fichas de EPI/Uniforme — Grupo 5 Estrelas. A planilha segue em anexo.</p>
   </div>`;
   // Planilha Excel (.xlsx) anexa.
   const xlsx = gerarXlsx('Convocação',
-    ['Colaborador', 'CPF', 'Matrícula', 'Função', 'Posto', 'UF', 'Ficha', 'Assinada em', 'Troca em', 'Situação', 'Itens de uniforme'],
-    lista.map(t => [t.nome, t.cpf, t.matricula, t.funcao, t.posto, t.uf, t.fichaNumero ?? '',
+    ['Colaborador', 'Matrícula', 'Função', 'Posto', 'UF', 'Ficha', 'Assinada em', 'Troca em', 'Situação', 'Itens de uniforme'],
+    lista.map(t => [t.nome, t.matricula, t.funcao, t.posto, t.uf, t.fichaNumero ?? '',
       formatarData(t.dataAssinatura), formatarData(t.dataTroca), situacaoTexto(t), t.itens.join(', ')]),
-    [36, 16, 12, 24, 30, 6, 8, 13, 13, 24, 60]);
+    [36, 12, 24, 30, 6, 8, 13, 13, 24, 60]);
   return {
     assunto: `Convocação troca de uniforme — ${lista.length} colaborador(es) — ${formatarData(hoje)}`,
     html,
