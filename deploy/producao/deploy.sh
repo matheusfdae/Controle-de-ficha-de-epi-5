@@ -41,6 +41,7 @@ MIGRACOES=(
   "20261013120000_entrada_manual.sql|SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='entradas_estoque' AND column_name='motivo')"
   "20261009130000_fichas_local_centro_custo.sql|SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='fichas_epi' AND column_name='escala')"
   "20261013130000_senior_etapas.sql|SELECT EXISTS (SELECT 1 FROM pg_proc WHERE proname='senior_inativar_ausentes')"
+  "20261014130000_integracao_senior.sql|SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='colaboradores_integracao' AND column_name='uf')"
 )
 PENDENTES=()
 echo ">>> Migrations:"

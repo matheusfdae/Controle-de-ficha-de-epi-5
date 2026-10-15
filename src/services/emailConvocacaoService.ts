@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { ConvocacaoUniforme } from '@/lib/convocacaoUniforme';
+import type { PessoaIntegracao } from '../../supabase/functions/_shared/emailIntegracao';
 
 export interface EmailConvocacaoConfig {
   destinatarios: string[];
@@ -94,3 +95,35 @@ export const iniciarLoginContaMs = (tenantId: string, clientId: string, caixa: s
 export const verificarLoginContaMs = () =>
   chamarContaMs<{ pendente?: boolean; conectado?: boolean; conta?: string | null }>({ acao: 'verificar' });
 export const desconectarContaMs = () => chamarContaMs<{ conectado: boolean }>({ acao: 'desconectar' });
+
+// ---------- Lista da integração (tela Integração) ----------
+
+export interface EnvioIntegracao {
+  destinatarios: string[];
+  copia: string[];
+  pessoas: PessoaIntegracao[];
+  /** aaaa-mm-dd */
+  data: string;
+  observacao: string;
+}
+
+export async function enviarEmailIntegracao(envio: EnvioIntegracao) {
+  if (import.meta.env.DEV) {
+    const res = await fetch('/__email/enviar-integracao', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(envio),
+    });
+    const r = await res.json().catch(() => null);
+    if (!res.ok || !r?.enviado) throw new Error(r?.error || `Falha ao enviar (HTTP ${res.status})`);
+    return r as { enviado: boolean; colaboradores: number; destinatarios: number; copia: number };
+  }
+  const { data, error } = await supabase.functions.invoke('enviar-email-integracao', { body: envio });
+  const erro = (data as { error?: string } | null)?.error;
+  if (error || erro) {
+    let msg = erro;
+    if (!msg && error && 'context' in error) {
+      try { msg = (await (error.context as Response).json()).error; } catch { /* corpo não é JSON */ }
+    }
+    throw new Error(msg || error?.message || 'Falha ao enviar');
+  }
+  return data as { enviado: boolean; colaboradores: number; destinatarios: number; copia: number };
+}

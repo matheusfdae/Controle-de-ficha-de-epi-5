@@ -302,6 +302,9 @@ export type Database = {
           profile_id: string | null
           status: string
           updated_at: string
+          cpf: string | null
+          telefone: string | null
+          uf: string | null
         }
         Insert: {
           created_at?: string
@@ -317,6 +320,9 @@ export type Database = {
           profile_id?: string | null
           status?: string
           updated_at?: string
+          cpf?: string | null
+          telefone?: string | null
+          uf?: string | null
         }
         Update: {
           created_at?: string
@@ -332,6 +338,9 @@ export type Database = {
           profile_id?: string | null
           status?: string
           updated_at?: string
+          cpf?: string | null
+          telefone?: string | null
+          uf?: string | null
         }
         Relationships: [
           {

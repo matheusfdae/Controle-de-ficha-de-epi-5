@@ -42,3 +42,6 @@ verify_jwt = false
 
 [functions.enviar-convocacao-uniforme]
 verify_jwt = false
+
+[functions.enviar-email-integracao]
+verify_jwt = false
