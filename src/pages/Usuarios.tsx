@@ -317,7 +317,7 @@ export default function Usuarios() {
           </div>
           <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setShowPwd(false); setForm({ ...emptyForm }); } }}>
             <DialogTrigger asChild>
-              <Button><UserPlus className="h-4 w-4 mr-2" /> Novo Usuário</Button>
+              <Button data-guia="btn-novo-usuario"><UserPlus className="h-4 w-4 mr-2" /> Novo Usuário</Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>

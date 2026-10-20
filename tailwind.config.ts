@@ -92,10 +92,26 @@ export default {
             height: "0",
           },
         },
+        flutuar: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-6px)" },
+        },
+        acenar: {
+          "0%, 60%, 100%": { transform: "rotate(0deg)" },
+          "10%, 30%": { transform: "rotate(-6deg) translateY(-4px)" },
+          "20%, 40%": { transform: "rotate(5deg) translateY(-4px)" },
+        },
+        cutucar: {
+          "0%, 100%": { transform: "translateX(0)" },
+          "50%": { transform: "translateX(-5px)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        flutuar: "flutuar 4s ease-in-out infinite",
+        acenar: "acenar 2.5s ease-in-out infinite",
+        cutucar: "cutucar 0.8s ease-in-out infinite",
       },
     },
   },

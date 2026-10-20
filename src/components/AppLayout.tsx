@@ -4,6 +4,7 @@ import { AppSidebar } from '@/components/AppSidebar';
 import { Separator } from '@/components/ui/separator';
 import InstallAppButton from '@/components/InstallAppButton';
 import ThemeToggle from '@/components/ThemeToggle';
+import ChatAjuda from '@/components/ChatAjuda';
 
 const titles: Record<string, string> = {
   '/': 'Dashboard',
@@ -30,7 +31,7 @@ export default function AppLayout() {
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <header className="sticky top-0 z-30 h-14 flex items-center gap-2 border-b border-white/50 dark:border-white/10 bg-white/45 dark:bg-slate-950/40 backdrop-blur-xl backdrop-saturate-150 px-4">
-            <SidebarTrigger />
+            <SidebarTrigger data-guia="abrir-menu" />
             <Separator orientation="vertical" className="h-5 mx-1" />
             <h1 className="text-sm font-semibold text-foreground truncate">{title}</h1>
             <div className="ml-auto flex items-center gap-1">
@@ -41,6 +42,9 @@ export default function AppLayout() {
           <main className="flex-1">
             <Outlet />
           </main>
+          {/* Chat "Dúvidas?": só no localhost até a produção ter a chave nova do
+              Gemini (deploy/producao/configurar-assistente.sh). */}
+          {import.meta.env.DEV && <ChatAjuda />}
         </div>
       </div>
     </SidebarProvider>

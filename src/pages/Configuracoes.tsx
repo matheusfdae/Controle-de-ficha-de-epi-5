@@ -180,7 +180,7 @@ export default function Configuracoes() {
             <TabsTrigger value="assinatura"><PenTool className="h-4 w-4 mr-1.5" />Assinatura</TabsTrigger>
             <TabsTrigger value="carimbo"><Stamp className="h-4 w-4 mr-1.5" />Carimbo</TabsTrigger>
             <TabsTrigger value="alertas"><Bell className="h-4 w-4 mr-1.5" />Alertas</TabsTrigger>
-            <TabsTrigger value="email"><Mail className="h-4 w-4 mr-1.5" />E-mail</TabsTrigger>
+            <TabsTrigger value="email" data-guia="aba-config-email"><Mail className="h-4 w-4 mr-1.5" />E-mail</TabsTrigger>
           </TabsList>
 
           {/* EMPRESA */}

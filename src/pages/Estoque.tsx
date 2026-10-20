@@ -340,10 +340,10 @@ export default function Estoque() {
               <EstadoSelect value={uf} onChange={setUf} className="w-28" />
               {can('estoque', 'create') && (
                 <>
-                  <Button variant="outline" onClick={() => navigate('/estoque/entrada?modo=manual')}>
+                  <Button variant="outline" onClick={() => navigate('/estoque/entrada?modo=manual')} data-guia="btn-estoque-entrada-manual">
                     <PackagePlus className="h-4 w-4 mr-1" /> Entrada manual
                   </Button>
-                  <Button onClick={() => navigate('/estoque/entrada')}>
+                  <Button onClick={() => navigate('/estoque/entrada')} data-guia="btn-estoque-entrada-nota">
                     <PackagePlus className="h-4 w-4 mr-1" /> Entrada por nota
                   </Button>
                 </>

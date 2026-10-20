@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FilePlus2, Search, CalendarClock, Settings, ShieldCheck, LogOut, Users, Package, Briefcase, UserPlus, ClipboardSignature, HardHat, Shirt, FileSignature, MapPin, FileStack,
+  IdCard, Palette, Printer, History, BarChart3, Inbox,
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -12,34 +13,45 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ModuleId, ActionId } from '@/lib/permissions';
 
-const baseItems: Array<{ title: string; url: string; icon: typeof LayoutDashboard; end: boolean; module: ModuleId }> = [
-  { title: 'Dashboard', url: '/', icon: LayoutDashboard, end: true, module: 'dashboard' },
-  { title: 'Assinar (Tablet)', url: '/pendentes', icon: ClipboardSignature, end: false, module: 'assinar_tablet' },
-  { title: 'Vencimentos', url: '/vencimentos', icon: CalendarClock, end: false, module: 'vencimentos' },
-  { title: 'Fichas por Posto', url: '/rank-postos', icon: MapPin, end: false, module: 'rank' },
-  { title: 'Colaboradores Senior', url: '/colaboradores', icon: Users, end: false, module: 'colaboradores' },
+const baseItems: Array<{ title: string; guia: string; url: string; icon: typeof LayoutDashboard; end: boolean; module: ModuleId }> = [
+  { title: 'Dashboard', guia: 'menu-dashboard', url: '/', icon: LayoutDashboard, end: true, module: 'dashboard' },
+  { title: 'Assinar (Tablet)', guia: 'menu-assinar', url: '/pendentes', icon: ClipboardSignature, end: false, module: 'assinar_tablet' },
+  { title: 'Vencimentos', guia: 'menu-vencimentos', url: '/vencimentos', icon: CalendarClock, end: false, module: 'vencimentos' },
+  { title: 'Fichas por Posto', guia: 'menu-rank', url: '/rank-postos', icon: MapPin, end: false, module: 'rank' },
+  { title: 'Colaboradores Senior', guia: 'menu-colaboradores-senior', url: '/colaboradores', icon: Users, end: false, module: 'colaboradores' },
 ];
 
-const epiItems: Array<{ title: string; url: string; icon: typeof FilePlus2; end: boolean; module?: ModuleId; action?: ActionId }> = [
-  { title: 'Nova Ficha EPI', url: '/nova-ficha?tipo=epi', icon: FilePlus2, end: false, module: 'fichas_epi', action: 'create' },
-  { title: 'Termo Coletivo EPI', url: '/termos-coletivos', icon: FileSignature, end: false },
-  { title: 'Consultar Fichas EPI', url: '/consultar?tipo=epi', icon: Search, end: false },
+const epiItems: Array<{ title: string; guia: string; url: string; icon: typeof FilePlus2; end: boolean; module?: ModuleId; action?: ActionId }> = [
+  { title: 'Nova Ficha EPI', guia: 'menu-nova-ficha-epi', url: '/nova-ficha?tipo=epi', icon: FilePlus2, end: false, module: 'fichas_epi', action: 'create' },
+  { title: 'Termo Coletivo EPI', guia: 'menu-termo-coletivo', url: '/termos-coletivos', icon: FileSignature, end: false },
+  { title: 'Consultar Fichas EPI', guia: 'menu-consultar-epi', url: '/consultar?tipo=epi', icon: Search, end: false },
 ];
 
-const uniformeItems: Array<{ title: string; url: string; icon: typeof FilePlus2; end: boolean; module?: ModuleId; action?: ActionId }> = [
-  { title: 'Nova Ficha Uniforme', url: '/nova-ficha?tipo=uniforme', icon: FilePlus2, end: false, module: 'fichas_uniforme', action: 'create' },
-  { title: 'Consultar Fichas Uniforme', url: '/consultar?tipo=uniforme', icon: Search, end: false },
+const uniformeItems: Array<{ title: string; guia: string; url: string; icon: typeof FilePlus2; end: boolean; module?: ModuleId; action?: ActionId }> = [
+  { title: 'Nova Ficha Uniforme', guia: 'menu-nova-ficha-uniforme', url: '/nova-ficha?tipo=uniforme', icon: FilePlus2, end: false, module: 'fichas_uniforme', action: 'create' },
+  { title: 'Consultar Fichas Uniforme', guia: 'menu-consultar-uniforme', url: '/consultar?tipo=uniforme', icon: Search, end: false },
+];
+
+const crachaItems: Array<{ title: string; guia: string; url: string; icon: typeof IdCard; end: boolean; action?: ActionId }> = [
+  { title: 'Painel de Crachás', guia: 'menu-crachas', url: '/crachas', icon: IdCard, end: true },
+  { title: 'Colaboradores', guia: 'menu-crachas-colaboradores', url: '/crachas/colaboradores', icon: Users, end: false },
+  { title: 'Solicitações', guia: 'menu-crachas-solicitar', url: '/crachas/solicitar', icon: Inbox, end: false },
+  { title: 'Gerar Crachás', guia: 'menu-crachas-gerar', url: '/crachas/gerar', icon: Printer, end: false, action: 'create' },
+  { title: 'Modelos de Crachá', guia: 'menu-crachas-modelos', url: '/crachas/modelos', icon: Palette, end: false },
+  { title: 'Histórico', guia: 'menu-crachas-historico', url: '/crachas/historico', icon: History, end: false },
+  { title: 'Relatórios', guia: 'menu-crachas-relatorios', url: '/crachas/relatorios', icon: BarChart3, end: false },
+  { title: 'Config. de Crachás', guia: 'menu-crachas-config', url: '/crachas/configuracoes', icon: Settings, end: false, action: 'edit' },
 ];
 
 // "Usuários" fica de fora daqui — continua exclusivo de Admin/RH (isAdmin),
 // não vira controlável pela matriz de permissões.
-const adminItems: Array<{ title: string; url: string; icon: typeof Package; end: boolean; module: ModuleId }> = [
-  { title: 'Integração', url: '/integracao', icon: UserPlus, end: false, module: 'integracao' },
-  { title: 'Estoque', url: '/estoque', icon: Package, end: false, module: 'estoque' },
-  { title: 'Funções', url: '/funcoes', icon: Briefcase, end: false, module: 'funcoes' },
-  { title: 'Postos', url: '/postos', icon: MapPin, end: false, module: 'configuracoes' },
-  { title: 'Modelos de Ficha', url: '/modelos-ficha', icon: FileStack, end: false, module: 'configuracoes' },
-  { title: 'Configurações', url: '/configuracoes', icon: Settings, end: false, module: 'configuracoes' },
+const adminItems: Array<{ title: string; guia: string; url: string; icon: typeof Package; end: boolean; module: ModuleId }> = [
+  { title: 'Integração', guia: 'menu-integracao', url: '/integracao', icon: UserPlus, end: false, module: 'integracao' },
+  { title: 'Estoque', guia: 'menu-estoque', url: '/estoque', icon: Package, end: false, module: 'estoque' },
+  { title: 'Funções', guia: 'menu-funcoes', url: '/funcoes', icon: Briefcase, end: false, module: 'funcoes' },
+  { title: 'Postos', guia: 'menu-postos', url: '/postos', icon: MapPin, end: false, module: 'configuracoes' },
+  { title: 'Modelos de Ficha', guia: 'menu-modelos-ficha', url: '/modelos-ficha', icon: FileStack, end: false, module: 'configuracoes' },
+  { title: 'Configurações', guia: 'menu-configuracoes', url: '/configuracoes', icon: Settings, end: false, module: 'configuracoes' },
 ];
 
 export function AppSidebar() {
@@ -54,6 +66,7 @@ export function AppSidebar() {
   const visibleBaseItems = baseItems.filter(i => can(i.module, 'view'));
   const visibleEpiItems = epiItems.filter(i => !i.module || can(i.module, i.action ?? 'view'));
   const visibleUniformeItems = uniformeItems.filter(i => !i.module || can(i.module, i.action ?? 'view'));
+  const visibleCrachaItems = crachaItems.filter(i => can('crachas', i.action ?? 'view'));
   const visibleAdminItems = adminItems.filter(i => can(i.module, 'view'));
   const showAdminSection = isAdmin || visibleAdminItems.length > 0;
 
@@ -81,7 +94,7 @@ export function AppSidebar() {
               {visibleBaseItems.map(item => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={isActive(item.url, item.end)} tooltip={item.title}>
-                    <NavLink to={item.url} end={item.end} className="flex items-center gap-2.5">
+                    <NavLink to={item.url} end={item.end} data-guia={item.guia} className="flex items-center gap-2.5">
                       <item.icon className="h-4 w-4" />
                       {!collapsed && <span className="text-sm">{item.title}</span>}
                     </NavLink>
@@ -99,7 +112,7 @@ export function AppSidebar() {
               {visibleEpiItems.map(item => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={isActive(item.url.split('?')[0], item.end)} tooltip={item.title}>
-                    <NavLink to={item.url} end={item.end} className="flex items-center gap-2.5">
+                    <NavLink to={item.url} end={item.end} data-guia={item.guia} className="flex items-center gap-2.5">
                       <item.icon className="h-4 w-4" />
                       {!collapsed && <span className="text-sm">{item.title}</span>}
                     </NavLink>
@@ -117,7 +130,7 @@ export function AppSidebar() {
               {visibleUniformeItems.map(item => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={isActive(item.url.split('?')[0], item.end)} tooltip={item.title}>
-                    <NavLink to={item.url} end={item.end} className="flex items-center gap-2.5">
+                    <NavLink to={item.url} end={item.end} data-guia={item.guia} className="flex items-center gap-2.5">
                       <item.icon className="h-4 w-4" />
                       {!collapsed && <span className="text-sm">{item.title}</span>}
                     </NavLink>
@@ -128,6 +141,26 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {visibleCrachaItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="flex items-center gap-1.5"><IdCard className="h-3 w-3" /> Crachás</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleCrachaItems.map(item => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={isActive(item.url, item.end)} tooltip={item.title}>
+                      <NavLink to={item.url} end={item.end} data-guia={item.guia} className="flex items-center gap-2.5">
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span className="text-sm">{item.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
         {showAdminSection && (
           <SidebarGroup>
             <SidebarGroupLabel>Administração</SidebarGroupLabel>
@@ -136,7 +169,7 @@ export function AppSidebar() {
                 {visibleAdminItems.map(item => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive(item.url, item.end)} tooltip={item.title}>
-                      <NavLink to={item.url} end={item.end} className="flex items-center gap-2.5">
+                      <NavLink to={item.url} end={item.end} data-guia={item.guia} className="flex items-center gap-2.5">
                         <item.icon className="h-4 w-4" />
                         {!collapsed && <span className="text-sm">{item.title}</span>}
                       </NavLink>
@@ -146,7 +179,7 @@ export function AppSidebar() {
                 {isAdmin && (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={isActive('/usuarios', false)} tooltip="Usuários">
-                      <NavLink to="/usuarios" className="flex items-center gap-2.5">
+                      <NavLink to="/usuarios" data-guia="menu-usuarios" className="flex items-center gap-2.5">
                         <Users className="h-4 w-4" />
                         {!collapsed && <span className="text-sm">Usuários</span>}
                       </NavLink>

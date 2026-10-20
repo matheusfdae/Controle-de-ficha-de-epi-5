@@ -42,8 +42,10 @@ MIGRACOES=(
   "20261009130000_fichas_local_centro_custo.sql|SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='fichas_epi' AND column_name='escala')"
   "20261013130000_senior_etapas.sql|SELECT EXISTS (SELECT 1 FROM pg_proc WHERE proname='senior_inativar_ausentes')"
   "20261014130000_integracao_senior.sql|SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='colaboradores_integracao' AND column_name='uf')"
+  "20261015120000_modulo_crachas.sql|SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='cracha_employees' AND column_name='desligado_em')"
   "20261019120000_situacao_link_assinatura.sql|SELECT EXISTS (SELECT 1 FROM pg_proc WHERE proname='situacao_link_assinatura')"
   "20261020120000_reenviar_assinatura.sql|SELECT EXISTS (SELECT 1 FROM pg_proc WHERE proname='reabrir_ficha_para_assinatura')"
+  "20261020150000_cracha_solicitacao_senior.sql|SELECT EXISTS (SELECT 1 FROM pg_proc WHERE proname='cracha_solicitacao_enviar')"
 )
 PENDENTES=()
 echo ">>> Migrations:"
