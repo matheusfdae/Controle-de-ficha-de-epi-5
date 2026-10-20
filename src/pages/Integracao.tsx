@@ -251,11 +251,11 @@ export default function Integracao() {
                   {selecionados.size > 0 && (
                     <Button variant="ghost" size="sm" onClick={() => setSelecionados(new Set())}>Limpar seleção</Button>
                   )}
-                  <Button variant="outline" size="sm" disabled={!selecionados.size} onClick={abrirEmail}
+                  <Button variant="outline" size="sm" disabled={!selecionados.size} onClick={abrirEmail} data-guia="btn-integracao-email"
                     title="Envia por e-mail a lista dos selecionados (participantes da integração)">
                     <Mail className="h-4 w-4 mr-1" /> Enviar por e-mail ({selecionados.size})
                   </Button>
-                  <Button size="sm" disabled={!selecionados.size}
+                  <Button size="sm" disabled={!selecionados.size} data-guia="btn-integracao-gerar"
                     onClick={() => abrirGerarSenior(colaboradores.filter(c => selecionados.has(chaveDe(c))))}>
                     <FileSignature className="h-4 w-4 mr-1" /> Gerar fichas ({selecionados.size})
                   </Button>

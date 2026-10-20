@@ -75,7 +75,7 @@ export default function EnviarConvocacaoDialog({ uf, convocados }: { uf: string;
   return (
     <Dialog open={aberto} onOpenChange={setAberto}>
       <DialogTrigger asChild>
-        <Button size="sm"><Mail className="h-4 w-4 mr-1" /> Enviar por e-mail</Button>
+        <Button size="sm" data-guia="btn-vencimentos-email"><Mail className="h-4 w-4 mr-1" /> Enviar por e-mail</Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg">
         <DialogHeader>

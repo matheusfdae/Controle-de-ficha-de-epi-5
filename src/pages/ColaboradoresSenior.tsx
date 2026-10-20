@@ -177,7 +177,7 @@ export default function ColaboradoresSenior() {
             <Download className="h-4 w-4 mr-1" /> Baixar Excel
           </Button>
           {podeAtualizar && (
-            <Button size="sm" onClick={atualizar} disabled={atualizando}>
+            <Button size="sm" onClick={atualizar} disabled={atualizando} data-guia="btn-atualizar-senior">
               {atualizando ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
               Atualizar da Senior
             </Button>

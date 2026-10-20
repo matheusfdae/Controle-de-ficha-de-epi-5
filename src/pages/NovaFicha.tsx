@@ -456,7 +456,7 @@ export default function NovaFicha() {
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); buscarNaSenior(); } }} />
                   </div>
                 )}
-                <Button type="button" variant="secondary" onClick={() => buscarNaSenior()} disabled={buscandoSenior}>
+                <Button type="button" variant="secondary" onClick={() => buscarNaSenior()} disabled={buscandoSenior} data-guia="btn-nova-ficha-buscar">
                   {buscandoSenior ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Search className="h-4 w-4 mr-1" />}
                   Buscar
                 </Button>
@@ -693,7 +693,7 @@ export default function NovaFicha() {
           <Button variant="outline" className="flex-1" onClick={() => handleSave(false)}>
             <Save className="h-4 w-4 mr-2" /> Salvar como Pendente
           </Button>
-          <Button className="flex-1" onClick={handleFinalize}>
+          <Button className="flex-1" onClick={handleFinalize} data-guia="btn-nova-ficha-finalizar">
             <ShieldCheck className="h-4 w-4 mr-2" /> Finalizar Ficha
           </Button>
         </div>

@@ -5,6 +5,7 @@ import fs from "fs";
 import { enviarComo, iniciarLogin, renovarAcesso, verificarLogin } from "./supabase/functions/_shared/microsoft";
 import { EMAIL, montarEmail } from "./supabase/functions/_shared/emailConvocacao";
 import { montarEmailIntegracao, normalizarPessoas } from "./supabase/functions/_shared/emailIntegracao";
+import { ErroAssistente, normalizarConversa, perguntarAssistente } from "./supabase/functions/_shared/assistente";
 import {
   consultarColaborador, consultarColaboradorPorCpf, cpfValido, escolherCadastro, SeniorError,
   buscarEtapa, postoEscalaDoColaborador, type PedidoEtapa, type SeniorConfig,
@@ -102,6 +103,33 @@ function emailLocal(env: Record<string, string>): Plugin {
   };
 }
 
+/**
+ * Só no `npm run dev`: chat "Tirar dúvidas" respondido daqui do PC, com a chave
+ * GEMINI_API_KEY do .env.local (fora do git e do navegador).
+ */
+function ajudaLocal(env: Record<string, string>): Plugin {
+  return {
+    name: "ajuda-local",
+    apply: "serve",
+    configureServer(server) {
+      server.middlewares.use("/__ajuda/perguntar", async (req, res) => {
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        try {
+          if (!env.GEMINI_API_KEY) throw new ErroAssistente("Falta GEMINI_API_KEY no .env.local", 503);
+          let t = "";
+          for await (const p of req) t += p;
+          const corpo = JSON.parse(t || "{}");
+          const resposta = await perguntarAssistente(env.GEMINI_API_KEY, normalizarConversa(corpo.conversa), corpo.pagina);
+          res.end(JSON.stringify({ resposta }));
+        } catch (err) {
+          res.statusCode = err instanceof ErroAssistente ? err.status : 502;
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+        }
+      });
+    },
+  };
+}
+
 function seniorLocal(env: Record<string, string>): Plugin {
   return {
     name: "senior-local",
@@ -171,7 +199,7 @@ export default defineConfig(({ mode }) => ({
       interval: 300,
     },
   },
-  plugins: [react(), seniorLocal(loadEnv(mode, process.cwd(), "SENIOR_")), emailLocal(loadEnv(mode, process.cwd(), "MS_"))],
+  plugins: [react(), seniorLocal(loadEnv(mode, process.cwd(), "SENIOR_")), emailLocal(loadEnv(mode, process.cwd(), "MS_")), ajudaLocal(loadEnv(mode, process.cwd(), "GEMINI_"))],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

@@ -14,6 +14,565 @@ export type Database = {
   }
   public: {
     Tables: {
+      cracha_badge_templates: {
+        Row: {
+          ai_layout_bg_url: string | null
+          ai_layout_suggestion: Json | null
+          ai_layout_updated_at: string | null
+          back_background_image_url: string | null
+          background_color: string | null
+          background_image_url: string | null
+          created_at: string
+          description: string | null
+          has_back_side: boolean
+          height_mm: number
+          id: string
+          is_default: boolean
+          name: string
+          updated_at: string
+          user_id: string
+          width_mm: number
+        }
+        Insert: {
+          ai_layout_bg_url?: string | null
+          ai_layout_suggestion?: Json | null
+          ai_layout_updated_at?: string | null
+          back_background_image_url?: string | null
+          background_color?: string | null
+          background_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          has_back_side?: boolean
+          height_mm?: number
+          id?: string
+          is_default?: boolean
+          name: string
+          updated_at?: string
+          user_id: string
+          width_mm?: number
+        }
+        Update: {
+          ai_layout_bg_url?: string | null
+          ai_layout_suggestion?: Json | null
+          ai_layout_updated_at?: string | null
+          back_background_image_url?: string | null
+          background_color?: string | null
+          background_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          has_back_side?: boolean
+          height_mm?: number
+          id?: string
+          is_default?: boolean
+          name?: string
+          updated_at?: string
+          user_id?: string
+          width_mm?: number
+        }
+        Relationships: []
+      }
+      cracha_template_elements: {
+        Row: {
+          background_color: string | null
+          border_color: string | null
+          border_radius: number | null
+          border_width: number | null
+          created_at: string
+          element_type: string
+          field_binding: string | null
+          font_color: string | null
+          font_family: string | null
+          font_size: number | null
+          font_weight: string | null
+          height: number | null
+          id: string
+          name_display_mode: string
+          object_fit: string | null
+          show_label: boolean
+          side: string
+          static_value: string | null
+          template_id: string
+          text_align: string | null
+          width: number | null
+          x_position: number
+          y_position: number
+          z_index: number
+        }
+        Insert: {
+          background_color?: string | null
+          border_color?: string | null
+          border_radius?: number | null
+          border_width?: number | null
+          created_at?: string
+          element_type: string
+          field_binding?: string | null
+          font_color?: string | null
+          font_family?: string | null
+          font_size?: number | null
+          font_weight?: string | null
+          height?: number | null
+          id?: string
+          name_display_mode?: string
+          object_fit?: string | null
+          show_label?: boolean
+          side?: string
+          static_value?: string | null
+          template_id: string
+          text_align?: string | null
+          width?: number | null
+          x_position?: number
+          y_position?: number
+          z_index?: number
+        }
+        Update: {
+          background_color?: string | null
+          border_color?: string | null
+          border_radius?: number | null
+          border_width?: number | null
+          created_at?: string
+          element_type?: string
+          field_binding?: string | null
+          font_color?: string | null
+          font_family?: string | null
+          font_size?: number | null
+          font_weight?: string | null
+          height?: number | null
+          id?: string
+          name_display_mode?: string
+          object_fit?: string | null
+          show_label?: boolean
+          side?: string
+          static_value?: string | null
+          template_id?: string
+          text_align?: string | null
+          width?: number | null
+          x_position?: number
+          y_position?: number
+          z_index?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cracha_template_elements_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "cracha_badge_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cracha_employees: {
+        Row: {
+          senior_id: string | null
+          request_motivo: string | null
+          request_photo_url: string | null
+          requested_at: string | null
+          requester_senior_id: string | null
+          requester_matricula: string | null
+          requester_cargo: string | null
+          desligado_em: string | null
+          access_level: string | null
+          address: string | null
+          blood_type: string | null
+          cnv: string | null
+          company: string | null
+          connection_id: string | null
+          cpf: string | null
+          created_at: string
+          document_id: string | null
+          employee_id: string
+          full_name: string
+          id: string
+          is_valid: boolean
+          notes: string | null
+          phone: string | null
+          photo_url: string | null
+          qr_value: string | null
+          rejection_reason: string | null
+          request_reason: string | null
+          request_status: string | null
+          requester_name: string | null
+          requester_phone: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          rg: string | null
+          role: string | null
+          row_number: number | null
+          updated_at: string
+          valid_until: string | null
+          validation_errors: Json | null
+        }
+        Insert: {
+          senior_id?: string | null
+          request_motivo?: string | null
+          request_photo_url?: string | null
+          requested_at?: string | null
+          requester_senior_id?: string | null
+          requester_matricula?: string | null
+          requester_cargo?: string | null
+          desligado_em?: string | null
+          access_level?: string | null
+          address?: string | null
+          blood_type?: string | null
+          cnv?: string | null
+          company?: string | null
+          connection_id?: string | null
+          cpf?: string | null
+          created_at?: string
+          document_id?: string | null
+          employee_id: string
+          full_name: string
+          id?: string
+          is_valid?: boolean
+          notes?: string | null
+          phone?: string | null
+          photo_url?: string | null
+          qr_value?: string | null
+          rejection_reason?: string | null
+          request_reason?: string | null
+          request_status?: string | null
+          requester_name?: string | null
+          requester_phone?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          rg?: string | null
+          role?: string | null
+          row_number?: number | null
+          updated_at?: string
+          valid_until?: string | null
+          validation_errors?: Json | null
+        }
+        Update: {
+          senior_id?: string | null
+          request_motivo?: string | null
+          request_photo_url?: string | null
+          requested_at?: string | null
+          requester_senior_id?: string | null
+          requester_matricula?: string | null
+          requester_cargo?: string | null
+          desligado_em?: string | null
+          access_level?: string | null
+          address?: string | null
+          blood_type?: string | null
+          cnv?: string | null
+          company?: string | null
+          connection_id?: string | null
+          cpf?: string | null
+          created_at?: string
+          document_id?: string | null
+          employee_id?: string
+          full_name?: string
+          id?: string
+          is_valid?: boolean
+          notes?: string | null
+          phone?: string | null
+          photo_url?: string | null
+          qr_value?: string | null
+          rejection_reason?: string | null
+          request_reason?: string | null
+          request_status?: string | null
+          requester_name?: string | null
+          requester_phone?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          rg?: string | null
+          role?: string | null
+          row_number?: number | null
+          updated_at?: string
+          valid_until?: string | null
+          validation_errors?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cracha_employees_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "cracha_sheet_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cracha_generation_batches: {
+        Row: {
+          completed_at: string | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          confirmed_by_name: string | null
+          connection_id: string | null
+          created_at: string
+          error_log: Json | null
+          export_format: string
+          failed_badges: number
+          file_url: string | null
+          id: string
+          layout_config: Json | null
+          processed_badges: number
+          started_at: string | null
+          status: Database["public"]["Enums"]["cracha_batch_status"]
+          template_id: string | null
+          total_badges: number
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          confirmed_by_name?: string | null
+          connection_id?: string | null
+          created_at?: string
+          error_log?: Json | null
+          export_format?: string
+          failed_badges?: number
+          file_url?: string | null
+          id?: string
+          layout_config?: Json | null
+          processed_badges?: number
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["cracha_batch_status"]
+          template_id?: string | null
+          total_badges?: number
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          confirmed_by_name?: string | null
+          connection_id?: string | null
+          created_at?: string
+          error_log?: Json | null
+          export_format?: string
+          failed_badges?: number
+          file_url?: string | null
+          id?: string
+          layout_config?: Json | null
+          processed_badges?: number
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["cracha_batch_status"]
+          template_id?: string | null
+          total_badges?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cracha_generation_batches_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "cracha_sheet_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cracha_generation_batches_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "cracha_badge_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cracha_batch_items: {
+        Row: {
+          batch_id: string
+          created_at: string
+          employee_id: string
+          error_message: string | null
+          file_url: string | null
+          id: string
+          status: string
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          employee_id: string
+          error_message?: string | null
+          file_url?: string | null
+          id?: string
+          status?: string
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          employee_id?: string
+          error_message?: string | null
+          file_url?: string | null
+          id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cracha_batch_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "cracha_generation_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cracha_batch_items_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "cracha_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cracha_sheet_connections: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          last_synced_at: string | null
+          range_spec: string | null
+          sheet_id: string
+          sheet_name: string
+          sheet_url: string | null
+          tab_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_synced_at?: string | null
+          range_spec?: string | null
+          sheet_id: string
+          sheet_name: string
+          sheet_url?: string | null
+          tab_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_synced_at?: string | null
+          range_spec?: string | null
+          sheet_id?: string
+          sheet_name?: string
+          sheet_url?: string | null
+          tab_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      cracha_column_mappings: {
+        Row: {
+          connection_id: string
+          created_at: string
+          field_name: string
+          id: string
+          is_required: boolean
+          sheet_column: string
+        }
+        Insert: {
+          connection_id: string
+          created_at?: string
+          field_name: string
+          id?: string
+          is_required?: boolean
+          sheet_column: string
+        }
+        Update: {
+          connection_id?: string
+          created_at?: string
+          field_name?: string
+          id?: string
+          is_required?: boolean
+          sheet_column?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cracha_column_mappings_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "cracha_sheet_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cracha_sync_logs: {
+        Row: {
+          completed_at: string | null
+          connection_id: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          new_records: number
+          skipped_records: number
+          started_at: string
+          status: string
+          total_records: number
+          updated_records: number
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          connection_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          new_records?: number
+          skipped_records?: number
+          started_at?: string
+          status?: string
+          total_records?: number
+          updated_records?: number
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          connection_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          new_records?: number
+          skipped_records?: number
+          started_at?: string
+          status?: string
+          total_records?: number
+          updated_records?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cracha_sync_logs_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "cracha_sheet_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cracha_user_connections: {
+        Row: {
+          connection_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          connection_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          connection_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cracha_user_connections_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "cracha_sheet_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_config: {
         Row: {
           key: string
@@ -1680,6 +2239,29 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cracha_solicitacao_identificar: {
+        Args: { _matricula: number | null; _cpf: string | null }
+        Returns: Json
+      }
+      cracha_solicitacao_buscar: {
+        Args: { _sol_matricula: number | null; _sol_cpf: string | null; _matricula?: number | null; _cpf?: string | null }
+        Returns: Json
+      }
+      cracha_solicitacao_enviar: {
+        Args: {
+          _sol_matricula: number | null
+          _sol_cpf: string | null
+          _sol_telefone: string
+          _matricula: number | null
+          _cpf: string | null
+          _motivo: string
+          _observacao?: string
+          _foto?: string
+          _tipo_sanguineo?: string
+          _cnv?: string
+        }
+        Returns: Json
+      }
       assinar_ficha_publica: {
         Args: {
           _assinatura: string
@@ -1772,6 +2354,7 @@ export type Database = {
       registrar_entrada_estoque: { Args: { _cabecalho: Json; _itens: Json }; Returns: string }
     }
     Enums: {
+      cracha_batch_status: "pending" | "processing" | "completed" | "failed"
       app_role: "admin" | "rh" | "supervisor" | "colaborador" | "almoxarife"
       epi_categoria:
         | "protecao_cabeca"
@@ -1922,6 +2505,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      cracha_batch_status: ["pending", "processing", "completed", "failed"],
       app_role: ["admin", "rh", "supervisor", "colaborador", "almoxarife"],
       epi_categoria: [
         "protecao_cabeca",

@@ -45,3 +45,6 @@ verify_jwt = false
 
 [functions.enviar-email-integracao]
 verify_jwt = false
+
+[functions.assistente-ajuda]
+verify_jwt = false

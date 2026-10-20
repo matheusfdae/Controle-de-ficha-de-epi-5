@@ -10,7 +10,8 @@ export type ModuleId =
   | 'funcoes'
   | 'configuracoes'
   | 'assinar_tablet'
-  | 'colaboradores';
+  | 'colaboradores'
+  | 'crachas';
 
 export type ActionId = 'view' | 'create' | 'edit' | 'delete';
 
@@ -32,6 +33,7 @@ export const MODULES: ModuleDef[] = [
   { id: 'rank',             label: 'Fichas por Posto',  actions: ['view'] },
   { id: 'colaboradores',    label: 'Colaboradores Senior', actions: ['view', 'edit'] },
   { id: 'integracao',       label: 'Integração',        actions: ['view', 'create', 'edit', 'delete'] },
+  { id: 'crachas',          label: 'Crachás',           actions: ['view', 'create', 'edit', 'delete'] },
   { id: 'funcoes',          label: 'Funções',           actions: ['view', 'create', 'edit', 'delete'] },
   { id: 'configuracoes',    label: 'Configurações',     actions: ['view', 'edit'] },
 ];
@@ -69,7 +71,7 @@ export const ROLE_PRESETS: Record<RolePreset, PermissionMap> = {
     dashboard: VIEW, assinar_tablet: VIEW,
     fichas_epi: ALL, fichas_uniforme: ALL, termos_coletivos: ALL,
     vencimentos: VIEW, rank: VIEW,
-    integracao: ALL, funcoes: CRUD_NO_DEL,
+    integracao: ALL, crachas: ALL, funcoes: CRUD_NO_DEL,
     configuracoes: { view: true, edit: true },
     estoque: ALL,
   },

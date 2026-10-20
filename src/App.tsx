@@ -36,6 +36,17 @@ const TermoColetivoNovo   = lazy(() => import('./pages/TermoColetivoNovo'));
 const TermoColetivoView   = lazy(() => import('./pages/TermoColetivoView'));
 const AssinarTermoColetivo = lazy(() => import('./pages/AssinarTermoColetivo'));
 const NotFound            = lazy(() => import('./pages/NotFound'));
+// Módulo Crachás
+const CrachasPainel       = lazy(() => import('./modules/crachas/pages/Dashboard'));
+const CrachasColaboradores = lazy(() => import('./modules/crachas/pages/Colaboradores'));
+const CrachasModelos      = lazy(() => import('./modules/crachas/pages/Modelos'));
+const CrachasEditor       = lazy(() => import('./modules/crachas/pages/EditorTemplate'));
+const CrachasGerar        = lazy(() => import('./modules/crachas/pages/GerarCrachas'));
+const CrachasSolicitar    = lazy(() => import('./modules/crachas/pages/SolicitarCracha'));
+const CrachasSolicitacaoPublica = lazy(() => import('./modules/crachas/pages/SolicitarCrachaPublico'));
+const CrachasHistorico    = lazy(() => import('./modules/crachas/pages/Historico'));
+const CrachasRelatorios   = lazy(() => import('./modules/crachas/pages/Relatorios'));
+const CrachasConfiguracoes = lazy(() => import('./modules/crachas/pages/Configuracoes'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -108,6 +119,7 @@ function AppRoutes() {
         <Route path="/reset-password"  element={<ResetPassword />} />
         <Route path="/assinar/:token"     element={<AssinarFicha />} />
         <Route path="/assinar-termo-coletivo/:token" element={<AssinarTermoColetivo />} />
+        <Route path="/crachas/solicitacao" element={<CrachasSolicitacaoPublica />} />
         <Route element={<ProtectedLayout />}>
           <Route path="/"             element={<Dashboard />} />
           <Route path="/nova-ficha"   element={<RequireNovaFicha><NovaFicha /></RequireNovaFicha>} />
@@ -129,6 +141,15 @@ function AppRoutes() {
           <Route path="/termos-coletivos" element={<RequireModule module="termos_coletivos"><TermosColetivos /></RequireModule>} />
           <Route path="/termo-coletivo/novo" element={<RequireModule module="termos_coletivos" action="create"><TermoColetivoNovo /></RequireModule>} />
           <Route path="/termo-coletivo/:id" element={<RequireModule module="termos_coletivos"><TermoColetivoView /></RequireModule>} />
+          <Route path="/crachas"               element={<RequireModule module="crachas"><CrachasPainel /></RequireModule>} />
+          <Route path="/crachas/colaboradores" element={<RequireModule module="crachas"><CrachasColaboradores /></RequireModule>} />
+          <Route path="/crachas/modelos"       element={<RequireModule module="crachas"><CrachasModelos /></RequireModule>} />
+          <Route path="/crachas/modelos/:id"   element={<RequireModule module="crachas" action="edit"><CrachasEditor /></RequireModule>} />
+          <Route path="/crachas/gerar"         element={<RequireModule module="crachas" action="create"><CrachasGerar /></RequireModule>} />
+          <Route path="/crachas/solicitar"     element={<RequireModule module="crachas"><CrachasSolicitar /></RequireModule>} />
+          <Route path="/crachas/historico"     element={<RequireModule module="crachas"><CrachasHistorico /></RequireModule>} />
+          <Route path="/crachas/relatorios"    element={<RequireModule module="crachas"><CrachasRelatorios /></RequireModule>} />
+          <Route path="/crachas/configuracoes" element={<RequireModule module="crachas" action="edit"><CrachasConfiguracoes /></RequireModule>} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>
