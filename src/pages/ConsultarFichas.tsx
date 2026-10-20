@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Download, ClipboardList, MessageCircle, Upload, FileSpreadsheet, Trash2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Eye, Download, ClipboardList, MessageCircle, Upload, FileSpreadsheet, Trash2, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { EPIFicha } from '@/types/epi';
+import { EPIFicha, MotivoEntrega } from '@/types/epi';
 import { getFichas, deleteFicha, criarTokenAssinatura } from '@/services/fichaService';
 import { generatePDF } from '@/services/pdfService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,6 +19,22 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 
+const MOTIVO_LABEL: Record<MotivoEntrega, string> = {
+  admissao: 'Admissão',
+  substituicao: 'Substituição',
+  perda_extravio: 'Perda/Extravio',
+  demissao: 'Demissão',
+  complemento: 'Complemento',
+};
+
+const normalizar = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+/** Data (YYYY-MM-DD) no fuso local, para comparar com os campos de data. */
+const diaLocal = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 export default function ConsultarFichas() {
   const { can } = useAuth();
   const canCreate = can('fichas_epi', 'create');
@@ -25,7 +43,32 @@ export default function ConsultarFichas() {
   const [importing, setImporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [uf, setUf] = useEstadoLembrado('consultar-fichas', true);
-  const visiveis = uf === TODOS_ESTADOS ? fichas : fichas.filter(f => f.uf === uf);
+  const [busca, setBusca] = useState('');
+  const [status, setStatus] = useState<'todos' | EPIFicha['status']>('todos');
+  const [motivo, setMotivo] = useState<'todos' | MotivoEntrega>('todos');
+  const [dataDe, setDataDe] = useState('');
+  const [dataAte, setDataAte] = useState('');
+  const temFiltro = !!busca || status !== 'todos' || motivo !== 'todos' || !!dataDe || !!dataAte;
+  const limparFiltros = () => {
+    setBusca(''); setStatus('todos'); setMotivo('todos'); setDataDe(''); setDataAte('');
+  };
+
+  const termo = normalizar(busca.trim());
+  const termoDigitos = busca.replace(/\D/g, '');
+  const visiveis = fichas.filter(f => {
+    if (uf !== TODOS_ESTADOS && f.uf !== uf) return false;
+    if (status !== 'todos' && f.status !== status) return false;
+    if (motivo !== 'todos' && f.motivo !== motivo) return false;
+    const dia = diaLocal(f.criadoEm);
+    if (dataDe && dia < dataDe) return false;
+    if (dataAte && dia > dataAte) return false;
+    if (termo) {
+      const texto = normalizar([f.nomeFuncionario, f.matricula, f.posto, f.funcao, f.numero].join(' '));
+      const cpfBate = termoDigitos.length >= 3 && (f.cpf || '').replace(/\D/g, '').includes(termoDigitos);
+      if (!texto.includes(termo) && !cpfBate) return false;
+    }
+    return true;
+  });
   const ufImportacao = uf === TODOS_ESTADOS ? '' : uf;
 
   const reload = () => getFichas().then(setFichas);
@@ -96,11 +139,58 @@ export default function ConsultarFichas() {
           )}
         </div>
 
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar por nome, CPF, matrícula, posto ou função..."
+                className="pl-9"
+              />
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os status</SelectItem>
+                  <SelectItem value="pendente">Pendente</SelectItem>
+                  <SelectItem value="assinada">Assinada</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={motivo} onValueChange={(v) => setMotivo(v as typeof motivo)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os motivos</SelectItem>
+                  {(Object.keys(MOTIVO_LABEL) as MotivoEntrega[]).map(m => (
+                    <SelectItem key={m} value={m}>{MOTIVO_LABEL[m]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input type="date" value={dataDe} max={dataAte || undefined}
+                onChange={(e) => setDataDe(e.target.value)} title="Criada a partir de" aria-label="Data inicial" />
+              <Input type="date" value={dataAte} min={dataDe || undefined}
+                onChange={(e) => setDataAte(e.target.value)} title="Criada até" aria-label="Data final" />
+            </div>
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>{visiveis.length} ficha(s){temFiltro ? ' encontrada(s)' : ''}</span>
+              {temFiltro && (
+                <Button variant="ghost" size="sm" onClick={limparFiltros}>
+                  <X className="h-4 w-4 mr-1" /> Limpar filtros
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         {visiveis.length === 0 ? (
           <div className="text-center py-16 space-y-3">
             <ClipboardList className="h-12 w-12 mx-auto text-muted-foreground/40" />
             <p className="text-muted-foreground">Nenhuma ficha encontrada.</p>
-            {canCreate && <Link to="/nova-ficha"><Button>Criar Nova Ficha</Button></Link>}
+            {temFiltro
+              ? <Button variant="outline" onClick={limparFiltros}>Limpar filtros</Button>
+              : canCreate && <Link to="/nova-ficha"><Button>Criar Nova Ficha</Button></Link>}
           </div>
         ) : (
           <div className="space-y-3">
