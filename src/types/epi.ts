@@ -50,6 +50,11 @@ export interface EPIFicha {
   itens: EPIItem[];
   assinaturaColaborador?: string;
   assinaturaResponsavel?: string;
+  /** Selfie tirada logo após a rubrica (só para GRAVAR; fica em fichas_selfies, que só admin/RH leem). */
+  selfieColaborador?: string;
+  selfieEm?: string;
+  /** IP de quem assinou pelo link/tablet. */
+  ipAssinatura?: string;
   status: 'pendente' | 'assinada';
   criadoEm: string;
   assinadoEm?: string;

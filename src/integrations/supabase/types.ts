@@ -729,36 +729,30 @@ export type Database = {
         }
         Relationships: []
       }
-      email_convocacao_config: {
+      fichas_selfies: {
         Row: {
-          automatico: boolean
-          destinatarios: string[]
-          dia_semana: number
-          id: number
-          ufs: string[]
-          ultimo_envio_automatico: string | null
-          updated_at: string
-          copia: string[]
+          colhida_por: string | null
+          created_at: string
+          ficha_id: string
+          id: string
+          selfie: string
+          tirada_em: string
         }
         Insert: {
-          automatico?: boolean
-          destinatarios?: string[]
-          dia_semana?: number
-          id?: number
-          ufs?: string[]
-          ultimo_envio_automatico?: string | null
-          updated_at?: string
-          copia?: string[]
+          colhida_por?: string | null
+          created_at?: string
+          ficha_id: string
+          id?: string
+          selfie: string
+          tirada_em?: string
         }
         Update: {
-          automatico?: boolean
-          destinatarios?: string[]
-          dia_semana?: number
-          id?: number
-          ufs?: string[]
-          ultimo_envio_automatico?: string | null
-          updated_at?: string
-          copia?: string[]
+          colhida_por?: string | null
+          created_at?: string
+          ficha_id?: string
+          id?: string
+          selfie?: string
+          tirada_em?: string
         }
         Relationships: []
       }
@@ -921,6 +915,39 @@ export type Database = {
         Row: { uf: string; user_id: string }
         Insert: { uf: string; user_id: string }
         Update: { uf?: string; user_id?: string }
+        Relationships: []
+      }
+      email_convocacao_config: {
+        Row: {
+          automatico: boolean
+          destinatarios: string[]
+          dia_semana: number
+          id: number
+          ufs: string[]
+          ultimo_envio_automatico: string | null
+          updated_at: string
+          copia: string[]
+        }
+        Insert: {
+          automatico?: boolean
+          destinatarios?: string[]
+          dia_semana?: number
+          id?: number
+          ufs?: string[]
+          ultimo_envio_automatico?: string | null
+          updated_at?: string
+          copia?: string[]
+        }
+        Update: {
+          automatico?: boolean
+          destinatarios?: string[]
+          dia_semana?: number
+          id?: number
+          ufs?: string[]
+          ultimo_envio_automatico?: string | null
+          updated_at?: string
+          copia?: string[]
+        }
         Relationships: []
       }
       entradas_estoque: {
@@ -2292,6 +2319,7 @@ export type Database = {
         Args: {
           _assinatura: string
           _ip?: string
+          _selfie?: string
           _itens_recebidos: string[]
           _token: string
         }

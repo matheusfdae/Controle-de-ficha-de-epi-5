@@ -7,6 +7,7 @@ import { EPIFicha } from '@/types/epi';
 import { getFichaPorToken, assinarFichaPublica, situacaoLinkAssinatura, type SituacaoLink } from '@/services/fichaService';
 import { generatePDF } from '@/services/pdfService';
 import SignaturePad from '@/components/SignaturePad';
+import SelfieAssinatura from '@/components/SelfieAssinatura';
 import FichaOficialView from '@/components/FichaOficialView';
 import { toast } from 'sonner';
 
@@ -14,6 +15,7 @@ export default function AssinarFicha() {
   const { token } = useParams<{ token: string }>();
   const [ficha, setFicha] = useState<EPIFicha | null>(null);
   const [assinatura, setAssinatura] = useState('');
+  const [selfie, setSelfie] = useState('');
   const [itensRecebidos, setItensRecebidos] = useState<Record<string, boolean>>({});
   // Por que a ficha não abriu: cada caso tem a sua mensagem (antes era tudo "Link inválido").
   const [estado, setEstado] = useState<'carregando' | 'ok' | 'sem_conexao' | SituacaoLink>('carregando');
@@ -119,9 +121,10 @@ export default function AssinarFicha() {
     const recebidosIds = Object.entries(itensRecebidos).filter(([,v]) => v).map(([k]) => k);
     if (recebidosIds.length === 0) { toast.error('Marque ao menos um item recebido'); return; }
     if (!assinatura) { toast.error('Por favor, assine no campo abaixo'); return; }
+    if (!selfie) { toast.error('Tire a selfie logo após a assinatura'); return; }
 
     if (!token) return;
-    const r = await assinarFichaPublica(token, assinatura, recebidosIds);
+    const r = await assinarFichaPublica(token, assinatura, recebidosIds, selfie);
     if (!r.ok) {
       // O link deixou de valer enquanto a tela estava aberta: mostra o motivo certo.
       if (r.error === 'token_invalido') {
@@ -130,6 +133,7 @@ export default function AssinarFicha() {
       toast.error(
         r.error === 'ja_assinada' ? 'Esta ficha já foi assinada.'
         : r.error === 'token_invalido' ? 'Link inválido, expirado ou já utilizado.'
+        : r.error === 'selfie_obrigatoria' ? 'Tire a selfie logo após a assinatura.'
         : (r.error || 'Erro ao assinar')
       );
       return;
@@ -138,6 +142,8 @@ export default function AssinarFicha() {
       ...ficha,
       itens: ficha.itens.map(i => ({ ...i, recebido: itensRecebidos[i.id] || false })),
       assinaturaColaborador: assinatura,
+      selfieColaborador: selfie,
+      selfieEm: new Date().toISOString(),
       status: 'assinada',
       assinadoEm: new Date().toISOString(),
     };
@@ -164,6 +170,7 @@ export default function AssinarFicha() {
             signatureSlot: (
               <div className="space-y-3 max-w-md mx-auto">
                 <SignaturePad label="Assine aqui" onSave={setAssinatura} />
+                <SelfieAssinatura value={selfie} onChange={setSelfie} habilitado={!!assinatura} />
                 <Button className="w-full" size="lg" onClick={handleSign}>
                   Confirmar Recebimento e Assinar
                 </Button>
