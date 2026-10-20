@@ -1,18 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Download, Copy, MessageCircle, Mail, CheckCircle2, Pencil, Plus, Trash2, Save, X } from 'lucide-react';
+import { ArrowLeft, Download, MessageCircle, CheckCircle2, Pencil, Plus, Trash2, Save, X } from 'lucide-react';
 import { EPIFicha, EPIItem } from '@/types/epi';
-import { getFichaById, saveFicha, generateId, criarTokenAssinatura } from '@/services/fichaService';
+import { getFichaById, saveFicha, generateId, listarAssinaturasAnteriores, type AssinaturaAnterior } from '@/services/fichaService';
+import ReenviarAssinaturaDialog from '@/components/ReenviarAssinaturaDialog';
 import { generatePDF } from '@/services/pdfService';
 import SignaturePad from '@/components/SignaturePad';
 import { useAuth } from '@/contexts/AuthContext';
 import FichaOficialView from '@/components/FichaOficialView';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
@@ -31,21 +29,24 @@ export default function VisualizarFicha() {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<EPIFicha | null>(null);
   const [epis, setEpis] = useState<EPI[]>([]);
-  const [shareUrl, setShareUrl] = useState('');
-  const [gerandoLink, setGerandoLink] = useState(false);
+  const [anteriores, setAnteriores] = useState<AssinaturaAnterior[]>([]);
+
+  const carregar = useCallback(() => {
+    if (!id) return;
+    getFichaById(id).then(f => {
+      if (f) {
+        setFicha(f);
+        setAssinaturaColaborador(f.assinaturaColaborador || '');
+        setAssinaturaResponsavel(f.assinaturaResponsavel || '');
+      }
+    });
+    listarAssinaturasAnteriores(id).then(setAnteriores).catch(() => setAnteriores([]));
+  }, [id]);
 
   useEffect(() => {
-    if (id) {
-      getFichaById(id).then(f => {
-        if (f) {
-          setFicha(f);
-          setAssinaturaColaborador(f.assinaturaColaborador || '');
-          setAssinaturaResponsavel(f.assinaturaResponsavel || '');
-        }
-      });
-    }
+    carregar();
     listEpis().then(setEpis).catch(() => {});
-  }, [id]);
+  }, [carregar]);
 
   if (!ficha) {
     return (
@@ -81,37 +82,6 @@ export default function VisualizarFicha() {
     }
   };
 
-  const gerarLink = async () => {
-    if (shareUrl || gerandoLink) return;
-    setGerandoLink(true);
-    const token = await criarTokenAssinatura(ficha.id);
-    setGerandoLink(false);
-    if (!token) { toast.error('Erro ao gerar link de assinatura'); return; }
-    setShareUrl(`${window.location.origin}/assinar/${token}`);
-  };
-
-  const shareMessage = `Olá ${ficha.nomeFuncionario}, segue o link para assinatura da sua ficha de EPI: ${shareUrl}`;
-
-  const copyLink = () => {
-    if (!shareUrl) return;
-    navigator.clipboard.writeText(shareUrl);
-    toast.success('Link copiado!');
-  };
-  const sendWhatsApp = () => {
-    if (!shareUrl) return;
-    const phone = (ficha.telefone || '').replace(/\D/g, '');
-    const url = phone
-      ? `https://wa.me/55${phone}?text=${encodeURIComponent(shareMessage)}`
-      : `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
-    window.open(url, '_blank');
-  };
-  const sendEmail = () => {
-    if (!shareUrl) return;
-    const subject = encodeURIComponent('Assinatura de Ficha de EPI');
-    const body = encodeURIComponent(shareMessage);
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
-  };
-
   return (
     <div className="p-4 lg:p-8 pb-20">
       <div className="max-w-6xl mx-auto space-y-4">
@@ -129,39 +99,12 @@ export default function VisualizarFicha() {
 
         {/* Ações */}
         <div className="flex flex-wrap gap-2">
-          {!isSigned && canEdit && (
-            <Dialog onOpenChange={(open) => { if (open) gerarLink(); }}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <MessageCircle className="h-4 w-4 mr-2" /> Enviar Link de Assinatura
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Enviar para assinatura remota</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-3">
-                  <div>
-                    <Label>Link público</Label>
-                    <Input readOnly value={gerandoLink ? 'Gerando link…' : shareUrl} onClick={(e) => e.currentTarget.select()} />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    O colaborador abre o link, marca os itens recebidos e assina diretamente do celular.
-                  </p>
-                </div>
-                <DialogFooter className="flex-wrap gap-2 sm:flex-row">
-                  <Button variant="outline" onClick={copyLink}>
-                    <Copy className="h-4 w-4 mr-2" /> Copiar
-                  </Button>
-                  <Button variant="outline" onClick={sendEmail}>
-                    <Mail className="h-4 w-4 mr-2" /> Email
-                  </Button>
-                  <Button onClick={sendWhatsApp} className="bg-whatsapp hover:bg-whatsapp-hover text-white">
-                    <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+          {canEdit && (
+            <ReenviarAssinaturaDialog ficha={ficha} onReaberta={carregar} trigger={
+              <Button variant="outline">
+                <MessageCircle className="h-4 w-4 mr-2" /> {isSigned ? 'Reenviar para Assinatura' : 'Enviar Link de Assinatura'}
+              </Button>
+            } />
           )}
           <Button variant={isSigned ? 'default' : 'outline'} onClick={() => generatePDF(ficha)}>
             <Download className="h-4 w-4 mr-2" /> Baixar PDF
@@ -269,6 +212,30 @@ export default function VisualizarFicha() {
 
         {/* Ficha oficial */}
         <FichaOficialView ficha={ficha} />
+
+        {/* Histórico: assinaturas que a ficha teve antes de ser reenviada */}
+        {anteriores.length > 0 && (
+          <Card>
+            <CardHeader><CardTitle className="text-base">Assinaturas anteriores ({anteriores.length})</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {anteriores.map(a => (
+                <div key={a.id} className="rounded-md border p-3 flex flex-col sm:flex-row gap-3">
+                  {a.assinatura
+                    ? <img src={a.assinatura} alt="rubrica anterior" className="h-16 w-40 object-contain bg-white border rounded" />
+                    : <div className="h-16 w-40 flex items-center justify-center text-xs text-muted-foreground border rounded">sem rubrica</div>}
+                  <div className="text-sm space-y-0.5 min-w-0">
+                    <p><b>Assinada em:</b> {a.assinadaEm ? new Date(a.assinadaEm).toLocaleString('pt-BR') : '—'}{a.ip ? ` · IP ${a.ip}` : ''}</p>
+                    <p><b>Reenviada em:</b> {new Date(a.reabertaEm).toLocaleString('pt-BR')}{a.reabertaPor ? ` por ${a.reabertaPor}` : ''}</p>
+                    <p><b>Motivo:</b> {a.motivo}</p>
+                    <p className="text-muted-foreground text-xs">
+                      Itens nessa assinatura: {a.itens.map(i => `${i.quantidade}x ${i.descricao}${i.tamanho ? ` (${i.tamanho})` : ''}`).join('; ') || '—'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Assinatura presencial (admin) */}
         {!isSigned && canEdit && (
