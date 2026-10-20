@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Eye, Download, ClipboardList, MessageCircle, Upload, FileSpreadsheet, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { EPIFicha } from '@/types/epi';
-import { getFichas, deleteFicha, criarTokenAssinatura } from '@/services/fichaService';
+import { getFichas, deleteFicha } from '@/services/fichaService';
+import ReenviarAssinaturaDialog from '@/components/ReenviarAssinaturaDialog';
 import { generatePDF } from '@/services/pdfService';
 import { useAuth } from '@/contexts/AuthContext';
 import { importFichasFromExcel, downloadTemplateExcel } from '@/services/importFichasService';
@@ -126,25 +127,12 @@ export default function ConsultarFichas() {
                     <Button variant="ghost" size="icon" title="Baixar PDF" onClick={() => generatePDF(ficha)}>
                       <Download className="h-4 w-4" />
                     </Button>
-                    {ficha.status !== 'assinada' && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Enviar link de assinatura via WhatsApp"
-                        onClick={async () => {
-                          const tel = (ficha.telefone || '').replace(/\D/g, '');
-                          if (!tel) { toast.error('Telefone do colaborador não cadastrado'); return; }
-                          const token = await criarTokenAssinatura(ficha.id);
-                          if (!token) { toast.error('Erro ao gerar link de assinatura'); return; }
-                          const numero = tel.startsWith('55') ? tel : `55${tel}`;
-                          const url = `${window.location.origin}/assinar/${token}`;
-                          const msg = encodeURIComponent(`Olá ${ficha.nomeFuncionario}, segue o link para assinatura da sua ficha de EPI/Uniforme: ${url}`);
-                          window.open(`https://wa.me/${numero}?text=${msg}`, '_blank');
-                        }}
-                      >
-                        <MessageCircle className="h-4 w-4 text-success" />
+                    <ReenviarAssinaturaDialog ficha={ficha} onReaberta={reload} trigger={
+                      <Button variant="ghost" size="icon"
+                        title={ficha.status === 'assinada' ? 'Reenviar para nova assinatura' : 'Enviar link de assinatura'}>
+                        <MessageCircle className={ficha.status === 'assinada' ? 'h-4 w-4 text-muted-foreground' : 'h-4 w-4 text-success'} />
                       </Button>
-                    )}
+                    } />
                     {canDelete && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>

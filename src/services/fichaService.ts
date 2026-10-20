@@ -131,6 +131,45 @@ export async function getFichaById(id: string): Promise<EPIFicha | undefined> {
   return mapFichaFromDB(ficha, itens ?? []);
 }
 
+/**
+ * Reabre a ficha para uma nova assinatura (inclusive se já foi assinada): a assinatura
+ * atual vai para o histórico (fichas_assinaturas_anteriores), a ficha volta a pendente
+ * e devolve o token do link novo.
+ */
+export async function reabrirParaAssinatura(fichaId: string, motivo: string): Promise<string> {
+  const { data, error } = await supabase.rpc('reabrir_ficha_para_assinatura', { _ficha_id: fichaId, _motivo: motivo });
+  if (error) throw new Error(error.message);
+  return data as string;
+}
+
+export interface AssinaturaAnterior {
+  id: string;
+  assinatura: string | null;
+  assinadaEm: string | null;
+  ip: string | null;
+  motivo: string;
+  reabertaPor: string | null;
+  reabertaEm: string;
+  itens: { descricao: string; quantidade: number; tamanho: string | null; ca: string | null; recebido: boolean }[];
+}
+
+/** Assinaturas que a ficha teve antes de ser reenviada (mais recente primeiro). */
+export async function listarAssinaturasAnteriores(fichaId: string): Promise<AssinaturaAnterior[]> {
+  const { data, error } = await supabase.from('fichas_assinaturas_anteriores').select('*')
+    .eq('ficha_id', fichaId).order('reaberta_em', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(r => ({
+    id: r.id,
+    assinatura: r.assinatura_colaborador_url,
+    assinadaEm: r.data_assinatura_colaborador,
+    ip: r.ip_assinatura,
+    motivo: r.motivo,
+    reabertaPor: r.reaberta_por_nome,
+    reabertaEm: r.reaberta_em,
+    itens: (r.itens as AssinaturaAnterior['itens']) ?? [],
+  }));
+}
+
 /** Gera um token de assinatura de uso único (72h) para compartilhar via link público. */
 export async function criarTokenAssinatura(fichaId: string): Promise<string | null> {
   const { data, error } = await supabase
