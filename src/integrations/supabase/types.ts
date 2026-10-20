@@ -747,6 +747,59 @@ export type Database = {
           },
         ]
       }
+      fichas_assinaturas_anteriores: {
+        Row: {
+          assinatura_colaborador_url: string | null
+          assinatura_supervisor_url: string | null
+          dados: Json
+          data_assinatura_colaborador: string | null
+          ficha_id: string
+          id: string
+          ip_assinatura: string | null
+          itens: Json
+          motivo: string
+          reaberta_em: string
+          reaberta_por: string | null
+          reaberta_por_nome: string | null
+        }
+        Insert: {
+          assinatura_colaborador_url?: string | null
+          assinatura_supervisor_url?: string | null
+          dados: Json
+          data_assinatura_colaborador?: string | null
+          ficha_id: string
+          id?: string
+          ip_assinatura?: string | null
+          itens: Json
+          motivo: string
+          reaberta_em?: string
+          reaberta_por?: string | null
+          reaberta_por_nome?: string | null
+        }
+        Update: {
+          assinatura_colaborador_url?: string | null
+          assinatura_supervisor_url?: string | null
+          dados?: Json
+          data_assinatura_colaborador?: string | null
+          ficha_id?: string
+          id?: string
+          ip_assinatura?: string | null
+          itens?: Json
+          motivo?: string
+          reaberta_em?: string
+          reaberta_por?: string | null
+          reaberta_por_nome?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fichas_assinaturas_anteriores_ficha_id_fkey"
+            columns: ["ficha_id"]
+            isOneToOne: false
+            referencedRelation: "fichas_epi"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fichas_epi_itens: {
         Row: {
           ca: string | null
@@ -1652,6 +1705,7 @@ export type Database = {
       get_ficha_publica: { Args: { _ficha_id: string }; Returns: Json }
       get_ficha_publica_por_token: { Args: { _token: string }; Returns: Json }
       situacao_link_assinatura: { Args: { _token: string }; Returns: Json }
+      reabrir_ficha_para_assinatura: { Args: { _ficha_id: string; _motivo: string }; Returns: string }
       assinar_ficha_publica_por_token: {
         Args: {
           _assinatura: string
