@@ -142,12 +142,25 @@ export async function criarTokenAssinatura(fichaId: string): Promise<string | nu
   return data.token;
 }
 
-/** Busca pública (sem login), via token de assinatura_tokens — usada no link de assinatura remota. */
+/**
+ * Busca pública (sem login), via token de assinatura_tokens — usada no link de assinatura remota.
+ * Sem ficha (link usado, vencido ou errado) devolve undefined; falha de conexão lança erro.
+ */
 export async function getFichaPorToken(token: string): Promise<EPIFicha | undefined> {
-  const { data: pub } = await supabase.rpc('get_ficha_publica_por_token', { _token: token });
+  const { data: pub, error } = await supabase.rpc('get_ficha_publica_por_token', { _token: token });
+  if (error) throw error;
   if (!pub) return undefined;
   const payload = pub as { ficha: FichaRow; itens: ItemRow[] };
   return mapFichaFromDB(payload.ficha, payload.itens ?? []);
+}
+
+export type SituacaoLink = { situacao: 'valido' | 'usado' | 'vencido' | 'inexistente'; usado_em?: string | null; expira_em?: string | null };
+
+/** Por que o link não abriu (já usado, vencido ou inexistente) — sem dados da ficha. */
+export async function situacaoLinkAssinatura(token: string): Promise<SituacaoLink> {
+  const { data, error } = await supabase.rpc('situacao_link_assinatura', { _token: token });
+  if (error) throw error;
+  return data as SituacaoLink;
 }
 
 export async function saveFicha(ficha: EPIFicha): Promise<void> {

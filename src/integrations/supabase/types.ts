@@ -1651,6 +1651,7 @@ export type Database = {
       get_combo_publico: { Args: { _ficha_id: string }; Returns: Json }
       get_ficha_publica: { Args: { _ficha_id: string }; Returns: Json }
       get_ficha_publica_por_token: { Args: { _token: string }; Returns: Json }
+      situacao_link_assinatura: { Args: { _token: string }; Returns: Json }
       assinar_ficha_publica_por_token: {
         Args: {
           _assinatura: string

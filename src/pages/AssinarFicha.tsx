@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, Download, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, Clock, Download, Link2Off, Loader2, RefreshCw, ShieldCheck, WifiOff } from 'lucide-react';
 import { EPIFicha } from '@/types/epi';
-import { getFichaPorToken, assinarFichaPublica } from '@/services/fichaService';
+import { getFichaPorToken, assinarFichaPublica, situacaoLinkAssinatura, type SituacaoLink } from '@/services/fichaService';
 import { generatePDF } from '@/services/pdfService';
 import SignaturePad from '@/components/SignaturePad';
 import FichaOficialView from '@/components/FichaOficialView';
@@ -15,24 +15,78 @@ export default function AssinarFicha() {
   const [ficha, setFicha] = useState<EPIFicha | null>(null);
   const [assinatura, setAssinatura] = useState('');
   const [itensRecebidos, setItensRecebidos] = useState<Record<string, boolean>>({});
+  // Por que a ficha não abriu: cada caso tem a sua mensagem (antes era tudo "Link inválido").
+  const [estado, setEstado] = useState<'carregando' | 'ok' | 'sem_conexao' | SituacaoLink>('carregando');
 
-  useEffect(() => {
-    if (token) {
-      getFichaPorToken(token).then(f => {
-        if (f) {
-          setFicha(f);
-          const rec: Record<string, boolean> = {};
-          f.itens.forEach(i => { rec[i.id] = i.recebido; });
-          setItensRecebidos(rec);
-        }
-      });
+  const carregar = useCallback(async () => {
+    if (!token) { setEstado({ situacao: 'inexistente' }); return; }
+    setEstado('carregando');
+    try {
+      const f = await getFichaPorToken(token);
+      if (f) {
+        setFicha(f);
+        const rec: Record<string, boolean> = {};
+        f.itens.forEach(i => { rec[i.id] = i.recebido; });
+        setItensRecebidos(rec);
+        setEstado('ok');
+        return;
+      }
+      setEstado(await situacaoLinkAssinatura(token));
+    } catch {
+      setEstado('sem_conexao');
     }
   }, [token]);
 
+  useEffect(() => { carregar(); }, [carregar]);
+
   if (!ficha) {
+    const dataHora = (iso?: string | null) => iso
+      ? new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : '';
+    const aviso = estado === 'carregando' ? null
+      : estado === 'sem_conexao' ? {
+          icone: <WifiOff className="h-12 w-12 mx-auto text-warning" />,
+          titulo: 'Não foi possível carregar a ficha',
+          texto: 'Verifique a internet do celular e tente de novo.',
+          tentar: true,
+        }
+      : estado !== 'ok' && estado.situacao === 'usado' ? {
+          icone: <CheckCircle2 className="h-12 w-12 mx-auto text-success" />,
+          titulo: 'Ficha já assinada',
+          texto: `Esta ficha já foi assinada${estado.usado_em ? ` em ${dataHora(estado.usado_em)}` : ''}. Não é preciso fazer mais nada.`,
+        }
+      : estado !== 'ok' && estado.situacao === 'vencido' ? {
+          icone: <Clock className="h-12 w-12 mx-auto text-warning" />,
+          titulo: 'Link vencido',
+          texto: `O link vale por 72 horas e venceu${estado.expira_em ? ` em ${dataHora(estado.expira_em)}` : ''}. Peça um novo link ao responsável pela entrega.`,
+        }
+      : estado !== 'ok' && estado.situacao === 'valido' ? {
+          // O token vale mas a ficha não veio (ex.: ficha excluída depois de gerar o link).
+          icone: <Link2Off className="h-12 w-12 mx-auto text-muted-foreground" />,
+          titulo: 'Ficha não encontrada',
+          texto: 'Esta ficha não está mais disponível. Fale com o responsável pela entrega.',
+        }
+      : {
+          icone: <Link2Off className="h-12 w-12 mx-auto text-muted-foreground" />,
+          titulo: 'Link inválido',
+          texto: 'Confira se o link foi copiado inteiro. Se continuar, peça um novo link ao responsável pela entrega.',
+        };
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <p className="text-muted-foreground">Link inválido, expirado ou já utilizado.</p>
+        {!aviso ? (
+          <p className="text-muted-foreground flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Carregando a ficha…</p>
+        ) : (
+          <Card className="max-w-md w-full text-center">
+            <CardContent className="py-8 space-y-3">
+              {aviso.icone}
+              <h2 className="text-xl font-bold">{aviso.titulo}</h2>
+              <p className="text-muted-foreground text-sm">{aviso.texto}</p>
+              {aviso.tentar && (
+                <Button onClick={carregar}><RefreshCw className="h-4 w-4 mr-2" /> Tentar de novo</Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     );
   }
@@ -69,6 +123,10 @@ export default function AssinarFicha() {
     if (!token) return;
     const r = await assinarFichaPublica(token, assinatura, recebidosIds);
     if (!r.ok) {
+      // O link deixou de valer enquanto a tela estava aberta: mostra o motivo certo.
+      if (r.error === 'token_invalido') {
+        try { setFicha(null); setEstado(await situacaoLinkAssinatura(token)); return; } catch { /* segue com o aviso */ }
+      }
       toast.error(
         r.error === 'ja_assinada' ? 'Esta ficha já foi assinada.'
         : r.error === 'token_invalido' ? 'Link inválido, expirado ou já utilizado.'
