@@ -9,6 +9,8 @@ import { getFichaById, saveFicha, generateId, listarAssinaturasAnteriores, type 
 import ReenviarAssinaturaDialog from '@/components/ReenviarAssinaturaDialog';
 import { generatePDF } from '@/services/pdfService';
 import SignaturePad from '@/components/SignaturePad';
+import SelfieAssinatura from '@/components/SelfieAssinatura';
+import ComprovacaoAssinatura from '@/components/ComprovacaoAssinatura';
 import { useAuth } from '@/contexts/AuthContext';
 import FichaOficialView from '@/components/FichaOficialView';
 import { Input } from '@/components/ui/input';
@@ -26,6 +28,8 @@ export default function VisualizarFicha() {
   const [ficha, setFicha] = useState<EPIFicha | null>(null);
   const [assinaturaColaborador, setAssinaturaColaborador] = useState('');
   const [assinaturaResponsavel, setAssinaturaResponsavel] = useState('');
+  const [selfie, setSelfie] = useState('');
+  const [selfieEm, setSelfieEm] = useState('');
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<EPIFicha | null>(null);
   const [epis, setEpis] = useState<EPI[]>([]);
@@ -66,10 +70,16 @@ export default function VisualizarFicha() {
       toast.error('É necessário ambas as assinaturas');
       return;
     }
+    if (!selfie) {
+      toast.error('Tire a selfie do funcionário logo após a rubrica');
+      return;
+    }
     const updated: EPIFicha = {
       ...ficha,
       assinaturaColaborador,
       assinaturaResponsavel,
+      selfieColaborador: selfie,
+      selfieEm,
       status: 'assinada',
       assinadoEm: new Date().toISOString(),
     };
@@ -237,12 +247,17 @@ export default function VisualizarFicha() {
           </Card>
         )}
 
+        {/* Prova da assinatura (só admin/RH; não vai na ficha nem no PDF) */}
+        <ComprovacaoAssinatura ficha={ficha} />
+
         {/* Assinatura presencial (admin) */}
         {!isSigned && canEdit && (
           <Card>
             <CardHeader><CardTitle className="text-base">Assinatura presencial</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <SignaturePad label="Assinatura do Funcionário" onSave={setAssinaturaColaborador} initialValue={assinaturaColaborador} />
+              <SelfieAssinatura value={selfie} habilitado={!!assinaturaColaborador}
+                onChange={foto => { setSelfie(foto); setSelfieEm(new Date().toISOString()); }} />
               <SignaturePad label="Assinatura do Responsável (Empresa)" onSave={setAssinaturaResponsavel} initialValue={assinaturaResponsavel} />
               <Button className="w-full" onClick={handleSign}>
                 <CheckCircle2 className="h-4 w-4 mr-2" /> Assinar e Finalizar

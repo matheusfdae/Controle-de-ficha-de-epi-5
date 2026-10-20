@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +50,19 @@ export default function ConsultarFichas() {
   const [dataDe, setDataDe] = useState('');
   const [dataAte, setDataAte] = useState('');
   const temFiltro = !!busca || status !== 'todos' || motivo !== 'todos' || !!dataDe || !!dataAte;
+
+  // Vindo dos cartões do Dashboard (?origem=painel&status=pendente): abre já filtrado e
+  // com todos os estados, para bater com o número do cartão. Depois limpa a URL.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const s = searchParams.get('status');
+    const doPainel = searchParams.get('origem') === 'painel';
+    if (s === 'assinada' || s === 'pendente') setStatus(s);
+    if (doPainel) setUf(TODOS_ESTADOS);
+    if (s || doPainel) {
+      setSearchParams(p => { p.delete('status'); p.delete('origem'); return p; }, { replace: true });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const limparFiltros = () => {
     setBusca(''); setStatus('todos'); setMotivo('todos'); setDataDe(''); setDataAte('');
   };

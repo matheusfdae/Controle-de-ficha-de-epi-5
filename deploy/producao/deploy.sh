@@ -46,6 +46,7 @@ MIGRACOES=(
   "20261019120000_situacao_link_assinatura.sql|SELECT EXISTS (SELECT 1 FROM pg_proc WHERE proname='situacao_link_assinatura')"
   "20261020120000_reenviar_assinatura.sql|SELECT EXISTS (SELECT 1 FROM pg_proc WHERE proname='reabrir_ficha_para_assinatura')"
   "20261020150000_cracha_solicitacao_senior.sql|SELECT EXISTS (SELECT 1 FROM pg_proc WHERE proname='cracha_solicitacao_enviar')"
+  "20261021120000_selfie_assinatura.sql|SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='fichas_selfies' AND column_name='id')"
 )
 PENDENTES=()
 echo ">>> Migrations:"

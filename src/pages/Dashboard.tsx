@@ -140,10 +140,11 @@ export default function Dashboard() {
 
         {/* Stats */}
         <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-          <StatCard icon={ClipboardList} label="Total de Fichas" value={totalFichas} color="primary" />
-          <StatCard icon={CheckCircle2} label="Assinadas" value={fichasAssinadas} color="success" />
-          <StatCard icon={Clock} label="Pendentes" value={fichasPendentes} color="warning" />
-          <StatCard icon={Users} label="Colaboradores" value={colaboradoresUnicos} color="primary" />
+          <StatCard icon={ClipboardList} label="Total de Fichas" value={totalFichas} color="primary" to="/consultar?origem=painel" />
+          <StatCard icon={CheckCircle2} label="Assinadas" value={fichasAssinadas} color="success" to="/consultar?origem=painel&status=assinada" />
+          <StatCard icon={Clock} label="Pendentes" value={fichasPendentes} color="warning" to="/consultar?origem=painel&status=pendente" />
+          <StatCard icon={Users} label="Colaboradores" value={colaboradoresUnicos} color="primary"
+            to={can('colaboradores', 'view') ? '/colaboradores' : undefined} />
         </div>
 
         {/* Charts */}
@@ -336,15 +337,16 @@ export default function Dashboard() {
   );
 }
 
-function StatCard({ icon: Icon, label, value, color }: any) {
+/** Cartão de número; com `to`, abre a lista correspondente (ex.: só as pendentes). */
+function StatCard({ icon: Icon, label, value, color, to }: any) {
   const colorMap: Record<string, string> = {
     primary: 'bg-primary/10 text-primary',
     success: 'bg-success/10 text-success',
     warning: 'bg-warning/10 text-warning',
     destructive: 'bg-destructive/10 text-destructive',
   };
-  return (
-    <Card className="hover:shadow-md transition-shadow">
+  const cartao = (
+    <Card className={`transition-shadow h-full ${to ? 'hover:shadow-md hover:ring-2 hover:ring-primary/30 cursor-pointer' : 'hover:shadow-md'}`}>
       <CardContent className="p-4 flex items-center gap-3">
         <div className={`p-2.5 rounded-lg ${colorMap[color]}`}>
           <Icon className="h-5 w-5" />
@@ -356,4 +358,5 @@ function StatCard({ icon: Icon, label, value, color }: any) {
       </CardContent>
     </Card>
   );
+  return to ? <Link to={to} title={`Ver ${label.toLowerCase()}`} className="block">{cartao}</Link> : cartao;
 }

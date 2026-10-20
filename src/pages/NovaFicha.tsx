@@ -16,6 +16,7 @@ import { EPIFicha, EPIItem, MotivoEntrega, Turno } from '@/types/epi';
 import { generateId, saveFicha, criarTokenAssinatura } from '@/services/fichaService';
 import { getConfig, loadConfig } from '@/services/configService';
 import SignaturePad from '@/components/SignaturePad';
+import SelfieAssinatura from '@/components/SelfieAssinatura';
 import { Funcao, EPI, listFuncoes, listEpis, listFuncaoEpis } from '@/services/estoqueService';
 import { Empresa, listEmpresas } from '@/services/empresasService';
 import { Posto, listPostos } from '@/services/postosService';
@@ -68,6 +69,8 @@ export default function NovaFicha() {
   ]);
 
   const [assinaturaColaborador, setAssinaturaColaborador] = useState('');
+  const [selfie, setSelfie] = useState('');
+  const [selfieEm, setSelfieEm] = useState('');
   const [assinaturaResponsavel, setAssinaturaResponsavel] = useState(config.assinaturaEmpresa || '');
 
   const [funcoes, setFuncoes] = useState<Funcao[]>([]);
@@ -175,6 +178,7 @@ export default function NovaFicha() {
     itens,
     assinaturaColaborador: assinaturaColaborador || undefined,
     assinaturaResponsavel: assinaturaResponsavel || undefined,
+    ...(asSigned && selfie && { selfieColaborador: selfie, selfieEm }),
     status: asSigned ? 'assinada' : 'pendente',
     criadoEm: new Date().toISOString(),
     assinadoEm: asSigned ? new Date().toISOString() : undefined,
@@ -195,6 +199,11 @@ export default function NovaFicha() {
       if (checkedItems.length === 0) { toast.error('Marque ao menos um item de EPI'); return; }
       if (!assinaturaColaborador || !assinaturaResponsavel) {
         toast.error('É necessário ambas as assinaturas para finalizar');
+        return;
+      }
+      if (!selfie) {
+        toast.error('Tire a selfie do funcionário logo após a rubrica');
+        document.getElementById('assinaturas-card')?.scrollIntoView({ behavior: 'smooth' });
         return;
       }
     }
@@ -227,8 +236,8 @@ export default function NovaFicha() {
 
   const finalizarDesktop = () => {
     setFinalizeOpen(false);
-    if (!assinaturaColaborador || !assinaturaResponsavel) {
-      toast.info('Capture as assinaturas abaixo e clique em "Confirmar Assinatura"');
+    if (!assinaturaColaborador || !assinaturaResponsavel || !selfie) {
+      toast.info('Capture as assinaturas e a selfie do funcionário abaixo e clique em "Confirmar Assinatura"');
       document.getElementById('assinaturas-card')?.scrollIntoView({ behavior: 'smooth' });
       return;
     }
@@ -681,6 +690,8 @@ export default function NovaFicha() {
           </CardHeader>
           <CardContent className="space-y-6">
             <SignaturePad label="Assinatura do Funcionário" onSave={setAssinaturaColaborador} />
+            <SelfieAssinatura value={selfie} habilitado={!!assinaturaColaborador}
+              onChange={foto => { setSelfie(foto); setSelfieEm(new Date().toISOString()); }} />
             <SignaturePad label="Assinatura do Responsável pela Entrega" onSave={setAssinaturaResponsavel} initialValue={assinaturaResponsavel} />
             {assinaturaResponsavel && config.assinaturaEmpresa === assinaturaResponsavel && (
               <p className="text-xs text-muted-foreground -mt-3">✓ Usando assinatura padrão da empresa (configurações)</p>

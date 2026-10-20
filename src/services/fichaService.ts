@@ -61,6 +61,7 @@ function mapFichaFromDB(ficha: FichaRow, itens: ItemRow[]): EPIFicha {
     itens: itens.map(mapItemFromDB),
     assinaturaColaborador: ficha.assinatura_colaborador_url ?? undefined,
     assinaturaResponsavel: ficha.assinatura_supervisor_url ?? undefined,
+    ipAssinatura: ficha.ip_assinatura ?? undefined,
     status: ficha.status === 'assinada' ? 'assinada' : 'pendente',
     criadoEm: ficha.created_at,
     assinadoEm: ficha.data_assinatura_colaborador ?? undefined,
@@ -235,6 +236,14 @@ export async function saveFicha(ficha: EPIFicha): Promise<void> {
   const { error: upErr } = await supabase.from('fichas_epi').upsert(fichaPayload);
   if (upErr) { console.error(upErr); throw upErr; }
 
+  // Selfie da assinatura presencial: tabela própria (só admin/RH leem); não é trocada depois.
+  if (ficha.selfieColaborador) {
+    const { error: selfieErr } = await supabase.from('fichas_selfies').insert({
+      ficha_id: ficha.id, selfie: ficha.selfieColaborador, tirada_em: ficha.selfieEm ?? new Date().toISOString(),
+    });
+    if (selfieErr && selfieErr.code !== '23505') { console.error(selfieErr); throw selfieErr; }
+  }
+
   if (ficha.itens?.length) {
     const itensPayload: ItemInsert[] = ficha.itens.map(i => ({
       id: i.id,
@@ -276,6 +285,7 @@ export async function assinarFichaPublica(
   token: string,
   assinaturaBase64: string,
   itensRecebidosIds: string[],
+  selfie: string,
 ): Promise<{ ok: boolean; error?: string }> {
   let ip: string | null = null;
   try {
@@ -288,11 +298,33 @@ export async function assinarFichaPublica(
     _assinatura: assinaturaBase64,
     _itens_recebidos: itensRecebidosIds,
     _ip: ip,
+    _selfie: selfie,
   });
   if (error) return { ok: false, error: error.message };
   const res = data as { ok: boolean; error?: string } | null;
   if (!res?.ok) return { ok: false, error: res?.error ?? 'erro' };
   return { ok: true };
+}
+
+export interface SelfieAssinatura {
+  selfie: string;
+  tiradaEm: string;
+  colhidaPor: string | null;
+}
+
+/** Selfie da assinatura (só admin/RH conseguem ler; para os demais volta null). */
+export async function buscarSelfieAssinatura(fichaId: string): Promise<SelfieAssinatura | null> {
+  const { data, error } = await supabase.from('fichas_selfies')
+    // A mais recente: a ficha pode ter sido reenviada e assinada de novo.
+    .select('selfie, tirada_em, colhida_por').eq('ficha_id', fichaId)
+    .order('tirada_em', { ascending: false }).limit(1).maybeSingle();
+  if (error || !data) return null;
+  let colhidaPor: string | null = null;
+  if (data.colhida_por) {
+    const { data: p } = await supabase.from('profiles').select('nome_completo, email').eq('id', data.colhida_por).maybeSingle();
+    colhidaPor = p?.nome_completo || p?.email || null;
+  }
+  return { selfie: data.selfie, tiradaEm: data.tirada_em, colhidaPor };
 }
 
 // noop — dados de demo não são mais auto-criados
