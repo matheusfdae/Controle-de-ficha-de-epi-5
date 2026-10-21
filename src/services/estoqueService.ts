@@ -150,6 +150,13 @@ export async function upsertFuncao(f: Partial<Funcao>): Promise<Funcao> {
   return data as Funcao;
 }
 
+/** Renomeia a função (só neste estado). As fichas já feitas guardam o nome antigo. */
+export async function renomearFuncao(id: string, nome: string) {
+  const { data, error } = await supabase.from('funcoes').update({ nome }).eq('id', id).select('id');
+  if (error) throw error;
+  if (!data?.length) throw new Error('Sem permissão para editar funções neste estado');
+}
+
 /** Copia as funções (com os EPIs padrão) de um estado para outro; devolve quantas copiou. */
 export async function copiarFuncoesEstado(de: string, para: string): Promise<number> {
   const { data, error } = await supabase.rpc('copiar_funcoes_estado', { _de: de, _para: para });
