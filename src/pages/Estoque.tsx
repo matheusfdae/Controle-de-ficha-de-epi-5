@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import {
   EPI, EPITamanho, ItemTipo, TAMANHO_UNICO, listEpis, upsertEpi, deleteEpi,
   listTamanhos, totaisPorItem, deleteTamanho, ajustarEstoque, resetarEstoqueEpi, transferirEstoque,
+  minimosPorItem, salvarMinimo,
 } from '@/services/estoqueService';
 import { listEstados } from '@/services/estadosService';
 import {
@@ -124,8 +125,10 @@ function TransferirDialog({ epi, uf, tamanhos, onDone }: {
 
 function ItemPanel({ tipo, uf }: { tipo: ItemTipo; uf: string }) {
   const r = ROTULO[tipo];
+  const { can } = useAuth();
   const [epis, setEpis] = useState<EPI[]>([]);
   const [totais, setTotais] = useState<Record<string, number>>({});
+  const [minimos, setMinimos] = useState<Record<string, number>>({});
   const [search, setSearch] = useState('');
   const [openNovo, setOpenNovo] = useState(false);
   const [novoNome, setNovoNome] = useState('');
@@ -140,8 +143,8 @@ function ItemPanel({ tipo, uf }: { tipo: ItemTipo; uf: string }) {
   const load = useCallback(async () => {
     if (!uf) return;
     try {
-      const [lista, t] = await Promise.all([listEpis(tipo), totaisPorItem(uf)]);
-      setEpis(lista); setTotais(t);
+      const [lista, t, m] = await Promise.all([listEpis(tipo), totaisPorItem(uf), minimosPorItem(uf)]);
+      setEpis(lista); setTotais(t); setMinimos(m);
     } catch (e: any) { toast.error(e.message); }
   }, [tipo, uf]);
 
@@ -151,6 +154,7 @@ function ItemPanel({ tipo, uf }: { tipo: ItemTipo; uf: string }) {
     load();
     const channel = supabase.channel(`estoque-changes-${tipo}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'epis' }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'estoque_minimos' }, () => load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'epi_tamanhos' }, (payload: any) => {
         load();
         const epiId = (payload.new?.epi_id) || (payload.old?.epi_id);
@@ -169,9 +173,11 @@ function ItemPanel({ tipo, uf }: { tipo: ItemTipo; uf: string }) {
   );
 
   const saldo = (e: EPI) => totais[e.id] ?? 0;
+  // Mínimo do item neste estado; sem valor definido no estado, vale o mínimo geral do item.
+  const minimo = (e: EPI) => minimos[e.id] ?? e.estoque_minimo;
   const status = (e: EPI) =>
     saldo(e) === 0 ? { label: 'Sem estoque', tone: 'destructive' as const }
-    : saldo(e) <= e.estoque_minimo ? { label: 'Crítico', tone: 'destructive' as const }
+    : saldo(e) <= minimo(e) ? { label: 'Crítico', tone: 'destructive' as const }
     : { label: 'OK', tone: 'default' as const };
 
   const handleCreate = async () => {
@@ -197,6 +203,14 @@ function ItemPanel({ tipo, uf }: { tipo: ItemTipo; uf: string }) {
   const handleUpdateTam = async (t: EPITamanho, estoque: number) => {
     try { await ajustarEstoque(t.epi_id, t.uf, t.tamanho, estoque); await loadTamanhos(t.epi_id); load(); }
     catch (e: any) { toast.error(e.message); }
+  };
+
+  const handleMinimo = async (epiId: string, valor: number) => {
+    try {
+      await salvarMinimo(epiId, uf, valor);
+      setMinimos(m => ({ ...m, [epiId]: valor }));
+      toast.success(`Estoque mínimo em ${uf}: ${valor}`);
+    } catch (e: any) { toast.error(e.message); }
   };
 
   const handleReset = async (epiId: string) => {
@@ -238,6 +252,7 @@ function ItemPanel({ tipo, uf }: { tipo: ItemTipo; uf: string }) {
                 <TableHead className="hidden sm:table-cell">Código</TableHead>
                 <TableHead className="hidden sm:table-cell">CA</TableHead>
                 <TableHead className="text-right">Estoque {uf}</TableHead>
+                <TableHead className="text-right hidden sm:table-cell">Mínimo</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-0" />
               </TableRow>
@@ -252,6 +267,7 @@ function ItemPanel({ tipo, uf }: { tipo: ItemTipo; uf: string }) {
                     <TableCell className="hidden sm:table-cell text-muted-foreground">{epi.codigo || '—'}</TableCell>
                     <TableCell className="hidden sm:table-cell text-muted-foreground">{epi.ca_numero || '—'}</TableCell>
                     <TableCell className="text-right font-bold tabular-nums">{saldo(epi)}</TableCell>
+                    <TableCell className="text-right hidden sm:table-cell tabular-nums text-muted-foreground">{minimo(epi)}</TableCell>
                     <TableCell>
                       <Badge variant={st.tone === 'destructive' ? 'destructive' : 'secondary'}>{st.label}</Badge>
                     </TableCell>
@@ -266,7 +282,7 @@ function ItemPanel({ tipo, uf }: { tipo: ItemTipo; uf: string }) {
               })}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-12">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-12">
                     <r.Icone className="h-10 w-10 mx-auto mb-2 opacity-40" /> Nenhum {r.item} cadastrado.
                   </TableCell>
                 </TableRow>
@@ -283,6 +299,17 @@ function ItemPanel({ tipo, uf }: { tipo: ItemTipo; uf: string }) {
             <DialogDescription>Saldo por tamanho neste estado. Item sem tamanho fica como "{TAMANHO_UNICO}".</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
+            {editing && (
+              <div className="flex flex-wrap gap-2 items-center p-2 rounded border bg-muted/40">
+                <Label className="text-sm">Estoque mínimo em {uf}</Label>
+                {can('estoque', 'edit') ? (
+                  <EstoqueInput value={minimo(editing)} onCommit={n => handleMinimo(editing.id, n)} />
+                ) : <span className="font-bold tabular-nums">{minimo(editing)}</span>}
+                <span className="text-xs text-muted-foreground basis-full">
+                  Ao chegar nesse saldo (somando os tamanhos), sai o e-mail de pedido de reposição. 0 = não avisar.
+                </span>
+              </div>
+            )}
             {tamanhos.map(t => (
               <div key={t.id} className="flex gap-2 items-center p-2 rounded border">
                 <Badge variant="outline" className="font-mono">{t.tamanho}</Badge>

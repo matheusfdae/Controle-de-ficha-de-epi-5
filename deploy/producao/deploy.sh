@@ -48,6 +48,8 @@ MIGRACOES=(
   "20261020150000_cracha_solicitacao_senior.sql|SELECT EXISTS (SELECT 1 FROM pg_proc WHERE proname='cracha_solicitacao_enviar')"
   "20261021120000_selfie_assinatura.sql|SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='fichas_selfies' AND column_name='id')"
   "20261021130000_funcoes_por_estado.sql|SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='funcoes' AND column_name='uf')"
+  "20261021140000_email_estoque.sql|SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='email_estoque_config')"
+  "20261021150000_alerta_reposicao_estoque.sql|SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='alertas_estoque')"
 )
 PENDENTES=()
 echo ">>> Migrations:"

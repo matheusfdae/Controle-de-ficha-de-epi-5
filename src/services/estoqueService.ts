@@ -90,6 +90,19 @@ export async function totaisPorItem(uf: string | null): Promise<Record<string, n
   return totais;
 }
 
+/** Estoque mínimo definido para cada item no estado (item sem valor usa o mínimo geral do item). */
+export async function minimosPorItem(uf: string): Promise<Record<string, number>> {
+  const { data, error } = await supabase.from('estoque_minimos').select('epi_id, minimo').eq('uf', uf);
+  if (error) throw error;
+  return Object.fromEntries((data ?? []).map(m => [m.epi_id, m.minimo]));
+}
+
+/** Define o estoque mínimo do item no estado; ao chegar nele, sai o e-mail de pedido de reposição. */
+export async function salvarMinimo(epiId: string, uf: string, minimo: number) {
+  const { error } = await supabase.from('estoque_minimos').upsert({ epi_id: epiId, uf, minimo });
+  if (error) throw new Error(error.message);
+}
+
 export async function deleteTamanho(id: string) {
   const { error } = await supabase.from('epi_tamanhos').delete().eq('id', id);
   if (error) throw error;
