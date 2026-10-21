@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Briefcase, Save, Copy, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Briefcase, Save, Copy, Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
@@ -19,7 +19,7 @@ import EstadoSelect, { useEstadoLembrado } from '@/components/EstadoSelect';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Funcao, EPI, FuncaoEPI,
-  listFuncoes, upsertFuncao, deleteFuncao, listEpis, copiarFuncoesEstado,
+  listFuncoes, upsertFuncao, deleteFuncao, listEpis, copiarFuncoesEstado, renomearFuncao,
   listFuncaoEpis, addFuncaoEpi, removeFuncaoEpi,
 } from '@/services/estoqueService';
 
@@ -35,6 +35,8 @@ export default function Funcoes() {
   const [openNova, setOpenNova] = useState(false);
   const [novoNome, setNovoNome] = useState('');
   const [editing, setEditing] = useState<Funcao | null>(null);
+  const [nomeEdit, setNomeEdit] = useState('');
+  const [renomeando, setRenomeando] = useState(false);
   const [vinculos, setVinculos] = useState<FuncaoEPI[]>([]);
   const [addEpiId, setAddEpiId] = useState('');
   const [addQtd, setAddQtd] = useState(1);
@@ -74,6 +76,22 @@ export default function Funcoes() {
     } catch (err: any) {
       toast.error(/duplicate|unique/i.test(err.message) ? `Já existe uma função com esse nome em ${uf}` : err.message);
     }
+  };
+
+  const abrir = (f: Funcao) => { setEditing(f); setNomeEdit(f.nome); loadVinc(f.id); };
+
+  const handleRenomear = async () => {
+    const nome = nomeEdit.trim();
+    if (!editing || !nome || nome === editing.nome) return;
+    setRenomeando(true);
+    try {
+      await renomearFuncao(editing.id, nome);
+      setEditing({ ...editing, nome });
+      load();
+      toast.success(`Função renomeada para "${nome}" em ${editing.uf}`);
+    } catch (err: any) {
+      toast.error(/duplicate|unique/i.test(err.message) ? `Já existe uma função com esse nome em ${editing.uf}` : err.message);
+    } finally { setRenomeando(false); }
   };
 
   const handleAddVinc = async () => {
@@ -133,7 +151,7 @@ export default function Funcoes() {
         <div className="grid gap-4 md:grid-cols-2">
           {funcoes.map(f => (
             <Card key={f.id} className="hover:border-primary/50 cursor-pointer transition-colors"
-                  onClick={() => { setEditing(f); loadVinc(f.id); }}>
+                  onClick={() => abrir(f)}>
               <CardContent className="p-5 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
                   <Briefcase className="h-5 w-5 text-primary" />
@@ -142,6 +160,7 @@ export default function Funcoes() {
                   <h3 className="font-bold text-lg">{f.nome}</h3>
                   {f.descricao && <p className="text-xs text-muted-foreground">{f.descricao}</p>}
                 </div>
+                <Pencil className="h-4 w-4 text-muted-foreground" aria-label="Editar" />
               </CardContent>
             </Card>
           ))}
@@ -155,6 +174,21 @@ export default function Funcoes() {
         <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
           <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle>{editing?.nome} ({editing?.uf}) — EPIs vinculados</DialogTitle></DialogHeader>
+            <div className="space-y-1">
+              <Label htmlFor="funcao-renomear" className="text-xs">Nome da função</Label>
+              <div className="flex gap-2">
+                <Input id="funcao-renomear" value={nomeEdit} onChange={e => setNomeEdit(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleRenomear(); }} />
+                <Button variant="outline" onClick={handleRenomear}
+                  disabled={renomeando || !nomeEdit.trim() || nomeEdit.trim() === editing?.nome}>
+                  {renomeando ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Salvar nome
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Muda só em {editing?.uf}; as fichas já feitas continuam com o nome antigo. Mantenha igual ao cargo da Senior
+                para a ficha nova escolher os EPIs padrão sozinha.
+              </p>
+            </div>
             <div className="space-y-2 max-h-80 overflow-y-auto">
               {vinculos.map(v => {
                 const epi = epis.find(e => e.id === v.epi_id);
