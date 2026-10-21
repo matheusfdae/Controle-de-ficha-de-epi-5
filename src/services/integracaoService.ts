@@ -4,7 +4,7 @@ import type { Posto } from '@/services/postosService';
 import type { ColaboradorLista } from '@/services/colaboradoresSeniorService';
 import { generateId, saveFicha } from '@/services/fichaService';
 import { nomePostoTrabalho, turnoDaEscala, formatCpf } from '@/services/seniorService';
-import { empresaPelaMatricula } from '@/lib/empresaPelaMatricula';
+import { empresaDaSenior, empresaPelaMatricula } from '@/lib/empresaPelaMatricula';
 import { chaveSolta, limparNomePosto } from '@/lib/geoPlanilha';
 
 /** Dados do colaborador para as fichas da admissão (vindos da Senior ou do cadastro manual). */
@@ -60,7 +60,7 @@ export function admitidoDaSenior(c: ColaboradorLista, postos: Posto[], empresaPa
     telefone: c.telefone ?? '',
     matricula,
     funcao: c.cargo ?? '',
-    empresa: empresaPelaMatricula(matricula) ?? empresaPadrao,
+    empresa: empresaDaSenior(c.empresa_nome, c.razao_social) ?? empresaPelaMatricula(matricula) ?? empresaPadrao,
     posto: posto?.nome ?? '',
     uf: c.uf ?? '',
     turno: turnoDaEscala(c.escala_nome) ?? 'diurno',

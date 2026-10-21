@@ -21,7 +21,7 @@ import { Funcao, EPI, listFuncoes, listEpis, listFuncaoEpis } from '@/services/e
 import { Empresa, listEmpresas } from '@/services/empresasService';
 import { Posto, listPostos } from '@/services/postosService';
 import { useAuth } from '@/contexts/AuthContext';
-import { empresaPelaMatricula } from '@/lib/empresaPelaMatricula';
+import { EMPRESAS_SENIOR, empresaDaSenior, empresaPelaMatricula } from '@/lib/empresaPelaMatricula';
 import { chaveSolta, limparNomePosto } from '@/lib/geoPlanilha';
 import { ModeloFicha, listModelosAtivos } from '@/services/modelosFichaService';
 import { supabase } from '@/integrations/supabase/client';
@@ -147,12 +147,18 @@ export default function NovaFicha() {
     setForm(prev => ({ ...prev, [field]: value }));
   };
 
-  // Empresa pela matrícula: 1xxxxxx = MATRIZ, 3xxxxxx = APOIO. Vale para matrícula
-  // digitada, vinda da Senior ou do histórico; a pessoa ainda pode trocar depois.
+  // Empresa pela matrícula: 1xxxxxx = segurança (matriz), 3xxxxxx = apoio. Vale para
+  // matrícula digitada ou do histórico; a busca na Senior traz o nome da própria Senior.
+  // Não passa por cima de uma empresa escolhida à mão (cadastrada em Configurações).
   useEffect(() => {
     const empresa = empresaPelaMatricula(form.matricula);
-    if (empresa) setForm(prev => (prev.empresa === empresa ? prev : { ...prev, empresa }));
-  }, [form.matricula]);
+    if (!empresa) return;
+    setForm(prev => {
+      const automatica = !prev.empresa || prev.empresa === config.empresaNome
+        || ['MATRIZ', 'APOIO', ...Object.values(EMPRESAS_SENIOR)].includes(prev.empresa);
+      return automatica && prev.empresa !== empresa ? { ...prev, empresa } : prev;
+    });
+  }, [form.matricula]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addItem = () => {
     setItens(prev => [...prev, {
@@ -321,6 +327,7 @@ export default function NovaFicha() {
         cpf: c.cpf ? formatCpf(c.cpf) : f.cpf,
         telefone: c.telefone || f.telefone,
         matricula: String(c.numCad),
+        empresa: empresaDaSenior(c.empresaNome, c.razaoSocial) ?? f.empresa,
         funcao: c.cargo || f.funcao,
         posto: posto?.nome ?? f.posto,
         localSenior: c.nomeLocal ?? '',
@@ -571,10 +578,8 @@ export default function NovaFicha() {
               <Select value={form.empresa} onValueChange={v => updateField('empresa', v)}>
                 <SelectTrigger><SelectValue placeholder="Selecione a empresa" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={config.empresaNome}>{config.empresaNome}</SelectItem>
-                    {empresas.map(e => <SelectItem key={e.id} value={e.nome}>{e.nome}</SelectItem>)}
-                    <SelectItem value="MATRIZ">MATRIZ</SelectItem>
-                    <SelectItem value="APOIO">APOIO</SelectItem>
+                    {[...new Set([form.empresa, ...Object.values(EMPRESAS_SENIOR), config.empresaNome, ...empresas.map(e => e.nome)])]
+                      .filter(Boolean).map(nome => <SelectItem key={nome} value={nome}>{nome}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

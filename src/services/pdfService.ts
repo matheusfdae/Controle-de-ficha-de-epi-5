@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import { EPIFicha, MotivoEntrega } from '@/types/epi';
 import { loadConfig, AppConfig } from '@/services/configService';
+import { dataCurta } from '@/lib/utils';
 import { ModeloFicha, resolveModelo } from '@/services/modelosFichaService';
 
 // ===== Constantes de layout =====
@@ -394,7 +395,7 @@ function renderItemsTable(doc: jsPDF, y: number, ficha: EPIFicha, modelo: Modelo
       if (item) {
         let val = '';
         switch (c) {
-          case 0: val = item.dataEntrega ?? ''; break;
+          case 0: val = dataCurta(item.dataEntrega); break;
           case 1: val = String(item.quantidade); break;
           case 2: val = item.descricao ?? ''; break;
           case 3: val = (modelo.colunaExtra === 'ca' ? item.ca : item.tamanho) ?? ''; break;
@@ -406,7 +407,7 @@ function renderItemsTable(doc: jsPDF, y: number, ficha: EPIFicha, modelo: Modelo
               val = '✓';
             }
             break;
-          case 6: val = item.devolucao?.data ?? ''; break;
+          case 6: val = dataCurta(item.devolucao?.data); break;
           case 7: val = item.devolucao?.quantidade ? String(item.devolucao.quantidade) : ''; break;
           case 8: val = item.devolucao?.recebidoPor ?? ''; break;
         }
