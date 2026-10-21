@@ -35,6 +35,9 @@ describe('integração (admissão)', () => {
       num_emp: 3, num_cad: 3009888, nome: 'ADEILTON', cpf: '01234567890', cargo: 'AGENTE DE PORTARIA', uf: 'DF',
       posto_descricao: '0003-0001-IDP NORTE - AGENTE DE PORTARIA', escala_nome: '19:00 - 07:00 12X36',
     } as ColaboradorLista, [], 'GRUPO 5 ESTRELAS');
-    expect(a).toMatchObject({ empresa: 'APOIO', turno: 'noturno', posto: 'IDP NORTE', cpf: '012.345.678-90', funcao: 'AGENTE DE PORTARIA' });
+    expect(a).toMatchObject({ empresa: '5 ESTRELAS SERVIÇOS DE APOIO', turno: 'noturno', posto: 'IDP NORTE', cpf: '012.345.678-90', funcao: 'AGENTE DE PORTARIA' });
+    // Com o nome da empresa vindo da Senior, vale o da Senior.
+    const b = admitidoDaSenior({ num_emp: 1, num_cad: 1000514, nome: 'X', empresa_nome: '5 ESTRELAS  SISTEMA DE SEGURANÇA LTDA' } as ColaboradorLista, [], 'GRUPO 5 ESTRELAS');
+    expect(b.empresa).toBe('5 ESTRELAS SISTEMA DE SEGURANÇA LTDA');
   });
 });

@@ -1,6 +1,7 @@
 import { EPIFicha, MotivoEntrega } from '@/types/epi';
 import { ReactNode, useEffect, useState } from 'react';
 import { getConfig, loadConfig } from '@/services/configService';
+import { dataCurta } from '@/lib/utils';
 import { ModeloFicha, FALLBACK_MODELO, resolveModelo } from '@/services/modelosFichaService';
 
 interface Props {
@@ -279,7 +280,7 @@ export default function FichaOficialView({ ficha, signMode }: Props) {
             const checked = item ? (signMode ? !!signMode.itensRecebidos[item.id] : item.recebido) : false;
             return (
               <tr key={i} style={{ height: 28 }}>
-                <td className="border border-black px-1 text-center">{item?.dataEntrega || ''}</td>
+                <td className="border border-black px-1 text-center">{dataCurta(item?.dataEntrega)}</td>
                 <td className="border border-black px-1 text-center">{item ? item.quantidade : ''}</td>
                 <td className="border border-black px-1">
                   {item?.descricao}
@@ -309,7 +310,7 @@ export default function FichaOficialView({ ficha, signMode }: Props) {
                     )
                   ) : ''}
                 </td>
-                <td className="border border-black px-1 text-center">{item?.devolucao?.data || ''}</td>
+                <td className="border border-black px-1 text-center">{dataCurta(item?.devolucao?.data)}</td>
                 <td className="border border-black px-1 text-center">{item?.devolucao?.quantidade || ''}</td>
                 <td className="border border-black px-1 text-center">{item?.devolucao?.recebidoPor || ''}</td>
               </tr>

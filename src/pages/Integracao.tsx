@@ -28,7 +28,7 @@ import { listModelosAtivos } from '@/services/modelosFichaService';
 import { getConfig, loadConfig } from '@/services/configService';
 import { ColaboradorLista, listarColaboradoresSenior } from '@/services/colaboradoresSeniorService';
 import { admitidoDaSenior, postoCadastrado } from '@/services/integracaoService';
-import { empresaPelaMatricula } from '@/lib/empresaPelaMatricula';
+import { empresaDaSenior, empresaPelaMatricula } from '@/lib/empresaPelaMatricula';
 import { formatarData } from '@/lib/convocacaoUniforme';
 import { chaveSolta } from '@/lib/geoPlanilha';
 import type { EPIFicha } from '@/types/epi';
@@ -152,7 +152,7 @@ export default function Integracao() {
 
   /** Lista para o e-mail da integração (quem foi selecionado). */
   const abrirEmail = () => setEmailPara(admitidos.filter(a => selecionados.has(chaveDe(a.c))).map(({ c, situacao }) => ({
-    nome: c.nome, matricula: String(c.num_cad), empresa: EMPRESA[c.num_emp] ?? `Empresa ${c.num_emp}`,
+    nome: c.nome, matricula: String(c.num_cad), empresa: empresaDaSenior(c.empresa_nome, c.razao_social) ?? EMPRESA[c.num_emp] ?? `Empresa ${c.num_emp}`,
     cargo: c.cargo, posto: c.posto_descricao ? c.posto_descricao.replace(/^\s*\d{3,4}\s*-\s*\d{3,4}\s*-\s*/, '') : c.nome_local,
     uf: c.uf, admissao: c.data_admissao, fichas: SITUACAO[situacao].rotulo,
   })));
