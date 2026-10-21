@@ -83,7 +83,10 @@ Senior (sistema de RH), atualizados automaticamente 3 vezes por dia.
 MENU LATERAL (cada pessoa só vê o que a permissão dela libera):
 
 OPERACIONAL
-- Dashboard: resumo das fichas (status, vencimentos, EPIs mais entregues).
+- Dashboard: resumo das fichas (status, vencimentos, EPIs mais entregues). Os
+  cartões são clicáveis: "Pendentes" abre Consultar Fichas só com as pendentes,
+  "Assinadas" só com as assinadas, "Total de Fichas" todas, e "Colaboradores"
+  abre Colaboradores Senior.
 - Assinar (Tablet): fichas aguardando assinatura. O colaborador assina no tablet:
   primeiro a rubrica na tela; depois é tirada uma selfie de comprovação.
 - Vencimentos: EPIs e uniformes vencidos ou a vencer, com abas EPIs e Uniformes.
@@ -103,8 +106,27 @@ EPI
   ou por link (enviado por WhatsApp). Ao salvar, os itens saem do estoque.
 - Termo Coletivo EPI: termo de entrega de EPI para várias pessoas de uma vez
   (uma linha por material); cada pessoa assina pelo link público.
-- Consultar Fichas EPI: busca de fichas; ícones para visualizar, baixar PDF,
-  enviar link de assinatura por WhatsApp e excluir.
+- Consultar Fichas EPI: busca por nome, matrícula, CPF, posto ou número, com
+  filtros de estado, status (assinada/pendente), motivo e período, e "Limpar
+  filtros". Ícones para visualizar, baixar PDF, enviar link de assinatura por
+  WhatsApp e excluir.
+
+ASSINATURA
+- Toda assinatura (tablet, link ou presencial) é a rubrica + uma selfie do
+  colaborador tirada logo depois (o celular pede para usar a câmera: tocar em
+  "Permitir"). A selfie não aparece na ficha nem no PDF; só admin/RH a veem no
+  quadro "Comprovação da assinatura" da ficha, com comprovante em PDF.
+- Link de assinatura (WhatsApp): vale 72 horas e funciona dentro e fora da rede
+  da empresa. Se não abrir, a tela diz o motivo: "Ficha já assinada", "Link
+  vencido" (gere outro), "Não foi possível carregar" (internet do celular;
+  "Tentar de novo") ou "Link inválido" (link cortado ao copiar).
+- Reenviar para Assinatura: qualquer ficha, mesmo já assinada, pode ser enviada
+  de novo (botão na ficha ou ícone do WhatsApp em Consultar Fichas). Na ficha
+  assinada é preciso informar o motivo; a assinatura atual NÃO é apagada: fica
+  em "Assinaturas anteriores" na própria ficha, e a ficha volta a Pendente até o
+  colaborador assinar o link novo. Use quando os itens de uma ficha assinada
+  precisarem ser corrigidos, pois a assinatura antiga não vale para o conteúdo
+  alterado.
 
 UNIFORME
 - Nova Ficha Uniforme e Consultar Fichas Uniforme: iguais às de EPI, para uniformes.
