@@ -60,7 +60,7 @@ export default function GerarFichasAdmissaoDialog({
     setLinhas({});
     for (const p of pessoas) {
       const kit = p.kitId
-        ?? funcoes.find(f => f.nome.trim().toLowerCase() === p.dados.funcao.trim().toLowerCase())?.id ?? '';
+        ?? funcoes.find(f => f.uf === p.dados.uf && f.nome.trim().toLowerCase() === p.dados.funcao.trim().toLowerCase())?.id ?? '';
       if (kit) escolherKit(p.chave, kit);
       else setLinhas(l => ({ ...l, [p.chave]: { kitId: '', itens: [], carregando: false } }));
     }
@@ -130,7 +130,7 @@ export default function GerarFichasAdmissaoDialog({
                   <Select value={l?.kitId ?? ''} onValueChange={v => escolherKit(p.chave, v)}>
                     <SelectTrigger className="w-64"><SelectValue placeholder="Tipo de uniforme" /></SelectTrigger>
                     <SelectContent>
-                      {funcoes.map(f => <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>)}
+                      {funcoes.filter(f => f.uf === p.dados.uf).map(f => <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>

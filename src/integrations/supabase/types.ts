@@ -1712,6 +1712,7 @@ export type Database = {
           id: string
           nome: string
           updated_at: string
+          uf: string
         }
         Insert: {
           ativo?: boolean
@@ -1720,6 +1721,7 @@ export type Database = {
           id?: string
           nome: string
           updated_at?: string
+          uf?: string
         }
         Update: {
           ativo?: boolean
@@ -1728,6 +1730,7 @@ export type Database = {
           id?: string
           nome?: string
           updated_at?: string
+          uf?: string
         }
         Relationships: []
       }
@@ -2315,6 +2318,7 @@ export type Database = {
       get_ficha_publica_por_token: { Args: { _token: string }; Returns: Json }
       situacao_link_assinatura: { Args: { _token: string }; Returns: Json }
       reabrir_ficha_para_assinatura: { Args: { _ficha_id: string; _motivo: string }; Returns: string }
+      copiar_funcoes_estado: { Args: { _de: string; _para: string }; Returns: number }
       assinar_ficha_publica_por_token: {
         Args: {
           _assinatura: string

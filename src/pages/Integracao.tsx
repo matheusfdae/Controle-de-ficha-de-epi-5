@@ -424,12 +424,12 @@ function NovoManualDialog({ funcoes, onSalvo }: { funcoes: Funcao[]; onSalvo: ()
           <div><Label htmlFor="m-cpf">CPF</Label><Input id="m-cpf" value={form.cpf} onChange={campo('cpf')} placeholder="000.000.000-00" /></div>
           <div><Label htmlFor="m-tel">Telefone</Label><Input id="m-tel" value={form.telefone} onChange={campo('telefone')} /></div>
           <div><Label htmlFor="m-mat">Matrícula</Label><Input id="m-mat" value={form.matricula} onChange={campo('matricula')} /></div>
-          <div><Label>Estado *</Label><EstadoSelect value={form.uf} onChange={v => setForm(f => ({ ...f, uf: v }))} placeholder="Escolha" /></div>
+          <div><Label>Estado *</Label><EstadoSelect value={form.uf} onChange={v => setForm(f => ({ ...f, uf: v, funcao_id: '' }))} placeholder="Escolha" /></div>
           <div className="sm:col-span-2"><Label htmlFor="m-posto">Posto</Label><Input id="m-posto" value={form.posto} onChange={campo('posto')} placeholder="Ex.: Parkshopping" /></div>
           <div><Label>Tipo de uniforme</Label>
             <Select value={form.funcao_id} onValueChange={v => setForm(f => ({ ...f, funcao_id: v }))}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>{funcoes.map(f => <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>)}</SelectContent>
+              <SelectContent>{funcoes.filter(f => f.uf === form.uf).map(f => <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div><Label htmlFor="m-adm">Admissão prevista</Label><Input id="m-adm" type="date" value={form.data_admissao} onChange={campo('data_admissao')} /></div>

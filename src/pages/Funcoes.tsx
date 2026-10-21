@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Briefcase, Save } from 'lucide-react';
+import { Plus, Trash2, Briefcase, Save, Copy, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
@@ -15,13 +15,21 @@ import {
 import BackButton from '@/components/BackButton';
 import PageHeader from '@/components/PageHeader';
 import { useConfirm } from '@/hooks/use-confirm';
+import EstadoSelect, { useEstadoLembrado } from '@/components/EstadoSelect';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Funcao, EPI, FuncaoEPI,
-  listFuncoes, upsertFuncao, deleteFuncao, listEpis,
+  listFuncoes, upsertFuncao, deleteFuncao, listEpis, copiarFuncoesEstado,
   listFuncaoEpis, addFuncaoEpi, removeFuncaoEpi,
 } from '@/services/estoqueService';
 
 export default function Funcoes() {
+  // Cada estado tem as suas funções: a tela mostra e edita só as do estado escolhido.
+  const { estados } = useAuth();
+  const [uf, setUf] = useEstadoLembrado('funcoes');
+  const [copiarDe, setCopiarDe] = useState('');
+  const [copiando, setCopiando] = useState(false);
+  const [openCopiar, setOpenCopiar] = useState(false);
   const [funcoes, setFuncoes] = useState<Funcao[]>([]);
   const [epis, setEpis] = useState<EPI[]>([]);
   const [openNova, setOpenNova] = useState(false);
@@ -34,20 +42,38 @@ export default function Funcoes() {
   const { confirm, ConfirmDialog } = useConfirm();
 
   const load = async () => {
+    if (!uf) { setFuncoes([]); return; }
     try {
-      const [f, e] = await Promise.all([listFuncoes(), listEpis()]);
+      const [f, e] = await Promise.all([listFuncoes(uf), listEpis()]);
       setFuncoes(f); setEpis(e);
     } catch (err: any) { toast.error(err.message); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [uf]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleCopiar = async () => {
+    if (!copiarDe || !uf) return;
+    setCopiando(true);
+    try {
+      const n = await copiarFuncoesEstado(copiarDe, uf);
+      toast.success(n
+        ? `${n} função(ões) copiada(s) de ${copiarDe} para ${uf}, com os EPIs padrão.`
+        : `Nada a copiar: ${uf} já tem todas as funções de ${copiarDe}.`);
+      setOpenCopiar(false); setCopiarDe(''); load();
+    } catch (err: any) { toast.error(err.message); }
+    finally { setCopiando(false); }
+  };
 
   const loadVinc = async (id: string) => setVinculos(await listFuncaoEpis(id));
 
   const handleCreate = async () => {
-    if (!novoNome.trim()) return;
-    await upsertFuncao({ nome: novoNome });
-    setOpenNova(false); setNovoNome(''); load();
-    toast.success('Função criada');
+    if (!novoNome.trim() || !uf) return;
+    try {
+      await upsertFuncao({ nome: novoNome.trim(), uf });
+      setOpenNova(false); setNovoNome(''); load();
+      toast.success(`Função criada em ${uf}`);
+    } catch (err: any) {
+      toast.error(/duplicate|unique/i.test(err.message) ? `Já existe uma função com esse nome em ${uf}` : err.message);
+    }
   };
 
   const handleAddVinc = async () => {
@@ -65,16 +91,42 @@ export default function Funcoes() {
           eyebrow="Cargos & EPIs padrão"
           title="Funções"
           actions={
+            <div className="flex flex-wrap items-center gap-2">
+            <EstadoSelect value={uf} onChange={setUf} className="w-28" />
+            {estados.length > 1 && (
+              <Dialog open={openCopiar} onOpenChange={o => { setOpenCopiar(o); if (!o) setCopiarDe(''); }}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" disabled={!uf}><Copy className="h-4 w-4 mr-1" /> Copiar de outro estado</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>Copiar funções para {uf}</DialogTitle></DialogHeader>
+                  <p className="text-sm text-muted-foreground">
+                    Cria em <b>{uf}</b> uma cópia das funções do estado escolhido, com os EPIs padrão. As cópias são
+                    independentes: editar em {uf} não muda o outro estado. Funções que já existem em {uf} (mesmo nome) ficam como estão.
+                  </p>
+                  <div>
+                    <Label htmlFor="copiar-de">Copiar de</Label>
+                    <EstadoSelect id="copiar-de" value={copiarDe} onChange={setCopiarDe} excluir={[uf]} placeholder="Estado de origem" />
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={handleCopiar} disabled={!copiarDe || copiando}>
+                      {copiando ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Copy className="h-4 w-4 mr-1" />} Copiar
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
             <Dialog open={openNova} onOpenChange={setOpenNova}>
               <DialogTrigger asChild>
-                <Button><Plus className="h-4 w-4 mr-1" /> Nova função</Button>
+                <Button disabled={!uf}><Plus className="h-4 w-4 mr-1" /> Nova função</Button>
               </DialogTrigger>
               <DialogContent>
-                <DialogHeader><DialogTitle>Nova Função</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>Nova Função em {uf}</DialogTitle></DialogHeader>
                 <div><Label htmlFor="funcao-nome">Nome *</Label><Input id="funcao-nome" value={novoNome} onChange={e => setNovoNome(e.target.value)} placeholder="Ex.: Operador, ASG..." /></div>
                 <DialogFooter><Button onClick={handleCreate}><Save className="h-4 w-4 mr-1" /> Salvar</Button></DialogFooter>
               </DialogContent>
             </Dialog>
+            </div>
           }
         />
 
@@ -94,13 +146,15 @@ export default function Funcoes() {
             </Card>
           ))}
           {funcoes.length === 0 && (
-            <p className="text-center text-muted-foreground py-12 col-span-full">Nenhuma função cadastrada.</p>
+            <p className="text-center text-muted-foreground py-12 col-span-full">
+              {uf ? `Nenhuma função cadastrada em ${uf}.${estados.length > 1 ? ' Use "Copiar de outro estado" para começar.' : ''}` : 'Escolha o estado.'}
+            </p>
           )}
         </div>
 
         <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
           <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>{editing?.nome} — EPIs vinculados</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editing?.nome} ({editing?.uf}) — EPIs vinculados</DialogTitle></DialogHeader>
             <div className="space-y-2 max-h-80 overflow-y-auto">
               {vinculos.map(v => {
                 const epi = epis.find(e => e.id === v.epi_id);

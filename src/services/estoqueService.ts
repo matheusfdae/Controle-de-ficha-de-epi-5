@@ -28,6 +28,8 @@ export interface Funcao {
   nome: string;
   descricao: string | null;
   ativo: boolean;
+  /** Estado dono da função: cada estado tem as suas (editar uma não muda as dos outros). */
+  uf: string;
 }
 
 export interface FuncaoEPI {
@@ -117,9 +119,11 @@ export async function transferirEstoque(t: {
   if (error) throw new Error(error.message);
 }
 
-// Funções
-export async function listFuncoes(): Promise<Funcao[]> {
-  const { data, error } = await supabase.from('funcoes').select('*').order('nome');
+// Funções (por estado; a RLS só devolve as dos estados que o usuário acessa)
+export async function listFuncoes(uf?: string): Promise<Funcao[]> {
+  let q = supabase.from('funcoes').select('*').order('nome');
+  if (uf) q = q.eq('uf', uf);
+  const { data, error } = await q;
   if (error) throw error;
   return (data || []) as Funcao[];
 }
@@ -127,9 +131,17 @@ export async function listFuncoes(): Promise<Funcao[]> {
 export async function upsertFuncao(f: Partial<Funcao>): Promise<Funcao> {
   const payload: any = { nome: f.nome, descricao: f.descricao };
   if (f.id) payload.id = f.id;
+  else payload.uf = f.uf;
   const { data, error } = await supabase.from('funcoes').upsert(payload).select().single();
   if (error) throw error;
   return data as Funcao;
+}
+
+/** Copia as funções (com os EPIs padrão) de um estado para outro; devolve quantas copiou. */
+export async function copiarFuncoesEstado(de: string, para: string): Promise<number> {
+  const { data, error } = await supabase.rpc('copiar_funcoes_estado', { _de: de, _para: para });
+  if (error) throw new Error(error.message);
+  return (data as number) ?? 0;
 }
 
 export async function deleteFuncao(id: string) {
