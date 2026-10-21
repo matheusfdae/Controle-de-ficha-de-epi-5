@@ -12,12 +12,25 @@ import robo from '@/assets/assistente/robo.png';
 import roboCabeca from '@/assets/assistente/robo-cabeca.png';
 
 const GUARDAR = 'chat-ajuda';
-const SUGESTOES = [
-  'Como faço uma nova ficha de EPI?',
-  'Como envio o link de assinatura?',
-  'Como dou entrada no estoque?',
-  'Por que não vejo um colaborador?',
-];
+// Perguntas prontas por assunto (Crachás só para quem acessa o módulo).
+const SUGESTOES = {
+  fichas: [
+    'Como faço uma nova ficha de EPI?',
+    'Como envio o link de assinatura?',
+    'Como reenvio uma ficha já assinada?',
+    'Como dou entrada no estoque?',
+    'Por que não vejo um colaborador?',
+  ],
+  crachas: [
+    'Como peço um crachá novo ou 2ª via?',
+    'Onde pego o link ou o QR Code de solicitação?',
+    'Como aprovo uma solicitação de crachá?',
+    'Como envio ou troco a foto do crachá?',
+    'Como gero e imprimo os crachás?',
+    'Como crio um modelo de crachá?',
+  ],
+};
+type Assunto = keyof typeof SUGESTOES;
 
 /** **negrito** e listas simples nas respostas, sem HTML vindo de fora. */
 function Texto({ texto }: { texto: string }) {
@@ -66,7 +79,13 @@ export default function ChatAjuda() {
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const fim = useRef<HTMLDivElement>(null);
-  const { user } = useAuth();
+  const { user, can } = useAuth();
+  const veCrachas = can('crachas', 'view');
+  const [assunto, setAssunto] = useState<Assunto>('fichas');
+  // Nas telas de crachá, as perguntas prontas já abrem no assunto Crachás.
+  useEffect(() => {
+    setAssunto(veCrachas && pathname.startsWith('/crachas') ? 'crachas' : 'fichas');
+  }, [pathname, veCrachas]);
   const [guia, setGuia] = useState<string | null>(null);
   const fimGuia = useCallback(() => setGuia(null), []);
   const mostrar = useCallback((destino: string) => { setAberto(false); setGuia(destino); }, []);
@@ -160,7 +179,18 @@ export default function ChatAjuda() {
           <div className="space-y-2">
             <img src={robo} alt="" draggable={false} className="h-32 w-auto mx-auto drop-shadow-lg" />
             <p className="text-muted-foreground text-center">{saudacao(user?.nome)} Sou o assistente do Grupo 5 Estrelas. Pergunte como usar qualquer tela do sistema. Alguns exemplos:</p>
-            {SUGESTOES.map(s => (
+            {veCrachas && (
+              <div className="flex gap-1.5 justify-center">
+                {([['fichas', 'Fichas e EPI'], ['crachas', 'Crachás']] as const).map(([id, rotulo]) => (
+                  <button key={id} onClick={() => setAssunto(id)}
+                    className={cn('rounded-full border px-3 py-1 text-xs transition-colors',
+                      assunto === id ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted')}>
+                    {rotulo}
+                  </button>
+                ))}
+              </div>
+            )}
+            {SUGESTOES[assunto].map(s => (
               <button key={s} onClick={() => enviar(s)}
                 className="block w-full text-left rounded-lg border px-3 py-2 hover:bg-muted transition-colors">
                 {s}

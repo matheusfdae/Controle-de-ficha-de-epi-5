@@ -105,7 +105,7 @@ const LinkPublico = () => {
         <div className="flex-1 w-full space-y-2">
           <Input value={url} readOnly className="font-mono text-sm bg-background" onFocus={e => e.target.select()} />
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={copiar} className="gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={copiar} className="gap-2" data-guia="btn-crachas-copiar-link">
               {copiado ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />} {copiado ? 'Copiado!' : 'Copiar'}
             </Button>
             <Button type="button" variant="outline" size="sm" onClick={() => window.open(url, '_blank')} className="gap-2">
@@ -113,7 +113,7 @@ const LinkPublico = () => {
             </Button>
             {qr && (
               <Button type="button" variant="outline" size="sm" asChild className="gap-2">
-                <a href={qr} download="qrcode-solicitar-cracha.png"><Download className="h-4 w-4" /> Baixar QR Code</a>
+                <a href={qr} download="qrcode-solicitar-cracha.png" data-guia="btn-crachas-qrcode"><Download className="h-4 w-4" /> Baixar QR Code</a>
               </Button>
             )}
           </div>
