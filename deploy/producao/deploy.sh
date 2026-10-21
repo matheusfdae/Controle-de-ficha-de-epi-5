@@ -47,6 +47,7 @@ MIGRACOES=(
   "20261020120000_reenviar_assinatura.sql|SELECT EXISTS (SELECT 1 FROM pg_proc WHERE proname='reabrir_ficha_para_assinatura')"
   "20261020150000_cracha_solicitacao_senior.sql|SELECT EXISTS (SELECT 1 FROM pg_proc WHERE proname='cracha_solicitacao_enviar')"
   "20261021120000_selfie_assinatura.sql|SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='fichas_selfies' AND column_name='id')"
+  "20261021130000_funcoes_por_estado.sql|SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='funcoes' AND column_name='uf')"
 )
 PENDENTES=()
 echo ">>> Migrations:"

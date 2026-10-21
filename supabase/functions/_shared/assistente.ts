@@ -159,7 +159,11 @@ ADMINISTRAÇÃO
 - Estoque: abas EPIs, Uniformes, Fornecedores e Relatório. "Entrada" registra
   entrada pela nota fiscal (importando PDF/XML da nota ou digitando) ou entrada
   manual item a item com motivo. As fichas dão baixa automática.
-- Funções: cargos/funções e os EPIs de cada uma.
+- Funções: cargos/tipos de uniforme e os EPIs padrão de cada um, POR ESTADO:
+  escolha o estado no topo da tela; cada estado tem as suas funções e editar a
+  de um estado não muda a dos outros. "Copiar de outro estado" cria cópias
+  independentes (com os EPIs padrão) para começar um estado novo. Na Nova Ficha
+  e na Integração só aparecem as funções do estado da ficha/colaborador.
 - Postos: cadastro dos postos com localização no mapa.
 - Modelos de Ficha: layout do PDF das fichas (título, textos, colunas, logos).
 - Configurações: dados e lista das empresas, logo, carimbo, assinatura padrão,

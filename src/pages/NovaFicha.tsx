@@ -110,6 +110,12 @@ export default function NovaFicha() {
 
   // "Tipo de uniforme" (cadastro de Funções): só preenche os itens. A função do
   // colaborador é texto próprio, vindo do cargo na Senior.
+  // Cada estado tem as suas funções: a ficha só oferece as do estado escolhido.
+  const funcoesDoEstado = funcoes.filter(f => f.uf === uf);
+  useEffect(() => {
+    if (funcaoId && funcoes.length && !funcoes.some(f => f.id === funcaoId && f.uf === uf)) setFuncaoId('');
+  }, [uf, funcoes]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const aplicarFuncao = async (id: string) => {
     setFuncaoId(id);
     if (!id) return;
@@ -325,12 +331,13 @@ export default function NovaFicha() {
         escala: c.escalaNome ?? '',
         turno: turno ?? f.turno,
       }));
+      let ufFicha = uf;
       if (posto) {
         setItens(prev => prev.map(it => (!it.postoServico || it.postoServico === form.posto) ? { ...it, postoServico: posto.nome } : it));
-        if (posto.uf && estados.includes(posto.uf)) setUf(posto.uf);
+        if (posto.uf && estados.includes(posto.uf)) { setUf(posto.uf); ufFicha = posto.uf; }
       }
-      // Se existir um tipo de uniforme com o mesmo nome do cargo, já escolhe e preenche os itens.
-      const tipoUniforme = c.cargo && funcoes.find(x => x.nome.trim().toLowerCase() === c.cargo!.trim().toLowerCase());
+      // Se existir no estado da ficha um tipo de uniforme com o nome do cargo, já escolhe e preenche os itens.
+      const tipoUniforme = c.cargo && funcoes.find(x => x.uf === ufFicha && x.nome.trim().toLowerCase() === c.cargo!.trim().toLowerCase());
       if (tipoUniforme) await aplicarFuncao(tipoUniforme.id);
       if (c.situacao !== null && c.situacao !== SITUACAO_TRABALHANDO) {
         toast.warning(`Atenção: na Senior este colaborador está "${c.situacaoDescricao || `situação ${c.situacao}`}".`);
@@ -485,12 +492,13 @@ export default function NovaFicha() {
             </div>
             <div>
               <Label htmlFor="tipo-uniforme">Tipo de uniforme</Label>
-              <Select value={funcaoId} onValueChange={aplicarFuncao} disabled={funcoes.length === 0}>
+              <Select value={funcaoId} onValueChange={aplicarFuncao} disabled={funcoesDoEstado.length === 0}>
                 <SelectTrigger id="tipo-uniforme">
-                  <SelectValue placeholder={funcoes.length ? 'Selecione (preenche os itens)' : 'Nenhum cadastrado em Funções'} />
+                  <SelectValue placeholder={!uf ? 'Escolha o estado primeiro'
+                    : funcoesDoEstado.length ? 'Selecione (preenche os itens)' : `Nenhum cadastrado em Funções para ${uf}`} />
                 </SelectTrigger>
                 <SelectContent>
-                  {funcoes.map(f => <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>)}
+                  {funcoesDoEstado.map(f => <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
