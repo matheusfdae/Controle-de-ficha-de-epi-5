@@ -282,7 +282,7 @@ const Modelos = () => {
             Crie e gerencie os modelos de layout para os crachás
           </p>
         </div>
-        <Button className="gap-2" onClick={() => navigate('/crachas/modelos/novo')}>
+        <Button className="gap-2" onClick={() => navigate('/crachas/modelos/novo')} data-guia="btn-crachas-novo-modelo">
           <Plus className="h-4 w-4" />
           Novo Modelo
         </Button>
