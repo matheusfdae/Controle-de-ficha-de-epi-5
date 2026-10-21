@@ -44,7 +44,7 @@ export default function AppLayout() {
           </main>
           {/* Chat "Dúvidas?": só no localhost até a produção ter a chave nova do
               Gemini (deploy/producao/configurar-assistente.sh). */}
-          {import.meta.env.DEV && <ChatAjuda />}
+          <ChatAjuda />
         </div>
       </div>
     </SidebarProvider>
