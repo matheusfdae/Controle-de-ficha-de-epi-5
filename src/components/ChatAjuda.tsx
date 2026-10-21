@@ -113,7 +113,7 @@ export default function ChatAjuda() {
     return (
       <div className="fixed bottom-1 right-2 z-40 flex items-end gap-1">
         {cumprimento ? (
-          <div className="relative mb-32 sm:mb-40 max-w-[230px] rounded-2xl rounded-br-sm bg-white/95 dark:bg-slate-900/95 px-4 py-3 text-sm text-foreground shadow-xl border animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <div className="relative mb-20 sm:mb-24 max-w-[230px] rounded-2xl rounded-br-sm bg-white/95 dark:bg-slate-900/95 px-4 py-3 text-sm text-foreground shadow-xl border animate-in fade-in slide-in-from-bottom-2 duration-500">
             <button onClick={() => setCumprimento(null)} title="Fechar"
               className="absolute top-1.5 right-1.5 text-muted-foreground hover:text-foreground">
               <X className="h-3.5 w-3.5" />
@@ -123,14 +123,14 @@ export default function ChatAjuda() {
           </div>
         ) : (
           <button onClick={() => setAberto(true)}
-            className="mb-28 sm:mb-36 hidden sm:block rounded-xl rounded-br-sm bg-white/90 dark:bg-slate-900/90 px-3 py-1.5 text-sm font-medium text-foreground shadow-md border hover:bg-white transition-colors">
+            className="mb-16 sm:mb-20 hidden sm:block rounded-xl rounded-br-sm bg-white/90 dark:bg-slate-900/90 px-3 py-1.5 text-sm font-medium text-foreground shadow-md border hover:bg-white transition-colors">
             Dúvidas?
           </button>
         )}
         <button onClick={() => { setCumprimento(null); setAberto(true); }} title="Tirar dúvidas sobre o sistema"
           className="focus:outline-none transition-transform hover:scale-105">
           <img src={robo} alt="Assistente de dúvidas" draggable={false}
-            className={cn('h-32 sm:h-44 w-auto drop-shadow-2xl origin-bottom', cumprimento ? 'animate-acenar' : 'animate-flutuar')} />
+            className={cn('h-20 sm:h-28 w-auto drop-shadow-xl origin-bottom', cumprimento ? 'animate-acenar' : 'animate-flutuar')} />
         </button>
       </div>
     );
