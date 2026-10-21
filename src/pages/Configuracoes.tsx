@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Building2, PenTool, Image as ImageIcon, Save, Trash2, Upload, Bell, Plus, Pencil, Building, Stamp, Eraser, Mail } from 'lucide-react';
 import EmailConvocacaoConfigCard from '@/components/EmailConvocacaoConfigCard';
+import EmailEstoqueConfigCard from '@/components/EmailEstoqueConfigCard';
 import ContaMicrosoftCard from '@/components/ContaMicrosoftCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppConfig, getConfig, loadConfig, saveConfig } from '@/services/configService';
@@ -188,6 +189,7 @@ export default function Configuracoes() {
             <div className="space-y-4">
               <ContaMicrosoftCard podeEditar={can('configuracoes', 'edit')} />
               <EmailConvocacaoConfigCard podeEditar={can('configuracoes', 'edit')} />
+              <EmailEstoqueConfigCard podeEditar={can('configuracoes', 'edit')} />
             </div>
           </TabsContent>
 

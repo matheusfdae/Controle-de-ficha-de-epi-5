@@ -159,6 +159,17 @@ ADMINISTRAÇÃO
 - Estoque: abas EPIs, Uniformes, Fornecedores e Relatório. "Entrada" registra
   entrada pela nota fiscal (importando PDF/XML da nota ou digitando) ou entrada
   manual item a item com motivo. As fichas dão baixa automática.
+  Relatório de estoque por e-mail: em Configurações > E-mail, cartão "E-mail
+  do relatório de estoque" — destinatários, cópia, estados, envio automático
+  semanal (7h do dia escolhido) e botão "Enviar agora". Vai uma planilha Excel
+  com o estoque completo por estado e tamanho, e no e-mail os itens "Sem
+  estoque" e "Crítico" (saldo igual ou abaixo do mínimo do item no estado).
+  Pedido de reposição: na tela Estoque, clique no item e preencha "Estoque
+  mínimo em <UF>" (cada estado tem o seu; 0 = não avisar). Com a chave
+  "Pedido de reposição automático" ligada no mesmo cartão de Configurações >
+  E-mail, quando o saldo do item no estado chega ao mínimo os destinatários
+  recebem, em até 15 minutos, um e-mail pedindo a reposição (um aviso por vez:
+  só avisa de novo depois que o estoque for reposto e cair outra vez).
 - Funções: cargos/tipos de uniforme e os EPIs padrão de cada um, POR ESTADO:
   escolha o estado no topo da tela; cada estado tem as suas funções e editar a
   de um estado não muda a dos outros. "Copiar de outro estado" cria cópias

@@ -950,6 +950,54 @@ export type Database = {
         }
         Relationships: []
       }
+      email_estoque_config: {
+        Row: {
+          automatico: boolean
+          destinatarios: string[]
+          dia_semana: number
+          id: number
+          ufs: string[]
+          ultimo_envio_automatico: string | null
+          updated_at: string
+          copia: string[]
+          alerta_reposicao: boolean
+        }
+        Insert: {
+          automatico?: boolean
+          destinatarios?: string[]
+          dia_semana?: number
+          id?: number
+          ufs?: string[]
+          ultimo_envio_automatico?: string | null
+          updated_at?: string
+          copia?: string[]
+          alerta_reposicao?: boolean
+        }
+        Update: {
+          automatico?: boolean
+          destinatarios?: string[]
+          dia_semana?: number
+          id?: number
+          ufs?: string[]
+          ultimo_envio_automatico?: string | null
+          updated_at?: string
+          copia?: string[]
+          alerta_reposicao?: boolean
+        }
+        Relationships: []
+      }
+      estoque_minimos: {
+        Row: { epi_id: string; uf: string; minimo: number; updated_at: string }
+        Insert: { epi_id: string; uf: string; minimo: number; updated_at?: string }
+        Update: { epi_id?: string; uf?: string; minimo?: number; updated_at?: string }
+        Relationships: []
+      }
+      alertas_estoque: {
+        Row: { id: string; epi_id: string; uf: string; saldo: number; minimo: number; criado_em: string; enviado_em: string | null }
+        Insert: { id?: string; epi_id: string; uf: string; saldo: number; minimo: number; criado_em?: string; enviado_em?: string | null }
+        Update: { id?: string; epi_id?: string; uf?: string; saldo?: number; minimo?: number; criado_em?: string; enviado_em?: string | null }
+        Relationships: []
+      }
       entradas_estoque: {
         Row: {
           chave_acesso: string | null
@@ -2319,6 +2367,7 @@ export type Database = {
       situacao_link_assinatura: { Args: { _token: string }; Returns: Json }
       reabrir_ficha_para_assinatura: { Args: { _ficha_id: string; _motivo: string }; Returns: string }
       copiar_funcoes_estado: { Args: { _de: string; _para: string }; Returns: number }
+      marcar_alertas_estoque_enviados: { Args: { _ids: string[] }; Returns: number }
       assinar_ficha_publica_por_token: {
         Args: {
           _assinatura: string
