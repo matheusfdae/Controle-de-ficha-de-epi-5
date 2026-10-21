@@ -62,6 +62,10 @@ export const ALVOS_GUIA: AlvoGuia[] = [
   { id: 'btn-novo-usuario', rotulo: 'botão "Novo Usuário"', rota: '/usuarios', menu: 'menu-usuarios' },
   { id: 'btn-crachas-atualizar-senior', rotulo: 'botão "Atualizar da Senior" dos crachás', rota: '/crachas/colaboradores', menu: 'menu-crachas-colaboradores' },
   { id: 'btn-crachas-adicionar', rotulo: 'botão "Adicionar" colaborador no crachá', rota: '/crachas/colaboradores', menu: 'menu-crachas-colaboradores' },
+  { id: 'btn-crachas-validar-fotos', rotulo: 'botão "Validar Fotos" dos crachás', rota: '/crachas/colaboradores', menu: 'menu-crachas-colaboradores' },
+  { id: 'btn-crachas-copiar-link', rotulo: 'botão "Copiar" o link público de solicitação de crachá', rota: '/crachas/solicitar', menu: 'menu-crachas-solicitar' },
+  { id: 'btn-crachas-qrcode', rotulo: 'botão "Baixar QR Code" da solicitação de crachá', rota: '/crachas/solicitar', menu: 'menu-crachas-solicitar' },
+  { id: 'btn-crachas-novo-modelo', rotulo: 'botão "Novo Modelo" de crachá', rota: '/crachas/modelos', menu: 'menu-crachas-modelos' },
 ];
 
 /** Tira a marca [[guia:id]] da resposta e devolve o destino (só se existir no catálogo). */
@@ -150,8 +154,20 @@ CRACHÁS
   manda foto e motivo. O RH vê quem pediu, compara a foto atual com a enviada
   e aprova ou recusa (com motivo); aprovada, a foto nova vira a do crachá e ele
   vai para Gerar Crachás.
-- Gerar Crachás: escolha o modelo e os colaboradores, gere PDF/PNG para imprimir.
-  A troca do fundo da foto por branco é feita no próprio navegador.
+- Gerar Crachás: escolha o modelo e marque os colaboradores; aí aparecem os
+  botões "Baixar PNG", "Baixar PDF" e "Imprimir" (o filtro "com foto/sem foto"
+  ajuda a achar quem ainda não tem foto). A troca do fundo da foto por branco é
+  feita no próprio navegador.
+- Foto do crachá: o jeito de enviar ou trocar a foto é pela solicitação de
+  crachá (link público de Solicitações): a pessoa manda a foto (de frente, fundo
+  claro) e ela vira a foto do crachá quando o RH aprova. Em Crachás ›
+  Colaboradores, "Validar Fotos" confere se a foto de cada um abre (marca quem
+  está sem foto ou com foto quebrada).
+- Pedir crachá novo ou 2ª via: pelo link público de Solicitações (copiar o link
+  ou baixar o QR Code e mandar ao colaborador/supervisor). Quem pede informa a
+  própria matrícula ou CPF, a matrícula ou CPF de quem vai receber, a foto e o
+  motivo. O RH aprova ou recusa em Solicitações; aprovado, o crachá vai para
+  Gerar Crachás.
 - Modelos de Crachá: editor visual (arrastar campos, foto, logo, QR code, frente e verso).
 - Histórico: lotes de crachás gerados, com confirmação de impressão.
 - Relatórios e Config. de Crachás (impressão, validade padrão, notificações).
@@ -211,7 +227,8 @@ envolver ir a uma tela ou clicar num dos pontos da lista DESTINOS, termine a
 resposta com uma linha contendo só [[guia:ID]], com o ID do destino FINAL (um
 só; o robô cuida do caminho, passando pelo menu sozinho). Se a resposta termina
 num botão ou aba que está na lista (ids btn-... e aba-...), use esse id, e não
-o do menu. Ex.: entrada de nota fiscal → btn-estoque-entrada-nota. Se nenhum
+o do menu. Ex.: entrada de nota fiscal → btn-estoque-entrada-nota; link ou QR
+Code de solicitação de crachá → btn-crachas-copiar-link. Se nenhum
 destino servir, não coloque a marca.
 Nunca invente IDs.
 

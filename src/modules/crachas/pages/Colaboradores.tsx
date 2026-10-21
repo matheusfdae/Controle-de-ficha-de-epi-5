@@ -397,7 +397,7 @@ const Colaboradores = () => {
         description={`Gerencie os dados e crachás dos colaboradores (${employees.length} total)`}
         actions={
           <>
-            <Button variant="outline" size="sm" className="gap-2" onClick={handleValidatePhotos} disabled={isValidating}>
+            <Button variant="outline" size="sm" className="gap-2" onClick={handleValidatePhotos} disabled={isValidating} data-guia="btn-crachas-validar-fotos">
               {isValidating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
               Validar Fotos
             </Button>
