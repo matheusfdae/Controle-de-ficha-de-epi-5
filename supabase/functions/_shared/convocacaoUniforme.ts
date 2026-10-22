@@ -2,10 +2,18 @@
 // Function que envia a convocação por e-mail. Sem imports de Deno/npm de
 // propósito: roda nos dois lados e é testada pelo vitest.
 //
-// Troca: MESES_TROCA meses depois da ASSINATURA da última ficha de uniforme
-// do colaborador (pedido do Matheus, 08/10/2026). Datas no fuso de Brasília.
+// Troca: X meses depois da ASSINATURA da última ficha de uniforme do
+// colaborador. O prazo é o do POSTO dessa ficha (cadastro de Postos), conforme
+// o contrato: "obrigatória" (o contrato exige a troca no prazo, ex.: 6 meses) ou
+// "flexível" (troca conforme o uso, ex.: 12 meses). Posto ainda não analisado
+// usa MESES_TROCA_PADRAO (e-mail do Dionei, 22/10/2026). Datas no fuso de Brasília.
+//
+// Posto, cargo e matrícula vêm da SENIOR (colaboradores_senior, atualizada todo
+// dia), achando o colaborador pelo CPF ou pela matrícula da ficha: assim o prazo
+// segue o contrato onde ele trabalha HOJE. Desligado na Senior sai da convocação.
+// Quem não é achado na Senior fica com os dados da própria ficha.
 
-export const MESES_TROCA = 3;
+export const MESES_TROCA_PADRAO = 12;
 export const DIAS_AVISO = 30;
 const FUSO = 'America/Sao_Paulo';
 
@@ -32,6 +40,84 @@ export interface FichaBase {
   itens: ItemFichaBase[];
 }
 
+/**
+ * Prazo de troca do posto. `definida` = falso para posto sem análise (usa o padrão).
+ * `postoCadastro` = nome do posto no cadastro de Postos (vazio = posto fora do cadastro).
+ */
+export interface RegraTroca { meses: number; obrigatoria: boolean; definida: boolean; postoCadastro?: string }
+
+export const REGRA_PADRAO: RegraTroca = { meses: MESES_TROCA_PADRAO, obrigatoria: false, definida: false };
+
+/** Posto do cadastro com a regra de troca (colunas de public.postos). */
+export interface PostoTroca {
+  nome: string;
+  apelidos?: string[] | null;
+  troca_uniforme_meses?: number | null;
+  troca_uniforme_obrigatoria?: boolean | null;
+}
+
+/**
+ * Regra do posto: o primeiro nome que bate com o cadastro (nome ou apelido). Aceita o
+ * nome com sobra no fim, como vem da Senior ("IDP NORTE - AGENTE DE PORTARIA" = "IDP NORTE"),
+ * ficando com o posto de nome mais longo. Sem cadastro ou sem prazo, o padrão.
+ */
+export function criarRegraTroca(postos: PostoTroca[]): (...nomes: (string | null | undefined)[]) => RegraTroca {
+  const porNome = new Map<string, RegraTroca>();
+  for (const p of postos) {
+    const regra: RegraTroca = p.troca_uniforme_meses
+      ? { meses: p.troca_uniforme_meses, obrigatoria: !!p.troca_uniforme_obrigatoria, definida: true, postoCadastro: p.nome }
+      : { ...REGRA_PADRAO, postoCadastro: p.nome };
+    for (const n of [p.nome, ...(p.apelidos ?? [])]) if (chaveTexto(n) && !porNome.has(chaveTexto(n))) porNome.set(chaveTexto(n), regra);
+  }
+  const chaves = [...porNome.keys()].filter(k => k.length >= 4).sort((a, b) => b.length - a.length);
+  const achar = (nome: string) => {
+    const k = chaveTexto(nome);
+    if (!k) return undefined;
+    return porNome.get(k) ?? porNome.get(chaves.find(c => k.startsWith(c)) ?? '');
+  };
+  return (...nomes) => {
+    for (const n of nomes) { const r = n ? achar(n) : undefined; if (r) return r; }
+    return REGRA_PADRAO;
+  };
+}
+
+/** Colaborador como gravado em colaboradores_senior (só o que a convocação usa). */
+export interface ColaboradorSeniorBase {
+  num_cad: number;
+  cpf?: string | null;
+  cargo?: string | null;
+  posto_descricao?: string | null;
+  nome_local?: string | null;
+  uf?: string | null;
+  ativo: boolean;
+}
+
+/** "0003-0001-IDP NORTE - AGENTE" -> "IDP NORTE - AGENTE" (igual a nomePostoTrabalho de senior.ts). */
+const semCodigoPosto = (d: string | null | undefined) => (d ?? '').replace(/^\s*\d{3,4}\s*-\s*\d{3,4}\s*-\s*/, '').trim();
+
+/** Acha o colaborador da ficha na Senior: pelo CPF; sem CPF, pela matrícula. Prefere o cadastro ativo. */
+export function criarBuscaSenior(colaboradores: ColaboradorSeniorBase[]) {
+  const porCpf = new Map<string, ColaboradorSeniorBase>();
+  const porMat = new Map<string, ColaboradorSeniorBase>();
+  const guardar = (m: Map<string, ColaboradorSeniorBase>, k: string, c: ColaboradorSeniorBase) => {
+    const atual = m.get(k);
+    if (!atual || (!atual.ativo && c.ativo)) m.set(k, c);
+  };
+  for (const c of colaboradores) {
+    const cpf = (c.cpf || '').replace(/\D/g, '');
+    if (cpf) guardar(porCpf, cpf.padStart(11, '0'), c);
+    guardar(porMat, String(c.num_cad), c);
+  }
+  return (f: Pick<FichaBase, 'cpf' | 'matricula'>): ColaboradorSeniorBase | null => {
+    const cpf = (f.cpf || '').replace(/\D/g, '');
+    const mat = (f.matricula || '').replace(/\D/g, '');
+    return (cpf.length >= 9 ? porCpf.get(cpf.padStart(11, '0')) : undefined) ?? (mat ? porMat.get(mat) : undefined) ?? null;
+  };
+}
+
+export const regraTexto = (r: Pick<RegraTroca, 'meses' | 'obrigatoria' | 'definida'>) =>
+  !r.definida ? `Sem análise · ${r.meses} meses` : `${r.obrigatoria ? 'Obrigatória' : 'Flexível'} · ${r.meses} meses`;
+
 export interface ConvocacaoUniforme {
   chave: string;
   nome: string;
@@ -48,6 +134,10 @@ export interface ConvocacaoUniforme {
   semDataAssinatura: boolean;
   /** yyyy-MM-dd */
   dataTroca: string;
+  /** Prazo usado (do posto atual na Senior; sem Senior, do posto da ficha). */
+  regra: RegraTroca;
+  /** De onde vieram posto/cargo: Senior (hoje) ou a própria ficha. */
+  origem: 'senior' | 'ficha';
   diasRestantes: number;
   situacao: SituacaoTroca;
   itens: string[];
@@ -99,6 +189,8 @@ export function chaveColaborador(f: { cpf?: string | null; nome: string }): stri
 
 export function calcularTrocasUniforme(
   fichas: FichaBase[], catalogo: ItemCatalogo[], hoje: Date = new Date(),
+  regraDe: (...nomes: (string | null | undefined)[]) => RegraTroca = () => REGRA_PADRAO,
+  seniorDe: (f: FichaBase) => ColaboradorSeniorBase | null = () => null,
 ): ConvocacaoUniforme[] {
   const tipoDe = criarClassificador(catalogo);
   const hojeIso = dataBrasilia(hoje);
@@ -119,28 +211,35 @@ export function calcularTrocasUniforme(
     }
   }
 
-  return Array.from(ultima.entries()).map(([chave, { f, data, semData, itens }]) => {
-    const dataTroca = somarMeses(data, MESES_TROCA);
+  const lista: ConvocacaoUniforme[] = [];
+  for (const [chave, { f, data, semData, itens }] of ultima) {
+    const sr = seniorDe(f);
+    if (sr && !sr.ativo) continue; // desligado na Senior: não convoca
+    const postoSenior = sr ? (semCodigoPosto(sr.posto_descricao) || (sr.nome_local ?? '').trim()) : '';
+    const regra = sr ? regraDe(postoSenior, sr.nome_local, f.posto) : regraDe(f.posto);
+    const dataTroca = somarMeses(data, regra.meses);
     const dias = diasEntre(hojeIso, dataTroca);
-    const c: ConvocacaoUniforme = {
+    lista.push({
       chave,
       nome: f.nome,
       cpf: f.cpf || '',
-      matricula: f.matricula || '',
-      funcao: f.funcao || '',
-      posto: f.posto || '',
-      uf: f.uf,
+      matricula: sr ? String(sr.num_cad) : f.matricula || '',
+      funcao: sr?.cargo || f.funcao || '',
+      posto: regra.postoCadastro || postoSenior || f.posto || '',
+      uf: sr?.uf || f.uf,
       fichaId: f.id,
       fichaNumero: f.numero ?? undefined,
       dataAssinatura: data,
       semDataAssinatura: semData,
       dataTroca,
+      regra,
+      origem: sr ? 'senior' : 'ficha',
       diasRestantes: dias,
       situacao: dias <= 0 ? 'vencido' : dias <= DIAS_AVISO ? 'proximo' : 'em_dia',
       itens,
-    };
-    return c;
-  }).sort((a, b) => a.diasRestantes - b.diasRestantes || a.nome.localeCompare(b.nome));
+    });
+  }
+  return lista.sort((a, b) => a.diasRestantes - b.diasRestantes || a.nome.localeCompare(b.nome));
 }
 
 export const situacaoTexto = (t: Pick<ConvocacaoUniforme, 'diasRestantes'>) =>

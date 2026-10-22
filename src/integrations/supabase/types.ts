@@ -1878,6 +1878,8 @@ export type Database = {
           nome_chave: string
           uf: string
           updated_at: string
+          troca_uniforme_meses: number | null
+          troca_uniforme_obrigatoria: boolean
         }
         Insert: {
           apelidos?: string[]
@@ -1890,6 +1892,8 @@ export type Database = {
           nome: string
           uf?: string
           updated_at?: string
+          troca_uniforme_meses?: number | null
+          troca_uniforme_obrigatoria?: boolean
         }
         Update: {
           apelidos?: string[]
@@ -1902,6 +1906,8 @@ export type Database = {
           nome?: string
           uf?: string
           updated_at?: string
+          troca_uniforme_meses?: number | null
+          troca_uniforme_obrigatoria?: boolean
         }
         Relationships: []
       }

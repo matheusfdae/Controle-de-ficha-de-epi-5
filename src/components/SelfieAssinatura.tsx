@@ -26,7 +26,7 @@ export default function SelfieAssinatura({ value, onChange, habilitado, disabled
     <div className="rounded-lg border border-dashed p-3 space-y-2">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-medium">Selfie do funcionário *</p>
+          <p className="text-sm font-medium">Selfie do funcionário <span className="font-normal text-muted-foreground">(opcional)</span></p>
           <p className="text-xs text-muted-foreground">
             {value ? 'Foto registrada junto com a assinatura.' : habilitado
               ? 'Logo após a rubrica, tire uma foto do rosto do funcionário.'
