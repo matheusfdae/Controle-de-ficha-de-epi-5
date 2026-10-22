@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,9 +15,15 @@ import { toast } from 'sonner';
 import EstadoSelect, { TODOS_ESTADOS, useEstadoLembrado } from '@/components/EstadoSelect';
 import EnviarConvocacaoDialog from '@/components/EnviarConvocacaoDialog';
 import { listEpis } from '@/services/estoqueService';
+import { Posto, listPostos } from '@/services/postosService';
+import { ColaboradorLista, listarColaboradoresSenior } from '@/services/colaboradoresSeniorService';
+import PrazosTrocaPostos from '@/components/PrazosTrocaPostos';
+import { useAuth } from '@/contexts/AuthContext';
 import {
-  ConvocacaoUniforme, DIAS_AVISO, MESES_TROCA, calcularTrocasUniforme, criarClassificador, formatarData, situacaoTexto,
+  ConvocacaoUniforme, DIAS_AVISO, MESES_TROCA_PADRAO, calcularTrocasUniforme, criarClassificador, formatarData, regraTexto,
+  situacaoTexto,
 } from '@/lib/convocacaoUniforme';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import BackButton from '@/components/BackButton';
 
 interface VencimentoItem {
@@ -156,21 +162,35 @@ function EpisPanel() {
 }
 
 function UniformesPanel() {
-  const [trocas, setTrocas] = useState<ConvocacaoUniforme[]>([]);
+  const { can } = useAuth();
+  const [dados, setDados] = useState<{ fichas: EPIFicha[]; catalogo: Awaited<ReturnType<typeof listEpis>> }>({ fichas: [], catalogo: [] });
+  const [postos, setPostos] = useState<Posto[]>([]);
+  const [senior, setSenior] = useState<ColaboradorLista[]>([]);
+  const [aba, setAba] = useState<'convocacao' | 'prazos'>('convocacao');
   // 'convocacao' (padrão) = vencidos + próximos; os demais vêm dos cartões.
   const [filtro, setFiltro] = useState<FiltroUniforme>('convocacao');
   const [busca, setBusca] = useState('');
+  const [tipoRegra, setTipoRegra] = useState<'todas' | 'obrigatoria' | 'flexivel' | 'sem'>('todas');
   const [uf, setUf] = useEstadoLembrado('vencimentos-uniforme', true);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([getFichas({ semAssinaturas: true }), listEpis()])
-      .then(([fichas, catalogo]) => setTrocas(calcularTrocasUniforme(fichas, catalogo)))
+    Promise.all([
+      getFichas({ semAssinaturas: true }), listEpis(), listPostos().catch(() => [] as Posto[]),
+      listarColaboradoresSenior().catch(() => [] as ColaboradorLista[]),
+    ])
+      .then(([fichas, catalogo, p, s]) => { setDados({ fichas, catalogo }); setPostos(p); setSenior(s); })
       .catch(e => toast.error(e instanceof Error ? e.message : 'Erro ao carregar'))
       .finally(() => setLoading(false));
   }, []);
 
-  const doEstado = trocas.filter(t => uf === TODOS_ESTADOS || t.uf === uf);
+  // Recalcula quando muda o prazo de algum posto (aba "Prazos por posto").
+  const trocas: ConvocacaoUniforme[] = useMemo(
+    () => calcularTrocasUniforme(dados.fichas, dados.catalogo, new Date(), postos, senior), [dados, postos, senior]);
+  const recarregarPostos = () => listPostos().then(setPostos).catch(e => toast.error(e.message));
+
+  const doEstado = trocas.filter(t => (uf === TODOS_ESTADOS || t.uf === uf) && (tipoRegra === 'todas'
+    || (tipoRegra === 'sem' ? !t.regra.definida : t.regra.definida && t.regra.obrigatoria === (tipoRegra === 'obrigatoria'))));
   const vencidos = doEstado.filter(t => t.situacao === 'vencido');
   const proximos = doEstado.filter(t => t.situacao === 'proximo');
   const emDia = doEstado.filter(t => t.situacao === 'em_dia');
@@ -183,7 +203,16 @@ function UniformesPanel() {
     : filtro === 'ok' ? 'Em dia' : filtro === 'todos' ? 'Todos os colaboradores' : 'Lista de convocação';
 
   return (
-    <div className="space-y-6">
+    <Tabs value={aba} onValueChange={v => setAba(v as typeof aba)} className="space-y-6">
+      <TabsList>
+        <TabsTrigger value="convocacao">Convocação</TabsTrigger>
+        <TabsTrigger value="prazos">Prazos por posto</TabsTrigger>
+      </TabsList>
+      <TabsContent value="prazos" className="mt-0">
+        <PrazosTrocaPostos postos={postos} trocas={trocas} estado={uf} onEstado={setUf}
+          podeEditar={can('configuracoes', 'edit')} onAlterado={recarregarPostos} />
+      </TabsContent>
+      <TabsContent value="convocacao" className="mt-0 space-y-6">
       <SummaryCards vencidos={vencidos.length} proximos={proximos.length} emDia={emDia.length}
         filtro={filtro} setFiltro={(f: FiltroUniforme) => setFiltro(f === 'todos' ? 'convocacao' : f)} />
       <Card>
@@ -194,7 +223,9 @@ function UniformesPanel() {
                 {titulo} <span className="text-muted-foreground font-normal ml-1">({lista.length})</span>
               </CardTitle>
               <p className="text-xs text-muted-foreground mt-1">
-                Troca a cada {MESES_TROCA} meses, contados da assinatura da última ficha de uniforme do colaborador.
+                Prazo de troca conforme o contrato do posto (cadastro de Postos), contado da assinatura da última ficha de
+                uniforme do colaborador. Posto, cargo e matrícula vêm da Senior (desligados ficam de fora); quem não
+                está na Senior usa os dados da ficha. Posto ainda sem análise: {MESES_TROCA_PADRAO} meses.
                 {filtro === 'convocacao' && ` Mostra os vencidos e quem vence em até ${DIAS_AVISO} dias.`}
               </p>
             </div>
@@ -212,6 +243,15 @@ function UniformesPanel() {
             <Input placeholder="Buscar colaborador, CPF, posto..." value={busca} onChange={e => setBusca(e.target.value)}
               className="max-w-xs" />
             <EstadoSelect value={uf} onChange={setUf} permitirTodos className="w-44" />
+            <Select value={tipoRegra} onValueChange={v => setTipoRegra(v as typeof tipoRegra)}>
+              <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todos os contratos</SelectItem>
+                <SelectItem value="obrigatoria">Troca obrigatória</SelectItem>
+                <SelectItem value="flexivel">Troca flexível</SelectItem>
+                <SelectItem value="sem">Posto sem análise</SelectItem>
+              </SelectContent>
+            </Select>
             {filtro !== 'convocacao' && (
               <Button variant="ghost" size="sm" onClick={() => setFiltro('convocacao')}>Voltar à convocação</Button>
             )}
@@ -251,6 +291,9 @@ function UniformesPanel() {
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
                       {t.posto || '—'} <Badge variant="outline" className="ml-1 font-mono">{t.uf}</Badge>
+                      <div className={`text-[11px] ${t.regra.obrigatoria ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
+                        {regraTexto(t.regra)}{t.origem === 'ficha' && ' · posto da ficha (não achado na Senior)'}
+                      </div>
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">{t.funcao || '—'}</TableCell>
                     <TableCell className="whitespace-nowrap">
@@ -266,7 +309,8 @@ function UniformesPanel() {
           )}
         </CardContent>
       </Card>
-    </div>
+      </TabsContent>
+    </Tabs>
   );
 }
 
@@ -283,6 +327,7 @@ async function baixarExcelConvocacao(lista: ConvocacaoUniforme[], titulo: string
     { header: 'Função', key: 'funcao', width: 22 },
     { header: 'Posto', key: 'posto', width: 30 },
     { header: 'Estado', key: 'uf', width: 8 },
+    { header: 'Prazo do contrato', key: 'regra', width: 22 },
     { header: 'Ficha', key: 'ficha', width: 8 },
     { header: 'Assinada em', key: 'assinatura', width: 13 },
     { header: 'Troca em', key: 'troca', width: 13 },
@@ -292,7 +337,7 @@ async function baixarExcelConvocacao(lista: ConvocacaoUniforme[], titulo: string
   ws.getRow(1).font = { bold: true };
   for (const t of lista) {
     ws.addRow({
-      nome: t.nome, matricula: t.matricula, funcao: t.funcao, posto: t.posto, uf: t.uf,
+      nome: t.nome, matricula: t.matricula, funcao: t.funcao, posto: t.posto, uf: t.uf, regra: regraTexto(t.regra),
       ficha: t.fichaNumero ?? '', assinatura: formatarData(t.dataAssinatura), troca: formatarData(t.dataTroca),
       situacao: situacaoTexto(t), itens: t.itens.join(', '),
     });
@@ -311,7 +356,7 @@ function imprimirConvocacao(lista: ConvocacaoUniforme[], titulo: string) {
     String(v ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
   const linhas = lista.map(t => `<tr>
     <td>${esc(t.nome)}</td><td>${esc(t.matricula)}</td><td>${esc(t.funcao)}</td>
-    <td>${esc(t.posto)} (${esc(t.uf)})</td><td>${esc(formatarData(t.dataAssinatura))}</td>
+    <td>${esc(t.posto)} (${esc(t.uf)})<br><small>${esc(regraTexto(t.regra))}</small></td><td>${esc(formatarData(t.dataAssinatura))}</td>
     <td>${esc(formatarData(t.dataTroca))}</td><td>${esc(situacaoTexto(t))}</td><td class="ass"></td></tr>`).join('');
   const w = window.open('', '_blank');
   if (!w) { toast.error('O navegador bloqueou a janela de impressão.'); return; }
@@ -325,7 +370,7 @@ function imprimirConvocacao(lista: ConvocacaoUniforme[], titulo: string) {
       @page { size: A4 landscape; margin: 12mm; }
     </style></head><body>
     <h1>Convocação para troca de uniforme — ${esc(titulo)}</h1>
-    <p>Gerado em ${new Date().toLocaleString('pt-BR')} · ${lista.length} colaborador(es) · troca a cada ${MESES_TROCA} meses da assinatura.</p>
+    <p>Gerado em ${new Date().toLocaleString('pt-BR')} · ${lista.length} colaborador(es) · prazo de troca conforme o contrato do posto, contado da assinatura.</p>
     <table><thead><tr><th>Colaborador</th><th>Matrícula</th><th>Função</th><th>Posto</th>
     <th>Assinada em</th><th>Troca em</th><th>Situação</th><th>Assinatura</th></tr></thead>
     <tbody>${linhas}</tbody></table></body></html>`);

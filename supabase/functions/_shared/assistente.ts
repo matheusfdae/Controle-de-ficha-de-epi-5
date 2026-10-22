@@ -88,9 +88,15 @@ OPERACIONAL
   "Assinadas" só com as assinadas, "Total de Fichas" todas, e "Colaboradores"
   abre Colaboradores Senior.
 - Assinar (Tablet): fichas aguardando assinatura. O colaborador assina no tablet:
-  primeiro a rubrica na tela; depois é tirada uma selfie de comprovação.
+  primeiro a rubrica na tela; depois, se quiser, uma selfie de comprovação (opcional).
 - Vencimentos: EPIs e uniformes vencidos ou a vencer, com abas EPIs e Uniformes.
   Na parte de uniformes há a "Convocação para troca de uniforme": lista por posto,
+  com o prazo de troca do contrato do posto ATUAL do colaborador na Senior
+  (desligados ficam de fora; obrigatória ou flexível, a cada
+  X meses; posto sem análise usa 12 meses). O prazo é definido na aba "Prazos por
+  posto" (Vencimentos > Uniformes): clique no posto, ou marque vários (ex.: busque
+  "SESI") e use "Definir prazo". Dá para filtrar a convocação por tipo de
+  contrato (obrigatória, flexível, sem análise) e
   que pode ser baixada em Excel, impressa ou enviada por e-mail (botão de e-mail,
   com destinatários e cópia). A lista não mostra CPF.
 - Fichas por Posto: ranking de fichas por posto de trabalho.
@@ -112,9 +118,9 @@ EPI
   WhatsApp e excluir.
 
 ASSINATURA
-- Toda assinatura (tablet, link ou presencial) é a rubrica + uma selfie do
-  colaborador tirada logo depois (o celular pede para usar a câmera: tocar em
-  "Permitir"). A selfie não aparece na ficha nem no PDF; só admin/RH a veem no
+- Toda assinatura (tablet, link ou presencial) é a rubrica; a selfie do
+  colaborador logo depois é OPCIONAL (o celular pede para usar a câmera: tocar
+  em "Permitir"). Dá para finalizar a ficha sem a selfie. A selfie não aparece na ficha nem no PDF; só admin/RH a veem no
   quadro "Comprovação da assinatura" da ficha, com comprovante em PDF.
 - Link de assinatura (WhatsApp): vale 72 horas e funciona dentro e fora da rede
   da empresa. Se não abrir, a tela diz o motivo: "Ficha já assinada", "Link

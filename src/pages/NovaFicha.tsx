@@ -213,11 +213,6 @@ export default function NovaFicha() {
         toast.error('É necessário ambas as assinaturas para finalizar');
         return;
       }
-      if (!selfie) {
-        toast.error('Tire a selfie do funcionário logo após a rubrica');
-        document.getElementById('assinaturas-card')?.scrollIntoView({ behavior: 'smooth' });
-        return;
-      }
     }
     const ficha = buildFicha(asSigned);
     try {
@@ -248,8 +243,8 @@ export default function NovaFicha() {
 
   const finalizarDesktop = () => {
     setFinalizeOpen(false);
-    if (!assinaturaColaborador || !assinaturaResponsavel || !selfie) {
-      toast.info('Capture as assinaturas e a selfie do funcionário abaixo e clique em "Confirmar Assinatura"');
+    if (!assinaturaColaborador || !assinaturaResponsavel) {
+      toast.info('Capture as assinaturas abaixo (a selfie do funcionário é opcional) e clique em "Confirmar Assinatura"');
       document.getElementById('assinaturas-card')?.scrollIntoView({ behavior: 'smooth' });
       return;
     }

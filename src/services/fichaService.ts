@@ -285,6 +285,7 @@ export async function assinarFichaPublica(
   token: string,
   assinaturaBase64: string,
   itensRecebidosIds: string[],
+  /** Opcional: vazio = assinatura sem selfie. */
   selfie: string,
 ): Promise<{ ok: boolean; error?: string }> {
   let ip: string | null = null;
@@ -298,7 +299,7 @@ export async function assinarFichaPublica(
     _assinatura: assinaturaBase64,
     _itens_recebidos: itensRecebidosIds,
     _ip: ip,
-    _selfie: selfie,
+    _selfie: selfie || undefined,
   });
   if (error) return { ok: false, error: error.message };
   const res = data as { ok: boolean; error?: string } | null;

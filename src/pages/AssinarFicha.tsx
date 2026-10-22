@@ -121,7 +121,6 @@ export default function AssinarFicha() {
     const recebidosIds = Object.entries(itensRecebidos).filter(([,v]) => v).map(([k]) => k);
     if (recebidosIds.length === 0) { toast.error('Marque ao menos um item recebido'); return; }
     if (!assinatura) { toast.error('Por favor, assine no campo abaixo'); return; }
-    if (!selfie) { toast.error('Tire a selfie logo após a assinatura'); return; }
 
     if (!token) return;
     const r = await assinarFichaPublica(token, assinatura, recebidosIds, selfie);
@@ -133,7 +132,7 @@ export default function AssinarFicha() {
       toast.error(
         r.error === 'ja_assinada' ? 'Esta ficha já foi assinada.'
         : r.error === 'token_invalido' ? 'Link inválido, expirado ou já utilizado.'
-        : r.error === 'selfie_obrigatoria' ? 'Tire a selfie logo após a assinatura.'
+        : r.error === 'selfie_invalida' ? 'Não foi possível usar a selfie. Tire de novo ou assine sem ela.'
         : (r.error || 'Erro ao assinar')
       );
       return;
@@ -142,8 +141,7 @@ export default function AssinarFicha() {
       ...ficha,
       itens: ficha.itens.map(i => ({ ...i, recebido: itensRecebidos[i.id] || false })),
       assinaturaColaborador: assinatura,
-      selfieColaborador: selfie,
-      selfieEm: new Date().toISOString(),
+      ...(selfie && { selfieColaborador: selfie, selfieEm: new Date().toISOString() }),
       status: 'assinada',
       assinadoEm: new Date().toISOString(),
     };

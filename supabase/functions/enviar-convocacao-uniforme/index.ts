@@ -12,7 +12,7 @@ import { verifyCaller, serviceClient, json, corsHeaders } from '../_shared/clerk
 import { enviarComo, ErroMicrosoft } from '../_shared/microsoft.ts';
 import { acessoParaEnviar } from '../_shared/contaMicrosoft.ts';
 import {
-  calcularTrocasUniforme, dataBrasilia, ConvocacaoUniforme, FichaBase, ItemCatalogo,
+  calcularTrocasUniforme, criarBuscaSenior, criarRegraTroca, dataBrasilia, ConvocacaoUniforme, FichaBase, ItemCatalogo,
 } from '../_shared/convocacaoUniforme.ts';
 import { EMAIL, montarEmail } from '../_shared/emailConvocacao.ts';
 const PAGINA = 1000;
@@ -49,6 +49,11 @@ async function convocados(admin: any, ufs: string[]): Promise<ConvocacaoUniforme
   }
   const { data: catalogo, error } = await admin.from('epis').select('id, nome, tipo');
   if (error) throw new Error(error.message);
+  const { data: postos, error: ePostos } = await admin.from('postos')
+    .select('nome, apelidos, troca_uniforme_meses, troca_uniforme_obrigatoria');
+  if (ePostos) throw new Error(ePostos.message);
+  const senior = await lerTudo((de, ate) => admin.from('colaboradores_senior')
+    .select('num_cad, cpf, cargo, posto_descricao, nome_local, uf, ativo').order('id').range(de, ate));
 
   const base: FichaBase[] = fichas.map((f: any) => ({
     id: f.id, numero: f.numero, nome: f.nome_funcionario ?? '', cpf: f.cpf_snapshot, matricula: f.matricula_snapshot,
@@ -56,8 +61,8 @@ async function convocados(admin: any, ufs: string[]): Promise<ConvocacaoUniforme
     assinadoEm: f.data_assinatura_colaborador, dataEntrega: f.data_entrega,
     itens: (porFicha.get(f.id) ?? []).map(i => ({ epiId: i.epi_id, descricao: i.descricao, recebido: i.recebido })),
   }));
-  return calcularTrocasUniforme(base, (catalogo ?? []) as ItemCatalogo[])
-    .filter(t => t.situacao !== 'em_dia');
+  return calcularTrocasUniforme(base, (catalogo ?? []) as ItemCatalogo[], new Date(), criarRegraTroca(postos ?? []), criarBuscaSenior(senior))
+    .filter(t => t.situacao !== 'em_dia' && ufs.includes(t.uf)); // estado atual (Senior) pode ser outro
 }
 
 Deno.serve(async (req) => {

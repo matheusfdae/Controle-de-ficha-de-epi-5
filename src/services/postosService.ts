@@ -9,6 +9,9 @@ export interface Posto {
   apelidos: string[];
   endereco: string | null;
   ativo: boolean;
+  /** Troca de uniforme do contrato: meses (null = posto ainda não analisado) e se é obrigatória. */
+  troca_uniforme_meses: number | null;
+  troca_uniforme_obrigatoria: boolean;
 }
 
 /** Mesma normalização da coluna gerada postos.nome_chave. */
@@ -17,11 +20,14 @@ export const chavePosto = (nome: string | null | undefined) =>
 
 export async function listPostos(): Promise<Posto[]> {
   const { data, error } = await supabase
-    .from('postos').select('id, nome, uf, latitude, longitude, apelidos, endereco, ativo').order('nome');
+    .from('postos')
+    .select('id, nome, uf, latitude, longitude, apelidos, endereco, ativo, troca_uniforme_meses, troca_uniforme_obrigatoria')
+    .order('nome');
   if (error) throw error;
   return data ?? [];
 }
 
+/** Cadastro do posto (a troca de uniforme é definida em Vencimentos, com definirTrocaUniforme). */
 export async function salvarPosto(p: Partial<Posto> & { nome: string; uf: string }): Promise<void> {
   const payload = {
     nome: p.nome.trim(),
@@ -36,6 +42,15 @@ export async function salvarPosto(p: Partial<Posto> & { nome: string; uf: string
     ? await supabase.from('postos').update(payload).eq('id', p.id)
     : await supabase.from('postos').insert(payload);
   if (error) throw new Error(error.code === '23505' ? 'Já existe um posto com esse nome.' : error.message);
+}
+
+/** Mesmo prazo de troca de uniforme para vários postos (ex.: todos de um contrato). meses null = sem análise. */
+export async function definirTrocaUniforme(ids: string[], meses: number | null, obrigatoria: boolean): Promise<void> {
+  const { data, error } = await supabase.from('postos')
+    .update({ troca_uniforme_meses: meses, troca_uniforme_obrigatoria: !!meses && obrigatoria })
+    .in('id', ids).select('id');
+  if (error) throw new Error(error.message);
+  if ((data?.length ?? 0) < ids.length) throw new Error('Sem permissão para alterar alguns desses postos');
 }
 
 export async function excluirPosto(id: string): Promise<void> {
