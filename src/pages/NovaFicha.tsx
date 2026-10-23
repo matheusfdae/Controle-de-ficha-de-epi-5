@@ -116,7 +116,9 @@ export default function NovaFicha() {
     if (funcaoId && funcoes.length && !funcoes.some(f => f.id === funcaoId && f.uf === uf)) setFuncaoId('');
   }, [uf, funcoes]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const aplicarFuncao = async (id: string) => {
+  // `posto`: quando quem chama acabou de mudar o posto (busca na Senior), o
+  // form ainda não foi atualizado; sem ele, vale o posto da ficha.
+  const aplicarFuncao = async (id: string, posto = form.posto) => {
     setFuncaoId(id);
     if (!id) return;
     try {
@@ -134,7 +136,7 @@ export default function NovaFicha() {
             quantidade: v.quantidade || 1,
             tamanho: v.tamanho || '',
             dataEntrega: today,
-            postoServico: '',
+            postoServico: posto,
             recebido: false,
             epiId: v.epi_id,
           };
@@ -168,7 +170,7 @@ export default function NovaFicha() {
       quantidade: 1,
       tamanho: '',
       dataEntrega: today,
-      postoServico: '',
+      postoServico: form.posto,
       recebido: false,
     }]);
   };
@@ -187,7 +189,8 @@ export default function NovaFicha() {
     id: generateId(),
     ...form,
     uf,
-    itens,
+    // Item sem posto próprio fica com o posto da ficha (o que veio da Senior).
+    itens: itens.map(i => (i.postoServico?.trim() ? i : { ...i, postoServico: form.posto })),
     assinaturaColaborador: assinaturaColaborador || undefined,
     assinaturaResponsavel: assinaturaResponsavel || undefined,
     ...(asSigned && selfie && { selfieColaborador: selfie, selfieEm }),
@@ -340,7 +343,7 @@ export default function NovaFicha() {
       }
       // Se existir no estado da ficha um tipo de uniforme com o nome do cargo, já escolhe e preenche os itens.
       const tipoUniforme = c.cargo && funcoes.find(x => x.uf === ufFicha && x.nome.trim().toLowerCase() === c.cargo!.trim().toLowerCase());
-      if (tipoUniforme) await aplicarFuncao(tipoUniforme.id);
+      if (tipoUniforme) await aplicarFuncao(tipoUniforme.id, posto?.nome ?? form.posto);
       if (c.situacao !== null && c.situacao !== SITUACAO_TRABALHANDO) {
         toast.warning(`Atenção: na Senior este colaborador está "${c.situacaoDescricao || `situação ${c.situacao}`}".`);
       } else {
