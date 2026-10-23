@@ -13,13 +13,32 @@ import roboCabeca from '@/assets/assistente/robo-cabeca.png';
 
 const GUARDAR = 'chat-ajuda';
 // Perguntas prontas por assunto (Crachás só para quem acessa o módulo).
+const ASSUNTOS: { id: 'fichas' | 'vencimentos' | 'estoque' | 'crachas'; rotulo: string }[] = [
+  { id: 'fichas', rotulo: 'Fichas' },
+  { id: 'vencimentos', rotulo: 'Uniforme e vencimentos' },
+  { id: 'estoque', rotulo: 'Estoque' },
+  { id: 'crachas', rotulo: 'Crachás' },
+];
 const SUGESTOES = {
   fichas: [
     'Como faço uma nova ficha de EPI?',
     'Como envio o link de assinatura?',
     'Como reenvio uma ficha já assinada?',
-    'Como dou entrada no estoque?',
     'Por que não vejo um colaborador?',
+    'A selfie é obrigatória para assinar?',
+  ],
+  vencimentos: [
+    'Como funciona a troca de uniforme?',
+    'Como defino o prazo de troca de um posto?',
+    'Como envio a convocação por e-mail?',
+    'Como é calculado o vencimento do EPI?',
+  ],
+  estoque: [
+    'Como dou entrada no estoque?',
+    'Como lanço uma nota fiscal pelo PDF ou XML?',
+    'Como defino o estoque mínimo?',
+    'Como transfiro estoque para outro estado?',
+    'Como recebo o relatório de estoque por e-mail?',
   ],
   crachas: [
     'Como peço um crachá novo ou 2ª via?',
@@ -82,9 +101,10 @@ export default function ChatAjuda() {
   const { user, can } = useAuth();
   const veCrachas = can('crachas', 'view');
   const [assunto, setAssunto] = useState<Assunto>('fichas');
-  // Nas telas de crachá, as perguntas prontas já abrem no assunto Crachás.
+  // As perguntas prontas já abrem no assunto da tela aberta.
   useEffect(() => {
-    setAssunto(veCrachas && pathname.startsWith('/crachas') ? 'crachas' : 'fichas');
+    setAssunto(veCrachas && pathname.startsWith('/crachas') ? 'crachas'
+      : pathname.startsWith('/estoque') ? 'estoque' : pathname.startsWith('/vencimentos') ? 'vencimentos' : 'fichas');
   }, [pathname, veCrachas]);
   const [guia, setGuia] = useState<string | null>(null);
   const fimGuia = useCallback(() => setGuia(null), []);
@@ -178,18 +198,16 @@ export default function ChatAjuda() {
         {!conversa.length && (
           <div className="space-y-2">
             <img src={robo} alt="" draggable={false} className="h-32 w-auto mx-auto drop-shadow-lg" />
-            <p className="text-muted-foreground text-center">{saudacao(user?.nome)} Sou o assistente do Grupo 5 Estrelas. Pergunte como usar qualquer tela do sistema. Alguns exemplos:</p>
-            {veCrachas && (
-              <div className="flex gap-1.5 justify-center">
-                {([['fichas', 'Fichas e EPI'], ['crachas', 'Crachás']] as const).map(([id, rotulo]) => (
-                  <button key={id} onClick={() => setAssunto(id)}
-                    className={cn('rounded-full border px-3 py-1 text-xs transition-colors',
-                      assunto === id ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted')}>
-                    {rotulo}
-                  </button>
-                ))}
-              </div>
-            )}
+            <p className="text-muted-foreground text-center">{saudacao(user?.nome)} Sou o assistente do Grupo 5 Estrelas. Pergunte qualquer coisa sobre o sistema. Alguns exemplos:</p>
+            <div className="flex flex-wrap gap-1.5 justify-center">
+              {ASSUNTOS.filter(a => a.id !== 'crachas' || veCrachas).map(({ id, rotulo }) => (
+                <button key={id} onClick={() => setAssunto(id)}
+                  className={cn('rounded-full border px-3 py-1 text-xs transition-colors',
+                    assunto === id ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted')}>
+                  {rotulo}
+                </button>
+              ))}
+            </div>
             {SUGESTOES[assunto].map(s => (
               <button key={s} onClick={() => enviar(s)}
                 className="block w-full text-left rounded-lg border px-3 py-2 hover:bg-muted transition-colors">
