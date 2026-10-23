@@ -70,16 +70,11 @@ export default function VisualizarFicha() {
       toast.error('É necessário ambas as assinaturas');
       return;
     }
-    if (!selfie) {
-      toast.error('Tire a selfie do funcionário logo após a rubrica');
-      return;
-    }
     const updated: EPIFicha = {
       ...ficha,
       assinaturaColaborador,
       assinaturaResponsavel,
-      selfieColaborador: selfie,
-      selfieEm,
+      ...(selfie && { selfieColaborador: selfie, selfieEm }),
       status: 'assinada',
       assinadoEm: new Date().toISOString(),
     };
