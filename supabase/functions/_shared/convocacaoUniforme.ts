@@ -37,6 +37,8 @@ export interface FichaBase {
   assinadoEm?: string | null;
   /** yyyy-MM-dd */
   dataEntrega?: string | null;
+  /** Telefone digitado na ficha. */
+  telefone?: string | null;
   itens: ItemFichaBase[];
 }
 
@@ -89,6 +91,7 @@ export interface ColaboradorSeniorBase {
   posto_descricao?: string | null;
   nome_local?: string | null;
   uf?: string | null;
+  telefone?: string | null;
   ativo: boolean;
 }
 
@@ -126,6 +129,10 @@ export interface ConvocacaoUniforme {
   funcao: string;
   posto: string;
   uf: string;
+  /** Telefone do cadastro da Senior, como veio (vazio sem Senior). */
+  telefone: string;
+  /** Telefones digitados nas fichas do colaborador (de EPI ou uniforme), da mais nova para a mais antiga. */
+  telefonesFicha: string[];
   fichaId: string;
   fichaNumero?: number;
   /** yyyy-MM-dd */
@@ -195,8 +202,16 @@ export function calcularTrocasUniforme(
   const tipoDe = criarClassificador(catalogo);
   const hojeIso = dataBrasilia(hoje);
   const ultima = new Map<string, { f: FichaBase; data: string; semData: boolean; itens: string[] }>();
+  const telefones = new Map<string, { data: string; tel: string }[]>();
 
   for (const f of fichas) {
+    const tel = (f.telefone || '').trim();
+    if (tel) {
+      const k = chaveColaborador(f);
+      const l = telefones.get(k) ?? [];
+      l.push({ data: f.assinadoEm || f.dataEntrega || '', tel });
+      telefones.set(k, l);
+    }
     if (f.status !== 'assinada') continue;
     // Itens entregues = marcados como recebidos; ficha antiga sem nenhuma marca conta todos.
     const entregues = f.itens.some(i => i.recebido) ? f.itens.filter(i => i.recebido) : f.itens;
@@ -227,6 +242,8 @@ export function calcularTrocasUniforme(
       funcao: sr?.cargo || f.funcao || '',
       posto: regra.postoCadastro || postoSenior || f.posto || '',
       uf: sr?.uf || f.uf,
+      telefone: sr?.telefone || '',
+      telefonesFicha: [...new Set((telefones.get(chave) ?? []).sort((a, b) => b.data.localeCompare(a.data)).map(t => t.tel))],
       fichaId: f.id,
       fichaNumero: f.numero ?? undefined,
       dataAssinatura: data,

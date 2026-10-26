@@ -61,6 +61,15 @@ describe('calcularTrocasUniforme', () => {
     expect(r[0].dataTroca).toBe('2026-12-01');
   });
 
+  it('junta os telefones de todas as fichas do colaborador, da mais nova para a mais antiga', () => {
+    const [c] = calcular([
+      ficha({ cpf: '12345678900', telefone: '61 98888-1111', assinadoEm: '2026-03-01T12:00:00Z', itens: [item({ epiId: 'gandola' })] }),
+      ficha({ cpf: '12345678900', telefone: '61 97777-2222', assinadoEm: '2026-08-01T12:00:00Z', itens: [item({ epiId: 'luva' })] }),
+      ficha({ cpf: '12345678900', telefone: '', assinadoEm: '2026-09-01T12:00:00Z', itens: [item({ epiId: 'gandola' })] }),
+    ]);
+    expect(c.telefonesFicha).toEqual(['61 97777-2222', '61 98888-1111']);
+  });
+
   it('ignora pendente, ficha só de EPI e item não entregue', () => {
     const r = calcular([
       ficha({ status: 'pendente', itens: [item({ epiId: 'gandola' })] }),

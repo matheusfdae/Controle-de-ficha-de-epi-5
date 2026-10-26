@@ -19,7 +19,7 @@ export function calcularTrocasUniforme(
 ): ConvocacaoUniforme[] {
   return calcular(fichas.map(f => ({
     id: f.id, numero: f.numero, nome: f.nomeFuncionario, cpf: f.cpf, matricula: f.matricula, funcao: f.funcao,
-    posto: f.posto, uf: f.uf, status: f.status, assinadoEm: f.assinadoEm, dataEntrega: f.dataEntrega,
+    posto: f.posto, uf: f.uf, status: f.status, assinadoEm: f.assinadoEm, dataEntrega: f.dataEntrega, telefone: f.telefone,
     itens: f.itens.map(i => ({ epiId: i.epiId, descricao: i.descricao, recebido: i.recebido })),
   })), catalogo, hoje, criarRegraTroca(postos), criarBuscaSenior(senior));
 }
