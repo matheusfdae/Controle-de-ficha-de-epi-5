@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { EPIFicha, MotivoEntrega } from '@/types/epi';
 import { getFichas, deleteFicha } from '@/services/fichaService';
 import ReenviarAssinaturaDialog from '@/components/ReenviarAssinaturaDialog';
+import FichasDashboard from '@/components/FichasDashboard';
 import { generatePDF } from '@/services/pdfService';
 import { useAuth } from '@/contexts/AuthContext';
 import { importFichasFromExcel, downloadTemplateExcel } from '@/services/importFichasService';
@@ -122,7 +123,7 @@ export default function ConsultarFichas() {
 
   return (
     <div className="p-4 lg:p-8 pb-20">
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto space-y-6">
         <BackButton />
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div>
@@ -152,6 +153,8 @@ export default function ConsultarFichas() {
             </div>
           )}
         </div>
+
+        <FichasDashboard fichas={visiveis} motivoLabel={MOTIVO_LABEL} status={status} onStatus={setStatus} />
 
         <Card>
           <CardContent className="p-4 space-y-3">
