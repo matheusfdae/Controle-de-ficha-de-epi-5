@@ -8,6 +8,9 @@ import { calcularEstoque, estadosDoRelatorio, montarEmailEstoque, montarEmailRep
 import { montarEmailIntegracao, normalizarPessoas } from "./supabase/functions/_shared/emailIntegracao";
 import { ErroAssistente, normalizarConversa, perguntarAssistente } from "./supabase/functions/_shared/assistente";
 import {
+  agendarEnvios, cancelarLote, ErroWhatsApp, lerLote, listarLotes, numeroWhatsApp, validarEnvios,
+} from "./supabase/functions/_shared/whatsapp";
+import {
   consultarColaborador, consultarColaboradorPorCpf, cpfValido, escolherCadastro, SeniorError,
   buscarEtapa, postoEscalaDoColaborador, type PedidoEtapa, type SeniorConfig,
 } from "./supabase/functions/_shared/senior";
@@ -148,6 +151,51 @@ function emailLocal(env: Record<string, string>): Plugin {
 }
 
 /**
+ * Só no `npm run dev`: convocação pelo WhatsApp agendada no WA-AKG daqui do PC
+ * (WAAKG_URL, WAAKG_SESSAO, WAAKG_API_KEY no .env.local). O banco de dev tem
+ * fichas reais, então TUDO vai para WAAKG_NUMERO_TESTE (no máximo 3 mensagens);
+ * sem esse número, não envia.
+ */
+function whatsappLocal(env: Record<string, string>): Plugin {
+  return {
+    name: "whatsapp-local",
+    apply: "serve",
+    configureServer(server) {
+      const { WAAKG_URL: url, WAAKG_SESSAO: sessao, WAAKG_API_KEY: apiKey } = env;
+      const conta = { url, sessao, apiKey };
+      /** Lê o corpo JSON, chama `fazer` e responde; erros viram { error }. */
+      const rota = (caminho: string, fazer: (corpo: any, req: import("http").IncomingMessage) => Promise<unknown>) =>
+        server.middlewares.use(caminho, async (req, res) => {
+          const responder = (status: number, corpo: unknown) => {
+            res.statusCode = status;
+            res.setHeader("Content-Type", "application/json; charset=utf-8");
+            res.end(JSON.stringify(corpo));
+          };
+          try {
+            if (!url || !sessao || !apiKey) return responder(503, { error: "WhatsApp não configurado no .env.local (WAAKG_URL, WAAKG_SESSAO, WAAKG_API_KEY)" });
+            let t = "";
+            for await (const p of req) t += p;
+            responder(200, await fazer(JSON.parse(t || "{}"), req));
+          } catch (err) {
+            responder(err instanceof ErroWhatsApp ? 400 : 502, { error: err instanceof Error ? err.message : String(err) });
+          }
+        });
+
+      rota("/__whatsapp/enviar-convocacao", async corpo => {
+        const teste = numeroWhatsApp(env.WAAKG_NUMERO_TESTE);
+        if (!teste) throw new ErroWhatsApp("No localhost, informe WAAKG_NUMERO_TESTE no .env.local (celular com DDD): as mensagens vão só para ele");
+        const envios = validarEnvios(corpo.envios);
+        const desvio = envios.slice(0, 3).map(e => ({ ...e, numero: teste, texto: `[TESTE — seria para ${e.nome}, ${e.numero}]\n\n${e.texto}` }));
+        return { ...(await agendarEnvios(conta, desvio, 20)), teste: true };
+      });
+      // Acompanhamento: { lote } traz as mensagens do lote; sem lote, o resumo dos últimos envios.
+      rota("/__whatsapp/lotes", async corpo => (corpo.lote ? lerLote(conta, String(corpo.lote)) : listarLotes(conta)));
+      rota("/__whatsapp/cancelar-lote", async corpo => cancelarLote(conta, String(corpo.lote)));
+    },
+  };
+}
+
+/**
  * Só no `npm run dev`: chat "Tirar dúvidas" respondido daqui do PC, com a chave
  * GEMINI_API_KEY do .env.local (fora do git e do navegador).
  */
@@ -243,7 +291,7 @@ export default defineConfig(({ mode }) => ({
       interval: 300,
     },
   },
-  plugins: [react(), seniorLocal(loadEnv(mode, process.cwd(), "SENIOR_")), emailLocal(loadEnv(mode, process.cwd(), "MS_")), ajudaLocal(loadEnv(mode, process.cwd(), "GEMINI_"))],
+  plugins: [react(), seniorLocal(loadEnv(mode, process.cwd(), "SENIOR_")), emailLocal(loadEnv(mode, process.cwd(), "MS_")), ajudaLocal(loadEnv(mode, process.cwd(), "GEMINI_")), whatsappLocal(loadEnv(mode, process.cwd(), "WAAKG_"))],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

@@ -14,6 +14,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { toast } from 'sonner';
 import EstadoSelect, { TODOS_ESTADOS, useEstadoLembrado } from '@/components/EstadoSelect';
 import EnviarConvocacaoDialog from '@/components/EnviarConvocacaoDialog';
+import EnviarWhatsAppDialog from '@/components/EnviarWhatsAppDialog';
+import EnviosWhatsAppPanel from '@/components/EnviosWhatsAppPanel';
 import { listEpis } from '@/services/estoqueService';
 import { Posto, listPostos } from '@/services/postosService';
 import { ColaboradorLista, listarColaboradoresSenior } from '@/services/colaboradoresSeniorService';
@@ -166,7 +168,7 @@ function UniformesPanel() {
   const [dados, setDados] = useState<{ fichas: EPIFicha[]; catalogo: Awaited<ReturnType<typeof listEpis>> }>({ fichas: [], catalogo: [] });
   const [postos, setPostos] = useState<Posto[]>([]);
   const [senior, setSenior] = useState<ColaboradorLista[]>([]);
-  const [aba, setAba] = useState<'convocacao' | 'prazos'>('convocacao');
+  const [aba, setAba] = useState<'convocacao' | 'prazos' | 'envios'>('convocacao');
   // 'convocacao' (padrão) = vencidos + próximos; os demais vêm dos cartões.
   const [filtro, setFiltro] = useState<FiltroUniforme>('convocacao');
   const [busca, setBusca] = useState('');
@@ -207,7 +209,11 @@ function UniformesPanel() {
       <TabsList>
         <TabsTrigger value="convocacao">Convocação</TabsTrigger>
         <TabsTrigger value="prazos">Prazos por posto</TabsTrigger>
+        <TabsTrigger value="envios">Envios WhatsApp</TabsTrigger>
       </TabsList>
+      <TabsContent value="envios" className="mt-0">
+        <EnviosWhatsAppPanel />
+      </TabsContent>
       <TabsContent value="prazos" className="mt-0">
         <PrazosTrocaPostos postos={postos} trocas={trocas} estado={uf} onEstado={setUf}
           podeEditar={can('configuracoes', 'edit')} onAlterado={recarregarPostos} />
@@ -231,6 +237,7 @@ function UniformesPanel() {
             </div>
             <div className="flex flex-wrap gap-2">
               <EnviarConvocacaoDialog uf={uf} convocados={[...vencidos, ...proximos]} />
+              <EnviarWhatsAppDialog convocados={lista} todos={doEstado} onEnviado={() => setAba('envios')} />
               <Button variant="outline" size="sm" disabled={!lista.length} onClick={() => baixarExcelConvocacao(lista, titulo)}>
                 <Download className="h-4 w-4 mr-1" /> Baixar Excel
               </Button>
