@@ -70,8 +70,8 @@ export const template5EstrelasImg: DefaultTemplate = {
     // ══════════ COLUNA ESQUERDA (frente) ══════════
     {
       type: 'image',
-      x: 12.94, y: 14.66,
-      width: 38.21, height: 51.05,
+      x: 12.87, y: 18.9,
+      width: 38.35, height: 45.2,
       fieldBinding: 'photo_url',
       borderRadius: 0,
       zIndex: 10, side: 'front', opacity: 1,
