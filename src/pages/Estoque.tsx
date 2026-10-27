@@ -24,6 +24,7 @@ import { supabase } from '@/integrations/supabase/client';
 import EstoqueChart from '@/components/EstoqueChart';
 import FornecedoresPanel from '@/components/FornecedoresPanel';
 import RelatorioMovimentacoes from '@/components/RelatorioMovimentacoes';
+import InventarioDialog from '@/components/InventarioDialog';
 import BackButton from '@/components/BackButton';
 import PageHeader from '@/components/PageHeader';
 import EstoqueInput from '@/components/EstoqueInput';
@@ -365,6 +366,7 @@ export default function Estoque() {
           actions={
             <div className="flex items-center gap-2">
               <EstadoSelect value={uf} onChange={setUf} className="w-28" />
+              {uf && can('estoque', 'edit') && <InventarioDialog uf={uf} />}
               {can('estoque', 'create') && (
                 <>
                   <Button variant="outline" onClick={() => navigate('/estoque/entrada?modo=manual')} data-guia="btn-estoque-entrada-manual">
