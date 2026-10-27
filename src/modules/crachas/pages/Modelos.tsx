@@ -256,6 +256,7 @@ const Modelos = () => {
             border_color: el.borderColor || null,
             border_width: el.borderWidth || 0,
             border_radius: el.borderRadius || 0,
+            name_display_mode: el.nameDisplayMode || 'short',
             z_index: el.zIndex,
             side: el.side,
           })));
