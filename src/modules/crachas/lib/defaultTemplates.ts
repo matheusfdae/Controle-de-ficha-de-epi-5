@@ -351,8 +351,73 @@ export const templateHcnImg: DefaultTemplate = {
   ],
 };
 
+/**
+ * Template "Baluarte - Vigilância Patrimonial"
+ * Arte: public/crachas/templates/baluarte.png — redesenhada em vetor a partir
+ * do modelo do Canva (só havia um print de 395 px) e exportada a 600 DPI; o
+ * escudo com a torre é uma recriação. Mesmo tamanho do 5 Estrelas.
+ * Campos medidos no modelo montado no editor.
+ */
+const BALUARTE_GREEN = '#80AF07';
+const BALUARTE_DARK = '#262626';
+const BALUARTE_NAVY = '#1e3a5f';
+
+const baluarteBox = (overrides: Partial<Omit<CanvasElement, 'id'>>): Omit<CanvasElement, 'id'> => ({
+  type: 'text',
+  x: 57.38, y: 0,
+  width: 53.35, height: 5.26,
+  fontFamily: ARIAL,
+  fontSize: 11,
+  fontWeight: '700',
+  fontColor: BALUARTE_NAVY,
+  textAlign: 'center',
+  backgroundColor: 'transparent',
+  borderColor: '#4b4b4b',
+  borderWidth: 1,
+  borderRadius: 1,
+  zIndex: 10, side: 'front', opacity: 1,
+  ...overrides,
+});
+
+export const templateBaluarteImg: DefaultTemplate = {
+  name: 'Baluarte - Vigilância Patrimonial',
+  description: 'Arte da Baluarte em alta definição (vetor)',
+  width_mm: 118.8,
+  height_mm: 96.1,
+  backgroundColor: '#E6E3DE',
+  backgroundImageUrl: '/crachas/templates/baluarte.png',
+  hasBackSide: false,
+  elements: [
+    {
+      type: 'image',
+      x: 15.22, y: 23.03,
+      width: 34.1, height: 40.43,
+      fieldBinding: 'photo_url',
+      borderRadius: 0,
+      zIndex: 10, side: 'front', opacity: 1,
+    },
+    baluarteBox({
+      x: 7.33, y: 66.73, width: 49.87, height: 6.16,
+      fieldBinding: 'full_name', nameDisplayMode: 'short',
+      fontSize: 12, fontColor: BALUARTE_DARK,
+    }),
+    baluarteBox({
+      x: 7.33, y: 75.79, width: 49.87, height: 6.71,
+      fieldBinding: 'role',
+      fontSize: 12, fontColor: BALUARTE_DARK,
+      backgroundColor: BALUARTE_GREEN, borderColor: undefined, borderWidth: 0, borderRadius: 1.5,
+    }),
+
+    baluarteBox({ y: 7.43, height: 5.98, fieldBinding: 'full_name', nameDisplayMode: 'full', fontSize: 9 }),
+    baluarteBox({ y: 15.23, fieldBinding: 'cpf', staticValue: 'CPF: ' }),
+    baluarteBox({ y: 22.84, fieldBinding: 'employee_id', staticValue: 'MAT: ' }),
+    baluarteBox({ y: 30.46, fieldBinding: 'issue_date' }),
+  ],
+};
+
 export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
   template5EstrelasImg,
+  templateBaluarteImg,
   templateSsServicosImg,
   templateHcnImg,
 ];
