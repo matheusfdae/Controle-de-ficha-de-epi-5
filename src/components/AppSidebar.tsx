@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FilePlus2, Search, CalendarClock, Settings, ShieldCheck, LogOut, Users, Package, Briefcase, UserPlus, ClipboardSignature, HardHat, Shirt, FileSignature, MapPin, FileStack,
-  IdCard, Palette, Printer, History, BarChart3, Inbox,
+  IdCard, Palette, Printer, History, BarChart3, Inbox, PenTool,
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -12,6 +13,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ModuleId, ActionId } from '@/lib/permissions';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import MinhaAssinatura from '@/components/MinhaAssinatura';
 
 const baseItems: Array<{ title: string; guia: string; url: string; icon: typeof LayoutDashboard; end: boolean; module: ModuleId }> = [
   { title: 'Dashboard', guia: 'menu-dashboard', url: '/', icon: LayoutDashboard, end: true, module: 'dashboard' },
@@ -59,6 +62,7 @@ export function AppSidebar() {
   const collapsed = state === 'collapsed';
   const { pathname } = useLocation();
   const { user, logout, isAdmin, can } = useAuth();
+  const [assinaturaAberta, setAssinaturaAberta] = useState(false);
 
   const isActive = (path: string, end?: boolean) =>
     end ? pathname === path : pathname === path || pathname.startsWith(path + '/');
@@ -204,16 +208,36 @@ export function AppSidebar() {
                 {isAdmin ? 'ADMIN' : 'OPERADOR'}
               </Badge>
             </div>
+            <Button variant="outline" size="sm" onClick={() => setAssinaturaAberta(true)} className="w-full h-8" data-guia="btn-minha-assinatura">
+              <PenTool className="h-3.5 w-3.5 mr-1.5" /> Minha assinatura
+            </Button>
             <Button variant="outline" size="sm" onClick={logout} className="w-full h-8">
               <LogOut className="h-3.5 w-3.5 mr-1.5" /> Sair
             </Button>
           </div>
         ) : (
-          <Button variant="ghost" size="icon" onClick={logout} title="Sair">
-            <LogOut className="h-4 w-4" />
-          </Button>
+          <>
+            <Button variant="ghost" size="icon" onClick={() => setAssinaturaAberta(true)} title="Minha assinatura">
+              <PenTool className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={logout} title="Sair">
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </>
         )}
       </SidebarFooter>
+
+      <Dialog open={assinaturaAberta} onOpenChange={setAssinaturaAberta}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Minha assinatura</DialogTitle>
+            <DialogDescription>
+              Ligada ao seu login. Ela é preenchida como "responsável pela entrega" nas fichas que você fizer.
+            </DialogDescription>
+          </DialogHeader>
+          {assinaturaAberta && <MinhaAssinatura />}
+        </DialogContent>
+      </Dialog>
     </Sidebar>
   );
 }

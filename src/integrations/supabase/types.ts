@@ -594,6 +594,24 @@ export type Database = {
         }
         Relationships: []
       }
+      assinaturas_usuario: {
+        Row: {
+          assinatura: string
+          profile_id: string
+          updated_at: string
+        }
+        Insert: {
+          assinatura: string
+          profile_id: string
+          updated_at?: string
+        }
+        Update: {
+          assinatura?: string
+          profile_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       assinatura_tokens: {
         Row: {
           created_at: string

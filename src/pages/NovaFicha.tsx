@@ -21,6 +21,7 @@ import { Funcao, EPI, listFuncoes, listEpis, listFuncaoEpis } from '@/services/e
 import { Empresa, listEmpresas } from '@/services/empresasService';
 import { Posto, listPostos } from '@/services/postosService';
 import { useAuth } from '@/contexts/AuthContext';
+import { getMinhaAssinatura } from '@/services/assinaturaUsuarioService';
 import { EMPRESAS_SENIOR, empresaDaSenior, empresaPelaMatricula } from '@/lib/empresaPelaMatricula';
 import { chaveSolta, limparNomePosto } from '@/lib/geoPlanilha';
 import { ModeloFicha, listModelosAtivos } from '@/services/modelosFichaService';
@@ -39,7 +40,7 @@ export default function NovaFicha() {
   const today = new Date().toISOString().split('T')[0];
   const [config, setConfig] = useState(getConfig());
   const [uf, setUf] = useEstadoLembrado('nova-ficha');
-  const { estados } = useAuth();
+  const { estados, user } = useAuth();
 
   const [form, setForm] = useState({
     nomeFuncionario: '',
@@ -71,7 +72,8 @@ export default function NovaFicha() {
   const [assinaturaColaborador, setAssinaturaColaborador] = useState('');
   const [selfie, setSelfie] = useState('');
   const [selfieEm, setSelfieEm] = useState('');
-  const [assinaturaResponsavel, setAssinaturaResponsavel] = useState(config.assinaturaEmpresa || '');
+  const [assinaturaResponsavel, setAssinaturaResponsavel] = useState('');
+  const [minhaAssinatura, setMinhaAssinatura] = useState('');
 
   const [funcoes, setFuncoes] = useState<Funcao[]>([]);
   const [epis, setEpis] = useState<EPI[]>([]);
@@ -103,10 +105,22 @@ export default function NovaFicha() {
       if (!active) return;
       setConfig(cfg);
       setForm(prev => ({ ...prev, empresa: prev.empresa || cfg.empresaNome }));
-      setAssinaturaResponsavel(prev => prev || cfg.assinaturaEmpresa || '');
     });
     return () => { active = false; };
   }, []);
+
+  // Responsável pela entrega = quem está logado: já vem com a assinatura dele.
+  const userId = user?.id;
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    getMinhaAssinatura(userId).then(a => {
+      if (!active) return;
+      setMinhaAssinatura(a);
+      if (a) setAssinaturaResponsavel(prev => prev || a);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [userId]);
 
   // "Tipo de uniforme" (cadastro de Funções): só preenche os itens. A função do
   // colaborador é texto próprio, vindo do cargo na Senior.
@@ -704,8 +718,11 @@ export default function NovaFicha() {
             <SelfieAssinatura value={selfie} habilitado={!!assinaturaColaborador}
               onChange={foto => { setSelfie(foto); setSelfieEm(new Date().toISOString()); }} />
             <SignaturePad label="Assinatura do Responsável pela Entrega" onSave={setAssinaturaResponsavel} initialValue={assinaturaResponsavel} />
-            {assinaturaResponsavel && config.assinaturaEmpresa === assinaturaResponsavel && (
-              <p className="text-xs text-muted-foreground -mt-3">✓ Usando assinatura padrão da empresa (configurações)</p>
+            {assinaturaResponsavel && minhaAssinatura === assinaturaResponsavel && (
+              <p className="text-xs text-muted-foreground -mt-3">✓ Usando a sua assinatura salva</p>
+            )}
+            {!minhaAssinatura && (
+              <p className="text-xs text-muted-foreground -mt-3">Dica: cadastre sua assinatura em "Minha assinatura", no menu lateral, para ela já vir preenchida.</p>
             )}
           </CardContent>
         </Card>
