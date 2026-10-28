@@ -40,18 +40,19 @@ describe('senior SOAP', () => {
       cpf: '01234567890', telefone: '(61) 999998888', email: null,
       dataAdmissao: '2022-03-15', dataAfastamento: null, codFil: 2,
       nomeLocal: 'HOSPITAL X', cargo: 'ASG', centroCusto: 'LIMPEZA',
-      situacao: 1, situacaoDescricao: 'Trabalhando',
+      situacao: 1, situacaoDescricao: 'Trabalhando', rg: null,
     });
     expect(JSON.stringify(c)).not.toContain('NAO DEVE SER USADO');
   });
 
   it('aceita os campos em camelCase da Senior Cloud', () => {
     const cloud = `<erroExecucao/><TMCSColaboradores><numEmp>1</numEmp><tipCol>1</tipCol><numCad>77</numCad>
-      <nomFun>JOSE</nomFun><numCpf>98765432100</numCpf><nomLoc>POSTO Y</nomLoc><titCar>VIGILANTE</titCar>
+      <nomFun>JOSE</nomFun><numCpf>98765432100</numCpf><numCid> 3456789 </numCid><emiCid>SSP</emiCid>
+      <nomLoc>POSTO Y</nomLoc><titCar>VIGILANTE</titCar>
       <sitAfa>1</sitAfa><desSit>Trabalhando</desSit><datAdm>01/02/2023</datAdm><dddTel>62</dddTel><numTel>988887777</numTel>
     </TMCSColaboradores>`;
     expect(parseConsultarColaborador(resposta(cloud))[0]).toMatchObject({
-      numEmp: 1, tipCol: 1, numCad: 77, nome: 'JOSE', cpf: '98765432100', nomeLocal: 'POSTO Y',
+      numEmp: 1, tipCol: 1, numCad: 77, nome: 'JOSE', cpf: '98765432100', rg: '3456789', nomeLocal: 'POSTO Y',
       cargo: 'VIGILANTE', situacao: 1, dataAdmissao: '2023-02-01', telefone: '(62) 988887777',
     });
   });

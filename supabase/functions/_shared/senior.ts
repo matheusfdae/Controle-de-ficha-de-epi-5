@@ -21,6 +21,8 @@ export interface Matricula {
 export interface ColaboradorSenior extends Matricula {
   nome: string;
   cpf: string | null;
+  /** Número do RG (numCid), impresso no crachá. */
+  rg: string | null;
   telefone: string | null;
   email: string | null;
   dataAdmissao: string | null;
@@ -123,6 +125,7 @@ export function mapColaborador(campos: Record<string, string>): ColaboradorSenio
     numCad: num(f.numcad) ?? 0,
     nome: f.nomfun || '',
     cpf: normalizeCpf(f.numcpf),
+    rg: str(f.numcid?.trim()),
     telefone: formatTelefone(f.dditel, f.dddtel, f.numtel),
     email: str(f.emacom),
     dataAdmissao: parseSeniorDate(f.datadm),
@@ -409,7 +412,7 @@ export function turnoDaEscala(nome: string | null | undefined): 'diurno' | 'notu
 /** Linha para a função sincronizar_colaboradores_senior. */
 export function linhaColaborador(c: ColaboradorSenior & { uf: string | null }) {
   return {
-    num_emp: c.numEmp, tip_col: c.tipCol, num_cad: c.numCad, nome: c.nome, cpf: c.cpf,
+    num_emp: c.numEmp, tip_col: c.tipCol, num_cad: c.numCad, nome: c.nome, cpf: c.cpf, rg: c.rg,
     telefone: c.telefone, email: c.email, data_admissao: c.dataAdmissao, empresa_nome: c.empresaNome,
     cod_fil: c.codFil, razao_social: c.razaoSocial, cod_local: c.codLocal, nome_local: c.nomeLocal,
     cod_cargo: c.codCargo, cargo: c.cargo, cod_centro_custo: c.codCentroCusto, centro_custo: c.centroCusto,
@@ -460,7 +463,7 @@ export async function buscarEtapa(cfg: SeniorConfig, p: PedidoEtapa) {
 
 /** Linha da tabela colaboradores_senior (só os campos usados aqui). */
 export interface LinhaListaSenior {
-  num_emp: number; tip_col: number; num_cad: number; nome: string; cpf: string | null;
+  num_emp: number; tip_col: number; num_cad: number; nome: string; cpf: string | null; rg?: string | null;
   telefone: string | null; email: string | null; data_admissao: string | null; empresa_nome: string | null;
   cod_fil: number | null; razao_social: string | null; cod_local: string | null; nome_local: string | null;
   cod_cargo: string | null; cargo: string | null; cod_centro_custo: string | null; centro_custo: string | null;
@@ -472,7 +475,8 @@ export interface LinhaListaSenior {
 /** Converte a linha gravada no mesmo formato da consulta à Senior (com posto e escala). */
 export function colaboradorDaLista(l: LinhaListaSenior): ColaboradorSenior & PostoEscala {
   return {
-    numEmp: l.num_emp, tipCol: l.tip_col, numCad: l.num_cad, nome: l.nome, cpf: l.cpf, telefone: l.telefone,
+    numEmp: l.num_emp, tipCol: l.tip_col, numCad: l.num_cad, nome: l.nome, cpf: l.cpf, rg: l.rg ?? null,
+    telefone: l.telefone,
     email: l.email, dataAdmissao: l.data_admissao, empresaNome: l.empresa_nome, codFil: l.cod_fil,
     razaoSocial: l.razao_social, cnpj: null, codLocal: l.cod_local, nomeLocal: l.nome_local,
     codCargo: l.cod_cargo, cargo: l.cargo, codCentroCusto: l.cod_centro_custo, centroCusto: l.centro_custo,

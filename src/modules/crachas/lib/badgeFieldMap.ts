@@ -44,6 +44,13 @@ function digitsOnly(value: string | null | undefined): string {
   return (value || '').replace(/\D+/g, '');
 }
 
+/** CPF como no crachá impresso (000.000.000-00); o banco guarda só os dígitos. */
+export function formatCpf(value: string | null | undefined): string {
+  const d = digitsOnly(value);
+  if (!d || d.length > 11) return (value || '').trim();
+  return d.padStart(11, '0').replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+}
+
 /**
  * Convert a DB employee row into a flat BadgeEmployeeData for rendering.
  */
@@ -64,7 +71,7 @@ export function mapEmployeeToBadgeData(emp: Record<string, any>): BadgeEmployeeD
       return oneYearFromNow.toLocaleDateString('pt-BR', dateOpts);
     })(),
     rg: emp.rg || '',
-    cpf: emp.cpf || '',
+    cpf: formatCpf(emp.cpf),
     blood_type: emp.blood_type || '',
     request_reason: emp.request_reason || '',
     access_level: emp.access_level || '',
