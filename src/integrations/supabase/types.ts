@@ -2412,6 +2412,10 @@ export type Database = {
         Args: { _epi_id: string; _motivo?: string; _novo: number; _tamanho: string; _uf: string }
         Returns: undefined
       }
+      aplicar_inventario_estoque: {
+        Args: { _uf: string; _motivo: string; _itens: Json }
+        Returns: Json
+      }
       pode_acessar_uf: { Args: { _uf: string }; Returns: boolean }
       pode_sincronizar_senior: { Args: Record<PropertyKey, never>; Returns: boolean }
       senior_gravar_descricoes: {

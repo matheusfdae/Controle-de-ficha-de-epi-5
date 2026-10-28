@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { ItemCatalogoInventario, SaldoTamanho } from '@/lib/inventarioPlanilha';
 
 export type ItemTipo = 'epi' | 'uniforme';
 
@@ -120,6 +121,34 @@ export async function ajustarEstoque(epiId: string, uf: string, tamanho: string,
 export async function resetarEstoqueEpi(epiId: string, uf: string) {
   const { error } = await supabase.rpc('resetar_estoque', { _epi_id: epiId, _uf: uf });
   if (error) throw new Error(error.message);
+}
+
+/**
+ * Catálogo inteiro e saldos por tamanho de todos os estados que o usuário vê
+ * (os tamanhos dos outros estados entram na planilha de inventário com saldo 0).
+ */
+export async function dadosInventario(): Promise<{ catalogo: ItemCatalogoInventario[]; saldos: SaldoTamanho[] }> {
+  const { data: catalogo, error } = await supabase.from('epis').select('id, nome, tipo, ca_numero, ativo').order('nome');
+  if (error) throw error;
+  const saldos: SaldoTamanho[] = [];
+  for (let de = 0; ; de += 1000) {
+    const { data, error: e } = await supabase.from('epi_tamanhos').select('epi_id, uf, tamanho, estoque')
+      .order('id').range(de, de + 999);
+    if (e) throw e;
+    saldos.push(...(data ?? []));
+    if (!data || data.length < 1000) break;
+  }
+  return { catalogo: (catalogo ?? []) as ItemCatalogoInventario[], saldos };
+}
+
+/** Grava a contagem do inventário (tudo ou nada); cada diferença vira uma movimentação. */
+export async function aplicarInventario(uf: string, motivo: string, itens: { epiId: string; tamanho: string; contado: number }[]) {
+  const { data, error } = await supabase.rpc('aplicar_inventario_estoque', {
+    _uf: uf, _motivo: motivo,
+    _itens: itens.map(i => ({ epi_id: i.epiId, tamanho: i.tamanho, contado: String(i.contado) })),
+  });
+  if (error) throw new Error(error.message);
+  return data as { ajustados: number; iguais: number };
 }
 
 export async function transferirEstoque(t: {
