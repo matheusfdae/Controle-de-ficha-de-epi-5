@@ -12,6 +12,7 @@ import SignaturePad from '@/components/SignaturePad';
 import SelfieAssinatura from '@/components/SelfieAssinatura';
 import ComprovacaoAssinatura from '@/components/ComprovacaoAssinatura';
 import { useAuth } from '@/contexts/AuthContext';
+import { getMinhaAssinatura } from '@/services/assinaturaUsuarioService';
 import FichaOficialView from '@/components/FichaOficialView';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,7 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 export default function VisualizarFicha() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const canEdit = can('fichas_epi', 'edit');
   const [ficha, setFicha] = useState<EPIFicha | null>(null);
   const [assinaturaColaborador, setAssinaturaColaborador] = useState('');
@@ -35,17 +36,20 @@ export default function VisualizarFicha() {
   const [epis, setEpis] = useState<EPI[]>([]);
   const [anteriores, setAnteriores] = useState<AssinaturaAnterior[]>([]);
 
+  const userId = user?.id;
   const carregar = useCallback(() => {
     if (!id) return;
-    getFichaById(id).then(f => {
+    getFichaById(id).then(async f => {
       if (f) {
         setFicha(f);
         setAssinaturaColaborador(f.assinaturaColaborador || '');
-        setAssinaturaResponsavel(f.assinaturaResponsavel || '');
+        // Ficha ainda sem responsável: quem vai finalizar é o usuário logado.
+        const minha = !f.assinaturaResponsavel && userId ? await getMinhaAssinatura(userId).catch(() => '') : '';
+        setAssinaturaResponsavel(f.assinaturaResponsavel || minha);
       }
     });
     listarAssinaturasAnteriores(id).then(setAnteriores).catch(() => setAnteriores([]));
-  }, [id]);
+  }, [id, userId]);
 
   useEffect(() => {
     carregar();

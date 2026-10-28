@@ -14,7 +14,7 @@ import { Empresa, listEmpresas, saveEmpresa, deleteEmpresa } from '@/services/em
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
-import SignaturePad from '@/components/SignaturePad';
+import MinhaAssinatura from '@/components/MinhaAssinatura';
 import { toast } from 'sonner';
 import BackButton from '@/components/BackButton';
 import { useConfirm } from '@/hooks/use-confirm';
@@ -23,7 +23,6 @@ import { tirarFundoCarimbo } from '@/lib/carimbo';
 export default function Configuracoes() {
   const { can } = useAuth();
   const [config, setConfig] = useState<AppConfig>(getConfig());
-  const [novaAssinatura, setNovaAssinatura] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const carimboRef = useRef<HTMLInputElement>(null);
 
@@ -68,31 +67,6 @@ export default function Configuracoes() {
       toast.success('Configurações salvas!');
     } catch (error: any) {
       toast.error(error?.message || 'Falha ao salvar configurações');
-    }
-  };
-
-  const handleSaveAssinatura = async () => {
-    if (!novaAssinatura) {
-      toast.error('Desenhe a nova assinatura primeiro');
-      return;
-    }
-    try {
-      const updated = await saveConfig({ assinaturaEmpresa: novaAssinatura });
-      setConfig(updated);
-      setNovaAssinatura('');
-      toast.success('Assinatura da empresa atualizada!');
-    } catch (error: any) {
-      toast.error(error?.message || 'Falha ao salvar assinatura');
-    }
-  };
-
-  const handleRemoveAssinatura = async () => {
-    try {
-      const updated = await saveConfig({ assinaturaEmpresa: '' });
-      setConfig(updated);
-      toast.success('Assinatura removida');
-    } catch (error: any) {
-      toast.error(error?.message || 'Falha ao remover assinatura');
     }
   };
 
@@ -170,7 +144,7 @@ export default function Configuracoes() {
         <BackButton />
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-foreground">Configurações</h2>
-          <p className="text-sm text-muted-foreground">Personalize os dados da empresa, logo e assinatura padrão.</p>
+          <p className="text-sm text-muted-foreground">Personalize os dados da empresa, logo e a sua assinatura.</p>
         </div>
 
         <Tabs defaultValue="empresa" className="space-y-4">
@@ -349,38 +323,14 @@ export default function Configuracoes() {
           <TabsContent value="assinatura">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Assinatura Padrão da Empresa</CardTitle>
+                <CardTitle className="text-base">Minha assinatura</CardTitle>
                 <CardDescription>
-                  Esta assinatura será preenchida automaticamente como "responsável pela entrega" em novas fichas.
+                  Cada usuário tem a sua, ligada ao próprio login. Ela é preenchida como "responsável pela entrega" nas fichas que você fizer.
+                  Também dá para cadastrar pelo botão "Minha assinatura" no menu lateral.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-5">
-                {config.assinaturaEmpresa && (
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Assinatura atual</Label>
-                    <div className="border rounded-lg p-4 bg-white flex items-center justify-center">
-                      <img src={config.assinaturaEmpresa} alt="Assinatura" className="max-h-24 object-contain" />
-                    </div>
-                    <div className="flex justify-end">
-                      <Button variant="outline" size="sm" onClick={handleRemoveAssinatura}>
-                        <Trash2 className="h-4 w-4 mr-2" /> Remover assinatura
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">
-                    {config.assinaturaEmpresa ? 'Substituir por nova assinatura' : 'Desenhar nova assinatura'}
-                  </Label>
-                  <SignaturePad label="" onSave={setNovaAssinatura} />
-                </div>
-
-                <div className="flex justify-end">
-                  <Button onClick={handleSaveAssinatura} disabled={!novaAssinatura}>
-                    <Save className="h-4 w-4 mr-2" /> Salvar Assinatura
-                  </Button>
-                </div>
+              <CardContent>
+                <MinhaAssinatura />
               </CardContent>
             </Card>
           </TabsContent>

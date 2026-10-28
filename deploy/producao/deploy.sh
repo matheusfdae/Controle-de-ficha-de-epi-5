@@ -52,6 +52,7 @@ MIGRACOES=(
   "20261021150000_alerta_reposicao_estoque.sql|SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='alertas_estoque')"
   "20261022120000_troca_uniforme_posto.sql|SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='postos' AND column_name='troca_uniforme_meses')"
   "20261022130000_selfie_opcional.sql|SELECT position('selfie_obrigatoria' in pg_get_functiondef('public.assinar_ficha_publica_por_token(text,text,uuid[],text,text)'::regprocedure)) = 0"
+  "20261028130000_assinatura_por_usuario.sql|SELECT to_regclass('public.assinaturas_usuario') IS NOT NULL"
 )
 PENDENTES=()
 echo ">>> Migrations:"
