@@ -655,6 +655,7 @@ export type Database = {
           cod_fil: number | null
           cod_local: string | null
           cpf: string | null
+          rg: string | null
           created_at: string
           data_admissao: string | null
           data_afastamento: string | null
@@ -688,6 +689,7 @@ export type Database = {
           cod_fil?: number | null
           cod_local?: string | null
           cpf?: string | null
+          rg?: string | null
           created_at?: string
           data_admissao?: string | null
           data_afastamento?: string | null
@@ -721,6 +723,7 @@ export type Database = {
           cod_fil?: number | null
           cod_local?: string | null
           cpf?: string | null
+          rg?: string | null
           created_at?: string
           data_admissao?: string | null
           data_afastamento?: string | null
