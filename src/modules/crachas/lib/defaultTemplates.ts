@@ -35,8 +35,9 @@ const { fontFamily: FONT, corPrimaria: BLUE, corTextoNome: WHITE, corBorda: GRAY
  * Dimensões: 118.8mm × 96.1mm, tamanho real do Canva. Uma face só, em duas
  * colunas: esquerda = frente (foto/nome), direita = verso (dados) — dobra ao meio.
  * Posições medidas no crachá preenchido do mesmo PDF. font_size ≈ pt no PDF.
- * Vigilância e Brigadista usam a mesma arte e os mesmos campos; só muda o
- * terceiro campo da frente: CNV no vigilante, RE (matrícula) no brigadista.
+ * Vigilância, Brigadista e Portaria usam a mesma arte; muda só o que vem
+ * abaixo da função na frente: CNV + tipo sanguíneo no vigilante, RE + tipo
+ * sanguíneo no brigadista, só o RE na portaria.
  */
 const NAVY = '#0f243e';
 const NAVY_PILL = '#1d2647';
@@ -63,7 +64,8 @@ const pill = (overrides: Partial<Omit<CanvasElement, 'id'>>): Omit<CanvasElement
 const template5Estrelas = (
   name: string,
   description: string,
-  terceiroCampo: Partial<Omit<CanvasElement, 'id'>>,
+  /** Campos abaixo da função, de cima para baixo. */
+  camposAbaixo: Partial<Omit<CanvasElement, 'id'>>[],
 ): DefaultTemplate => ({
   name,
   description,
@@ -92,8 +94,7 @@ const template5Estrelas = (
       borderWidth: 0,
     }),
     pill({ y: 71.61, fieldBinding: 'role' }),
-    pill({ y: 78.0, ...terceiroCampo }),
-    pill({ y: 84.29, fieldBinding: 'blood_type', staticValue: 'TIPO SANGUÍNEO: ' }),
+    ...camposAbaixo.map((c, i) => pill({ y: [78.0, 84.29][i], ...c })),
 
     // ══════════ COLUNA DIREITA (verso) ══════════
     pill({ x: 61.55, y: 9.7, width: 52.14, fieldBinding: 'full_name', nameDisplayMode: 'full', fontSize: 8 }),
@@ -122,16 +123,25 @@ const template5Estrelas = (
   ],
 });
 
+const RE = { fieldBinding: 'employee_id', staticValue: 'RE: ' };
+const TIPO_SANGUINEO = { fieldBinding: 'blood_type', staticValue: 'TIPO SANGUÍNEO: ' };
+
 export const template5EstrelasImg = template5Estrelas(
   '5 Estrelas - Vigilância',
   'Arte oficial do Canva em alta definição (frente e verso lado a lado), com a CNV',
-  { fieldBinding: 'cnv', staticValue: 'CNV: ' },
+  [{ fieldBinding: 'cnv', staticValue: 'CNV: ' }, TIPO_SANGUINEO],
 );
 
 export const template5EstrelasBrigadistaImg = template5Estrelas(
   '5 Estrelas - Brigadista',
   'Mesma arte da Vigilância, com o RE (matrícula) no lugar da CNV',
-  { fieldBinding: 'employee_id', staticValue: 'RE: ' },
+  [RE, TIPO_SANGUINEO],
+);
+
+export const template5EstrelasPortariaImg = template5Estrelas(
+  '5 Estrelas - Portaria',
+  'Mesma arte da Vigilância, com o RE (matrícula) e sem o tipo sanguíneo',
+  [RE],
 );
 
 /**
@@ -436,6 +446,7 @@ export const templateBaluarteImg: DefaultTemplate = {
 export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
   template5EstrelasImg,
   template5EstrelasBrigadistaImg,
+  template5EstrelasPortariaImg,
   templateBaluarteImg,
   templateSsServicosImg,
   templateHcnImg,
