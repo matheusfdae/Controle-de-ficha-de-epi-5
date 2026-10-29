@@ -1007,6 +1007,39 @@ export type Database = {
         }
         Relationships: []
       }
+      email_pendentes_config: {
+        Row: {
+          automatico: boolean
+          destinatarios: string[]
+          dia_semana: number
+          id: number
+          ufs: string[]
+          ultimo_envio_automatico: string | null
+          updated_at: string
+          copia: string[]
+        }
+        Insert: {
+          automatico?: boolean
+          destinatarios?: string[]
+          dia_semana?: number
+          id?: number
+          ufs?: string[]
+          ultimo_envio_automatico?: string | null
+          updated_at?: string
+          copia?: string[]
+        }
+        Update: {
+          automatico?: boolean
+          destinatarios?: string[]
+          dia_semana?: number
+          id?: number
+          ufs?: string[]
+          ultimo_envio_automatico?: string | null
+          updated_at?: string
+          copia?: string[]
+        }
+        Relationships: []
+      }
       estoque_minimos: {
         Row: { epi_id: string; uf: string; minimo: number; updated_at: string }
         Insert: { epi_id: string; uf: string; minimo: number; updated_at?: string }

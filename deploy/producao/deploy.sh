@@ -54,6 +54,7 @@ MIGRACOES=(
   "20261022130000_selfie_opcional.sql|SELECT position('selfie_obrigatoria' in pg_get_functiondef('public.assinar_ficha_publica_por_token(text,text,uuid[],text,text)'::regprocedure)) = 0"
   "20261028120000_rg_colaboradores_senior.sql|SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='colaboradores_senior' AND column_name='rg')"
   "20261028130000_assinatura_por_usuario.sql|SELECT to_regclass('public.assinaturas_usuario') IS NOT NULL"
+  "20261029120000_email_pendentes.sql|SELECT to_regclass('public.email_pendentes_config') IS NOT NULL"
 )
 PENDENTES=()
 echo ">>> Migrations:"

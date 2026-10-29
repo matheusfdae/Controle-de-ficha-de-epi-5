@@ -5,6 +5,7 @@ import fs from "fs";
 import { enviarComo, iniciarLogin, renovarAcesso, verificarLogin } from "./supabase/functions/_shared/microsoft";
 import { EMAIL, montarEmail } from "./supabase/functions/_shared/emailConvocacao";
 import { calcularEstoque, estadosDoRelatorio, montarEmailEstoque, montarEmailReposicao } from "./supabase/functions/_shared/relatorioEstoque";
+import { calcularPendentes, estadosDosPendentes, montarEmailPendentes } from "./supabase/functions/_shared/relatorioPendentes";
 import { montarEmailIntegracao, normalizarPessoas } from "./supabase/functions/_shared/emailIntegracao";
 import { ErroAssistente, normalizarConversa, perguntarAssistente } from "./supabase/functions/_shared/assistente";
 import {
@@ -102,6 +103,26 @@ function emailLocal(env: Record<string, string>): Plugin {
           gravar({ ...e, refreshToken: acesso.refreshToken });
           await enviarComo(acesso.accessToken, { para, copia, assunto: m.assunto, html: m.html, anexos: [m.anexo] }, e.caixa || null);
           responder(res, 200, { enviado: true, itens: m.itens, alerta: m.alerta, destinatarios: para.length, copia: copia.length });
+        } catch (err) {
+          responder(res, 502, { error: err instanceof Error ? err.message : String(err) });
+        }
+      });
+      // Fichas pendentes: no localhost a tela manda as fichas, itens e links que ela já lê.
+      server.middlewares.use("/__email/enviar-relatorio-pendentes", async (req, res) => {
+        try {
+          const { destinatarios = [], copia: cc = [], ufs = [], fichas = [], itens = [], tokens = [] } = await lerCorpo(req);
+          const limpa = (l: string[]) => [...new Set(l.map(x => String(x).trim().toLowerCase()))].filter(x => EMAIL.test(x));
+          const para = limpa(destinatarios);
+          const copia = limpa(cc).filter(x => !para.includes(x));
+          if (!para.length) return responder(res, 400, { error: "Informe ao menos um e-mail válido" });
+          const e = ler();
+          if (!e.refreshToken) return responder(res, 503, { error: 'Nenhuma conta do Microsoft 365 conectada. Em Configurações > E-mail, clique em "Conectar conta".' });
+          const estados = estadosDosPendentes(ufs, fichas);
+          const m = montarEmailPendentes(calcularPendentes(fichas, itens, tokens, estados), estados);
+          const acesso = await renovarAcesso(app(e), e.refreshToken);
+          gravar({ ...e, refreshToken: acesso.refreshToken });
+          await enviarComo(acesso.accessToken, { para, copia, assunto: m.assunto, html: m.html, anexos: [m.anexo] }, e.caixa || null);
+          responder(res, 200, { enviado: true, fichas: m.fichas, antigas: m.antigas, sem_itens: m.semItens, destinatarios: para.length, copia: copia.length });
         } catch (err) {
           responder(res, 502, { error: err instanceof Error ? err.message : String(err) });
         }
