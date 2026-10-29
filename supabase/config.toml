@@ -51,3 +51,6 @@ verify_jwt = false
 
 [functions.enviar-relatorio-estoque]
 verify_jwt = false
+
+[functions.enviar-relatorio-pendentes]
+verify_jwt = false

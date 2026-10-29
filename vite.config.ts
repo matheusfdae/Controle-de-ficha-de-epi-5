@@ -5,6 +5,10 @@ import fs from "fs";
 import { enviarComo, iniciarLogin, renovarAcesso, verificarLogin } from "./supabase/functions/_shared/microsoft";
 import { EMAIL, montarEmail } from "./supabase/functions/_shared/emailConvocacao";
 import { calcularEstoque, estadosDoRelatorio, montarEmailEstoque, montarEmailReposicao } from "./supabase/functions/_shared/relatorioEstoque";
+import { calcularPendentes, montarEmailPendentes } from "./supabase/functions/_shared/relatorioPendentes";
+import { calcularPainel, svgPainel } from "./supabase/functions/_shared/painelFichas";
+import { base64 } from "./supabase/functions/_shared/xlsx";
+import { initWasm, Resvg } from "@resvg/resvg-wasm";
 import { montarEmailIntegracao, normalizarPessoas } from "./supabase/functions/_shared/emailIntegracao";
 import { ErroAssistente, normalizarConversa, perguntarAssistente } from "./supabase/functions/_shared/assistente";
 import {
@@ -21,6 +25,21 @@ import {
  * Credenciais em .env.local (SENIOR_WS_URL, SENIOR_WS_USER, SENIOR_WS_PASSWORD),
  * que não vai para o git nem para o navegador.
  */
+/** SVG → PNG no localhost (resvg do node_modules; fonte Inter baixada do jsDelivr uma vez). */
+let resvgPronto: Promise<Uint8Array[]> | null = null;
+async function svgParaPngLocal(svg: string): Promise<Uint8Array> {
+  resvgPronto ??= (async () => {
+    await initWasm(fs.readFileSync(path.resolve(__dirname, "node_modules/@resvg/resvg-wasm/index_bg.wasm")));
+    return Promise.all(["Inter_400Regular", "Inter_700Bold"].map(async f => {
+      const r = await fetch(`https://cdn.jsdelivr.net/npm/@expo-google-fonts/inter@0.2.3/${f}.ttf`);
+      if (!r.ok) throw new Error(`Falha ao baixar a fonte ${f} (${r.status})`);
+      return new Uint8Array(await r.arrayBuffer());
+    }));
+  })().catch(e => { resvgPronto = null; throw e; });
+  const fontes = await resvgPronto;
+  return new Resvg(svg, { font: { fontBuffers: fontes, defaultFontFamily: "Inter", loadSystemFonts: false } }).render().asPng();
+}
+
 /**
  * Só no `npm run dev`: login por código da conta do Microsoft 365 e envio da
  * convocação daqui do PC (modelo delegado, igual à produção). A autorização
@@ -102,6 +121,32 @@ function emailLocal(env: Record<string, string>): Plugin {
           gravar({ ...e, refreshToken: acesso.refreshToken });
           await enviarComo(acesso.accessToken, { para, copia, assunto: m.assunto, html: m.html, anexos: [m.anexo] }, e.caixa || null);
           responder(res, 200, { enviado: true, itens: m.itens, alerta: m.alerta, destinatarios: para.length, copia: copia.length });
+        } catch (err) {
+          responder(res, 502, { error: err instanceof Error ? err.message : String(err) });
+        }
+      });
+      // Fichas pendentes (um estado): no localhost a tela manda as fichas, itens e links que ela já lê.
+      server.middlewares.use("/__email/enviar-relatorio-pendentes", async (req, res) => {
+        try {
+          const { destinatarios = [], copia: cc = [], uf = "", fichas = [], itens = [], tokens = [] } = await lerCorpo(req);
+          const limpa = (l: string[]) => [...new Set(l.map(x => String(x).trim().toLowerCase()))].filter(x => EMAIL.test(x));
+          const para = limpa(destinatarios);
+          const copia = limpa(cc).filter(x => !para.includes(x));
+          if (!para.length) return responder(res, 400, { error: "Informe ao menos um e-mail válido" });
+          const e = ler();
+          if (!e.refreshToken) return responder(res, 503, { error: 'Nenhuma conta do Microsoft 365 conectada. Em Configurações > E-mail, clique em "Conectar conta".' });
+          const pendentes = fichas.filter((f: { status: string }) => f.status !== "assinada");
+          const m = montarEmailPendentes(calcularPendentes(pendentes, itens, tokens, [uf]), [uf]);
+          const anexos = [m.anexo];
+          let erroImagem: string | null = null;
+          try {
+            const png = await svgParaPngLocal(svgPainel(calcularPainel(fichas, itens), uf));
+            anexos.unshift({ nome: `painel-fichas-${uf.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.png`, tipo: "image/png", base64: base64(png) });
+          } catch (err) { erroImagem = err instanceof Error ? err.message : String(err); }
+          const acesso = await renovarAcesso(app(e), e.refreshToken);
+          gravar({ ...e, refreshToken: acesso.refreshToken });
+          await enviarComo(acesso.accessToken, { para, copia, assunto: m.assunto, html: m.html, anexos }, e.caixa || null);
+          responder(res, 200, { enviado: true, fichas: m.fichas, antigas: m.antigas, sem_itens: m.semItens, destinatarios: para.length, copia: copia.length, erro_imagem: erroImagem });
         } catch (err) {
           responder(res, 502, { error: err instanceof Error ? err.message : String(err) });
         }

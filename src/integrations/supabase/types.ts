@@ -1007,6 +1007,44 @@ export type Database = {
         }
         Relationships: []
       }
+      email_pendentes_estados: {
+        Row: {
+          automatico: boolean
+          destinatarios: string[]
+          dia_semana: number
+          uf: string
+          ultimo_envio_automatico: string | null
+          updated_at: string
+          copia: string[]
+        }
+        Insert: {
+          automatico?: boolean
+          destinatarios?: string[]
+          dia_semana?: number
+          uf: string
+          ultimo_envio_automatico?: string | null
+          updated_at?: string
+          copia?: string[]
+        }
+        Update: {
+          automatico?: boolean
+          destinatarios?: string[]
+          dia_semana?: number
+          uf?: string
+          ultimo_envio_automatico?: string | null
+          updated_at?: string
+          copia?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_pendentes_estados_uf_fkey"
+            columns: ["uf"]
+            isOneToOne: true
+            referencedRelation: "estados"
+            referencedColumns: ["uf"]
+          },
+        ]
+      }
       estoque_minimos: {
         Row: { epi_id: string; uf: string; minimo: number; updated_at: string }
         Insert: { epi_id: string; uf: string; minimo: number; updated_at?: string }
