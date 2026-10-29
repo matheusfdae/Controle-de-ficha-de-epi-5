@@ -8,9 +8,44 @@ interface SignaturePadProps {
   onSave: (dataUrl: string) => void;
   initialValue?: string;
   disabled?: boolean;
+  /**
+   * Campo mais alto, para assinar com o dedo no celular (links de assinatura).
+   * A imagem que sai continua 3:1: os traços são recortados e centralizados.
+   */
+  grande?: boolean;
 }
 
-export default function SignaturePad({ label, onSave, initialValue, disabled }: SignaturePadProps) {
+/**
+ * Recorta os traços e os centraliza numa imagem 3:1 (a caixa da assinatura no
+ * PDF), sem esticar. `ratio` é a densidade usada no canvas.
+ */
+function imagem3por1(canvas: HTMLCanvasElement, pad: SignaturePadLib, ratio: number): string {
+  const pontos = pad.toData().flatMap(g => g.points);
+  if (!pontos.length) return pad.toDataURL();
+  // Metade da largura máxima do traço + folga.
+  const m = 6;
+  const larg = canvas.width / ratio, alt = canvas.height / ratio;
+  const x0 = Math.max(0, Math.min(...pontos.map(p => p.x)) - m);
+  const y0 = Math.max(0, Math.min(...pontos.map(p => p.y)) - m);
+  const x1 = Math.min(larg, Math.max(...pontos.map(p => p.x)) + m);
+  const y1 = Math.min(alt, Math.max(...pontos.map(p => p.y)) + m);
+  const w = Math.max(x1 - x0, 1), h = Math.max(y1 - y0, 1);
+
+  const W = 900, H = 300;
+  const saida = document.createElement('canvas');
+  saida.width = W;
+  saida.height = H;
+  const ctx = saida.getContext('2d');
+  if (!ctx) return pad.toDataURL();
+  ctx.fillStyle = 'rgb(255, 255, 255)';
+  ctx.fillRect(0, 0, W, H);
+  const esc = Math.min((W * 0.94) / w, (H * 0.9) / h);
+  ctx.drawImage(canvas, x0 * ratio, y0 * ratio, w * ratio, h * ratio,
+    (W - w * esc) / 2, (H - h * esc) / 2, w * esc, h * esc);
+  return saida.toDataURL();
+}
+
+export default function SignaturePad({ label, onSave, initialValue, disabled, grande }: SignaturePadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const padRef = useRef<SignaturePadLib | null>(null);
   // Última imagem do campo (a que este componente mandou para fora ou a que
@@ -50,6 +85,7 @@ export default function SignaturePad({ label, onSave, initialValue, disabled }: 
     // remede sempre que o tamanho mudar, sem perder o que já foi assinado.
     let largura = 0;
     let altura = 0;
+    let densidade = 1;
     const redimensionar = () => {
       const rect = canvas.getBoundingClientRect();
       const w = Math.round(rect.width);
@@ -58,6 +94,7 @@ export default function SignaturePad({ label, onSave, initialValue, disabled }: 
       largura = w;
       altura = h;
       const ratio = Math.max(window.devicePixelRatio || 1, 1);
+      densidade = ratio;
       const tracos = pad.toData();
       canvas.width = w * ratio;
       canvas.height = h * ratio;
@@ -72,7 +109,7 @@ export default function SignaturePad({ label, onSave, initialValue, disabled }: 
 
     pad.addEventListener('endStroke', () => {
       setIsEmpty(pad.isEmpty());
-      const dataUrl = pad.toDataURL();
+      const dataUrl = grande ? imagem3por1(canvas, pad, densidade) : pad.toDataURL();
       ultimaRef.current = dataUrl;
       onSaveRef.current(dataUrl);
     });
@@ -82,7 +119,7 @@ export default function SignaturePad({ label, onSave, initialValue, disabled }: 
       pad.off();
       padRef.current = null;
     };
-  }, [disabled]);
+  }, [disabled, grande]);
 
   useEffect(() => {
     const pad = padRef.current;
@@ -111,14 +148,19 @@ export default function SignaturePad({ label, onSave, initialValue, disabled }: 
         )}
       </div>
       <div className="border rounded-lg overflow-hidden bg-card">
-        {/* 3:1 como a caixa da assinatura no PDF (60×20 mm): sem achatar ao imprimir. */}
+        {/* 3:1 como a caixa da assinatura no PDF (60×20 mm): sem achatar ao imprimir.
+            O grande é mais alto na tela, mas exporta 3:1 (imagem3por1). */}
         <canvas
           ref={canvasRef}
-          className="block w-full aspect-[3/1] touch-none select-none"
+          className={`block w-full touch-none select-none ${grande ? 'aspect-[3/2] sm:aspect-[5/2] max-h-[60vh]' : 'aspect-[3/1]'}`}
         />
       </div>
       {!disabled && (
-        <p className="text-xs text-muted-foreground">Assine usando o mouse ou o dedo na tela</p>
+        <p className="text-xs text-muted-foreground">
+          {grande
+            ? 'Assine com o dedo usando todo o espaço do quadro. Se preferir, vire o celular na horizontal.'
+            : 'Assine usando o mouse ou o dedo na tela'}
+        </p>
       )}
     </div>
   );

@@ -166,12 +166,14 @@ export default function AssinarFicha() {
             itensRecebidos,
             onToggleItem: toggleItem,
             signatureSlot: (
-              <div className="space-y-3 max-w-md mx-auto">
-                <SignaturePad label="Assine aqui" onSave={setAssinatura} />
-                <SelfieAssinatura value={selfie} onChange={setSelfie} habilitado={!!assinatura} />
-                <Button className="w-full" size="lg" onClick={handleSign}>
-                  Confirmar Recebimento e Assinar
-                </Button>
+              <div className="space-y-3">
+                <SignaturePad label="Assine aqui" onSave={setAssinatura} grande />
+                <div className="space-y-3 max-w-md mx-auto">
+                  <SelfieAssinatura value={selfie} onChange={setSelfie} habilitado={!!assinatura} />
+                  <Button className="w-full" size="lg" onClick={handleSign}>
+                    Confirmar Recebimento e Assinar
+                  </Button>
+                </div>
               </div>
             ),
           }}
