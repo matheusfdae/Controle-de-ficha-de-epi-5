@@ -67,7 +67,7 @@ export default function AssinarTermoColetivo() {
                 Declaro ter recebido o EPI acima em perfeito estado, comprometendo-me com seu uso
                 correto conforme NR-06.
               </p>
-              <SignaturePad label="Sua assinatura" onSave={setPad} />
+              <SignaturePad label="Sua assinatura" onSave={setPad} grande />
               <Button className="w-full" onClick={submit} disabled={!pad}>Confirmar assinatura</Button>
             </>
           )}
