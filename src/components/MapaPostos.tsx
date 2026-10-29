@@ -11,6 +11,10 @@ export interface PontoMapa {
   detalhe?: string;
   /** Define o tamanho da estrela (ex.: nº de fichas). */
   peso?: number;
+  /** Cor da estrela (padrão: azul). */
+  cor?: string;
+  /** Texto do valor na legenda (padrão: o peso). */
+  valorLegenda?: string;
 }
 
 interface Props {
@@ -26,10 +30,14 @@ interface Props {
   mostrarRelogio?: boolean;
   /** Legenda com a lista de postos do mapa (padrão: sim, exceto ao escolher posição). */
   mostrarLegenda?: boolean;
+  /** Linha de resumo da legenda (padrão: total de fichas). */
+  resumoLegenda?: string;
+  /** Dica no balão quando há onSelecionar (padrão: ver as fichas). */
+  dicaClique?: string;
 }
 
 /** Lista dos postos do mapa (com nº de fichas); clicar leva o mapa até a estrela. */
-function Legenda({ pontos, onIr }: { pontos: PontoMapa[]; onIr: (chave: string) => void }) {
+function Legenda({ pontos, onIr, resumo }: { pontos: PontoMapa[]; onIr: (chave: string) => void; resumo?: string }) {
   const [aberta, setAberta] = useState(true);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -47,7 +55,7 @@ function Legenda({ pontos, onIr }: { pontos: PontoMapa[]; onIr: (chave: string) 
         className="flex items-center justify-between gap-2 border-b px-3 py-2 text-left text-sm font-semibold text-foreground"
         aria-expanded={aberta}>
         <span>{pontos.length} posto{pontos.length === 1 ? '' : 's'} no mapa
-          <span className="block text-xs font-normal text-muted-foreground">{totalFichas} fichas</span>
+          <span className="block text-xs font-normal text-muted-foreground">{resumo ?? `${totalFichas} fichas`}</span>
         </span>
         <span className="text-xs font-normal text-muted-foreground">{aberta ? 'recolher ▲' : 'abrir ▼'}</span>
       </button>
@@ -58,7 +66,7 @@ function Legenda({ pontos, onIr }: { pontos: PontoMapa[]; onIr: (chave: string) 
               <button type="button" onClick={() => onIr(p.chave)}
                 className="flex w-full items-center justify-between gap-2 px-3 py-1 text-left hover:bg-muted">
                 <span className="truncate" title={p.nome}>{p.nome}</span>
-                <span className="shrink-0 tabular-nums text-muted-foreground">{p.peso ?? 0}</span>
+                <span className="shrink-0 tabular-nums text-muted-foreground">{p.valorLegenda ?? p.peso ?? 0}</span>
               </button>
             </li>
           ))}
@@ -91,10 +99,10 @@ function Relogio() {
 const CENTRO_PADRAO: L.LatLngTuple = [-15.79, -47.88];
 
 /** Ícone de estrela (SVG) centralizado na coordenada. O nome aparece no balão ao passar o mouse. */
-function iconeEstrela(tamanho: number) {
+function iconeEstrela(tamanho: number, cor = '#2563eb') {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${tamanho}" height="${tamanho}">
     <path d="M12 1.8l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 17.9l-6.4 3.5 1.4-7.1-5.3-5 7.2-.9z"
-      fill="#2563eb" stroke="#1e3a8a" stroke-width="1.3" stroke-linejoin="round"/></svg>`;
+      fill="${cor}" stroke="${cor === '#2563eb' ? '#1e3a8a' : '#1e293b'}" stroke-width="1.3" stroke-linejoin="round"/></svg>`;
   return L.divIcon({
     html: svg, className: 'mapa-postos-estrela',
     iconSize: [tamanho, tamanho], iconAnchor: [tamanho / 2, tamanho / 2], tooltipAnchor: [0, -tamanho / 2],
@@ -107,13 +115,14 @@ const escapar = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 export default function MapaPostos({
   pontos, onSelecionar, onEscolherPosicao, altura = 'max(450px, 70vh)', className,
   mostrarRelogio = !onEscolherPosicao, mostrarLegenda = !onEscolherPosicao,
+  resumoLegenda, dicaClique = 'Clique para ver as fichas',
 }: Props) {
   const divRef = useRef<HTMLDivElement>(null);
   const mapaRef = useRef<L.Map | null>(null);
   const camadaRef = useRef<L.LayerGroup | null>(null);
   const marcadoresRef = useRef(new Map<string, L.Marker>());
-  const callbacks = useRef({ onSelecionar, onEscolherPosicao });
-  callbacks.current = { onSelecionar, onEscolherPosicao };
+  const callbacks = useRef({ onSelecionar, onEscolherPosicao, dicaClique });
+  callbacks.current = { onSelecionar, onEscolherPosicao, dicaClique };
 
   useEffect(() => {
     if (!divRef.current || mapaRef.current) return;
@@ -144,9 +153,9 @@ export default function MapaPostos({
     for (const p of pontos) {
       const tamanho = Math.round(24 + 20 * Math.sqrt((p.peso ?? 1) / maxPeso));
       const marcador = L.marker([p.latitude, p.longitude], {
-        icon: iconeEstrela(tamanho), keyboard: false, riseOnHover: true,
+        icon: iconeEstrela(tamanho, p.cor), keyboard: false, riseOnHover: true,
       }).bindTooltip(`<strong>${escapar(p.nome)}</strong>${p.detalhe ? `<br>${escapar(p.detalhe)}` : ''}`
-        + (callbacks.current.onSelecionar ? '<br><em>Clique para ver as fichas</em>' : ''));
+        + (callbacks.current.onSelecionar ? `<br><em>${escapar(callbacks.current.dicaClique)}</em>` : ''));
       if (callbacks.current.onSelecionar) marcador.on('click', () => callbacks.current.onSelecionar?.(p.chave));
       marcador.addTo(camada);
       marcadoresRef.current.set(p.chave, marcador);
@@ -164,7 +173,7 @@ export default function MapaPostos({
         className={`w-full rounded-lg border z-0 ${onEscolherPosicao ? 'cursor-crosshair' : ''}`} />
       {mostrarRelogio && <Relogio />}
       {mostrarLegenda && (
-        <Legenda pontos={pontos} onIr={chave => {
+        <Legenda pontos={pontos} resumo={resumoLegenda} onIr={chave => {
           const m = marcadoresRef.current.get(chave);
           if (!m || !mapaRef.current) return;
           mapaRef.current.setView(m.getLatLng(), Math.max(mapaRef.current.getZoom(), 15));

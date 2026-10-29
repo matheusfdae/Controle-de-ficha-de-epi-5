@@ -1045,6 +1045,66 @@ export type Database = {
           },
         ]
       }
+      materiais: {
+        Row: { id: string; nome: string; nome_chave: string; unidade: string; categoria: string | null; preco_referencia: number | null; ativo: boolean; created_at: string; updated_at: string }
+        Insert: { id?: string; nome: string; unidade?: string; categoria?: string | null; preco_referencia?: number | null; ativo?: boolean }
+        Update: { id?: string; nome?: string; unidade?: string; categoria?: string | null; preco_referencia?: number | null; ativo?: boolean }
+        Relationships: []
+      }
+      posto_tetos: {
+        Row: { id: string; posto_id: string; vigente_desde: string; valor: number; criado_por: string | null; created_at: string }
+        Insert: { id?: string; posto_id: string; vigente_desde: string; valor: number; criado_por?: string | null }
+        Update: { id?: string; posto_id?: string; vigente_desde?: string; valor?: number; criado_por?: string | null }
+        Relationships: []
+      }
+      pedido_alcadas: {
+        Row: { nivel: string; ordem: number; valor_acima_de: number | null; updated_at: string }
+        Insert: { nivel: string; ordem: number; valor_acima_de?: number | null }
+        Update: { nivel?: string; ordem?: number; valor_acima_de?: number | null }
+        Relationships: []
+      }
+      pedido_aprovadores: {
+        Row: { id: string; user_id: string; nivel: string; uf: string; postos: string[]; created_at: string }
+        Insert: { id?: string; user_id: string; nivel: string; uf: string; postos?: string[] }
+        Update: { id?: string; user_id?: string; nivel?: string; uf?: string; postos?: string[] }
+        Relationships: []
+      }
+      pedido_recorrencias: {
+        Row: { id: string; posto_id: string; frequencia: string; itens: Json; observacao: string | null; proxima_data: string; ativa: boolean; encerrada_em: string | null; solicitante_senior_id: string | null; solicitante_nome: string; solicitante_matricula: string | null; solicitante_cargo: string | null; solicitante_telefone: string | null; created_at: string }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
+      pedidos_material: {
+        Row: { id: string; numero: number; posto_id: string; uf: string; recorrencia_id: string | null; data_pedido: string; status: string; nivel_atual: string | null; niveis: string[]; valor_estimado: number; valor_real: number | null; acima_do_teto: boolean; sem_preco: boolean; data_aprovacao: string | null; aprovado_em: string | null; observacao: string | null; solicitante_senior_id: string | null; solicitante_nome: string; solicitante_matricula: string | null; solicitante_cargo: string | null; solicitante_telefone: string | null; created_at: string; updated_at: string }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
+      pedidos_material_itens: {
+        Row: { id: string; pedido_id: string; material_id: string; quantidade: number; quantidade_pedida: number; preco_estimado: number | null }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
+      pedido_aprovacoes: {
+        Row: { id: string; pedido_id: string; nivel: string; decisao: string; comentario: string | null; valor_no_momento: number | null; saldo_teto_no_momento: number | null; usuario_id: string | null; usuario_nome: string | null; created_at: string }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
+      material_compras: {
+        Row: { id: string; pedido_id: string | null; fornecedor_id: string | null; fornecedor_nome: string; fornecedor_cnpj: string | null; numero_nf: string | null; data_compra: string; observacao: string | null; criado_por: string | null; created_at: string }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
+      material_compras_itens: {
+        Row: { id: string; compra_id: string; material_id: string; quantidade: number; valor_unitario: number }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
       estoque_minimos: {
         Row: { epi_id: string; uf: string; minimo: number; updated_at: string }
         Insert: { epi_id: string; uf: string; minimo: number; updated_at?: string }
@@ -2379,9 +2439,40 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      vw_material_precos: {
+        Row: { id: string; compra_id: string; pedido_id: string | null; data_compra: string; numero_nf: string | null; fornecedor_id: string | null; fornecedor_nome: string; fornecedor_cnpj: string | null; material_id: string; material_nome: string; unidade: string; categoria: string | null; quantidade: number; valor_unitario: number; valor_anterior: number | null; data_anterior: string | null; nf_anterior: string | null }
+        Relationships: []
+      }
     }
     Functions: {
+      pedido_material_identificar: {
+        Args: { _matricula: number | null; _cpf: string | null }
+        Returns: Json
+      }
+      pedido_material_enviar: {
+        Args: { _matricula: number | null; _cpf: string | null; _telefone: string; _posto_id: string; _itens: Json; _observacao?: string | null; _frequencia?: string }
+        Returns: Json
+      }
+      pedido_material_cancelar: {
+        Args: { _matricula: number | null; _cpf: string | null; _pedido_id?: string | null; _recorrencia_id?: string | null }
+        Returns: Json
+      }
+      pedido_material_decidir: {
+        Args: { _pedido_id: string; _aprovar: boolean; _comentario?: string | null; _quantidades?: Json | null }
+        Returns: Json
+      }
+      pedidos_material_minhas_pendencias: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      gerar_pedidos_recorrentes: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      material_compra_registrar: {
+        Args: { _pedido_id: string | null; _fornecedor_id: string | null; _fornecedor_nome: string | null; _numero_nf: string | null; _data_compra: string; _itens: Json; _observacao?: string | null }
+        Returns: string
+      }
       cracha_solicitacao_identificar: {
         Args: { _matricula: number | null; _cpf: string | null }
         Returns: Json

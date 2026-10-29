@@ -48,6 +48,12 @@ const CrachasHistorico    = lazy(() => import('./modules/crachas/pages/Historico
 const CrachasRelatorios   = lazy(() => import('./modules/crachas/pages/Relatorios'));
 const CrachasConfiguracoes = lazy(() => import('./modules/crachas/pages/Configuracoes'));
 
+const PedidoMaterialPublico = lazy(() => import('./modules/pedidos/pages/PedidoMaterialPublico'));
+const Pedidos             = lazy(() => import('./modules/pedidos/pages/Pedidos'));
+const PedidosPainel       = lazy(() => import('./modules/pedidos/pages/PainelGastos'));
+const PedidosPrecos       = lazy(() => import('./modules/pedidos/pages/RelatorioPrecos'));
+const PedidosConfig       = lazy(() => import('./modules/pedidos/pages/ConfigPedidos'));
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -120,6 +126,7 @@ function AppRoutes() {
         <Route path="/assinar/:token"     element={<AssinarFicha />} />
         <Route path="/assinar-termo-coletivo/:token" element={<AssinarTermoColetivo />} />
         <Route path="/crachas/solicitacao" element={<CrachasSolicitacaoPublica />} />
+        <Route path="/pedido-material" element={<PedidoMaterialPublico />} />
         <Route element={<ProtectedLayout />}>
           <Route path="/"             element={<Dashboard />} />
           <Route path="/nova-ficha"   element={<RequireNovaFicha><NovaFicha /></RequireNovaFicha>} />
@@ -150,6 +157,11 @@ function AppRoutes() {
           <Route path="/crachas/historico"     element={<RequireModule module="crachas"><CrachasHistorico /></RequireModule>} />
           <Route path="/crachas/relatorios"    element={<RequireModule module="crachas"><CrachasRelatorios /></RequireModule>} />
           <Route path="/crachas/configuracoes" element={<RequireModule module="crachas" action="edit"><CrachasConfiguracoes /></RequireModule>} />
+          {/* Sem RequireModule: aprovador sem a permissão do módulo também decide (o banco filtra o que ele vê). */}
+          <Route path="/pedidos"               element={<Pedidos />} />
+          <Route path="/pedidos/painel"        element={<RequireModule module="pedidos_material"><PedidosPainel /></RequireModule>} />
+          <Route path="/pedidos/precos"        element={<RequireModule module="pedidos_material"><PedidosPrecos /></RequireModule>} />
+          <Route path="/pedidos/configuracoes" element={<RequireModule module="pedidos_material"><PedidosConfig /></RequireModule>} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>
