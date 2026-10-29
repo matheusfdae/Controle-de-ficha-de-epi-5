@@ -102,7 +102,7 @@ export function montarEmailPendentes(linhas: LinhaPendente[], ufs: string[], ago
       <tbody>${corpo}</tbody></table>
     ${linhas.length > MAX_LINHAS_EMAIL ? `<p>… e mais ${linhas.length - MAX_LINHAS_EMAIL} ficha(s) — veja a planilha.</p>` : ''}`}
     <p style="color:#64748b;font-size:11px;margin-top:16px">Enviado pelo sistema de Fichas de EPI/Uniforme — Grupo 5 Estrelas.
-      A planilha em anexo traz todas as fichas pendentes. Para colher a assinatura, abra a ficha em Consultar Fichas
+      Em anexo: a imagem do painel do estado (como na tela Consultar Fichas) e a planilha com todas as fichas pendentes. Para colher a assinatura, abra a ficha em Consultar Fichas
       (tablet, computador ou reenvio do link pelo WhatsApp).</p>
   </div>`;
 

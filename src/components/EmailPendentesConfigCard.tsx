@@ -79,6 +79,7 @@ export default function EmailPendentesConfigCard({ podeEditar }: { podeEditar: b
     try {
       const r = await enviarRelatorioPendentes({ uf: cfg.uf, destinatarios: validos, copia: copiaValidos });
       toast.success(`Relatório de ${cfg.uf} enviado para ${r.destinatarios} e-mail(s)${r.copia ? ` + ${r.copia} em cópia` : ''} · ${r.fichas} ficha(s) pendente(s).`);
+      if (r.erro_imagem) toast.warning(`O e-mail saiu sem a imagem do painel: ${r.erro_imagem}`);
     } catch (e) { toast.error(e instanceof Error ? e.message : 'Falha ao enviar'); }
     finally { setEnviando(false); }
   }
@@ -90,7 +91,7 @@ export default function EmailPendentesConfigCard({ podeEditar }: { podeEditar: b
         <CardDescription>
           Configurado por estado: cada estado tem os seus destinatários e o seu dia. O e-mail traz só as fichas do estado
           que ainda não foram assinadas (das mais antigas para as mais novas), com há quantos dias estão paradas, as
-          fichas sem itens e a situação do link. Planilha Excel em anexo. Enviado pelo Microsoft 365.
+          fichas sem itens e a situação do link. Em anexo: imagem do painel do estado (como em Consultar Fichas) e planilha Excel. Enviado pelo Microsoft 365.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">

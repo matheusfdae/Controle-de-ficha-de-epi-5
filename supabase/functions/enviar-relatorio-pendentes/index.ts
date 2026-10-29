@@ -1,6 +1,6 @@
 // deno-lint-ignore-file
 // Envia por e-mail (Microsoft 365) o relatório de fichas pendentes de assinatura
-// de UM estado: planilha com todas as pendentes + resumo no corpo do e-mail.
+// de UM estado: imagem do painel (PNG) + planilha com todas as pendentes + resumo no corpo do e-mail.
 // A configuração é por estado (email_pendentes_estados).
 //
 //  * Manual (botão "Enviar agora" em Configurações > E-mail): Bearer do Clerk;
@@ -15,6 +15,9 @@ import { acessoParaEnviar } from '../_shared/contaMicrosoft.ts';
 import { dataBrasilia } from '../_shared/convocacaoUniforme.ts';
 import { EMAIL } from '../_shared/emailConvocacao.ts';
 import { calcularPendentes, montarEmailPendentes } from '../_shared/relatorioPendentes.ts';
+import { calcularPainel, svgPainel } from '../_shared/painelFichas.ts';
+import { base64 } from '../_shared/xlsx.ts';
+import { svgParaPng } from './png.ts';
 const PAGINA = 1000;
 // Ids por consulta .in(): mantém a URL curta.
 const LOTE_IDS = 100;
@@ -42,17 +45,31 @@ async function porFicha(admin: any, tabela: string, colunas: string, ids: string
 const lista = (v: unknown) => (Array.from(new Set((Array.isArray(v) ? v : []).map(e => String(e).trim().toLowerCase())))
   .filter(e => EMAIL.test(e))) as string[];
 
-/** Monta o relatório das fichas pendentes do estado `uf`. */
+/**
+ * Monta o relatório das fichas pendentes do estado `uf`, com a imagem do painel
+ * (todas as fichas do estado, como na tela Consultar Fichas). Se a imagem falhar,
+ * o e-mail sai sem ela.
+ */
 async function relatorio(admin: any, uf: string) {
   const fichas = await lerTudo((de, ate) => admin.from('fichas_epi')
-    .select('id, numero, nome_funcionario, matricula_snapshot, funcao, posto_snapshot, uf, empresa, motivo, created_at')
-    .neq('status', 'assinada').eq('uf', uf).order('id').range(de, ate));
-  const ids = fichas.map((f: any) => f.id);
+    .select('id, numero, nome_funcionario, matricula_snapshot, funcao, posto_snapshot, uf, empresa, motivo, status, created_at')
+    .eq('uf', uf).order('id').range(de, ate));
+  const pendentes = fichas.filter((f: any) => f.status !== 'assinada');
   const [itens, tokens] = await Promise.all([
-    porFicha(admin, 'fichas_epi_itens', 'ficha_id', ids),
-    porFicha(admin, 'assinatura_tokens', 'ficha_id, expira_em, usado, created_at', ids, q => q.eq('tipo_ficha', 'epi')),
+    porFicha(admin, 'fichas_epi_itens', 'ficha_id, quantidade, recebido', fichas.map((f: any) => f.id)),
+    porFicha(admin, 'assinatura_tokens', 'ficha_id, expira_em, usado, created_at', pendentes.map((f: any) => f.id), q => q.eq('tipo_ficha', 'epi')),
   ]);
-  return montarEmailPendentes(calcularPendentes(fichas, itens, tokens, [uf]), [uf]);
+  const m = montarEmailPendentes(calcularPendentes(pendentes, itens, tokens, [uf]), [uf]);
+  const anexos = [m.anexo];
+  let erroImagem: string | null = null;
+  try {
+    const png = await svgParaPng(svgPainel(calcularPainel(fichas, itens), uf));
+    anexos.unshift({ nome: `painel-fichas-${uf.toLowerCase()}-${dataBrasilia(new Date())}.png`, tipo: 'image/png', base64: base64(png) });
+  } catch (e) {
+    erroImagem = e instanceof Error ? e.message : String(e);
+    console.error('imagem do painel:', erroImagem);
+  }
+  return { ...m, anexos, erroImagem };
 }
 
 Deno.serve(async (req) => {
@@ -86,9 +103,9 @@ Deno.serve(async (req) => {
         try {
           const m = await relatorio(admin, cfg.uf);
           acesso ??= await acessoParaEnviar(admin);
-          await enviarComo(acesso.accessToken, { para, copia, assunto: m.assunto, html: m.html, anexos: [m.anexo] }, acesso.caixa);
+          await enviarComo(acesso.accessToken, { para, copia, assunto: m.assunto, html: m.html, anexos: m.anexos }, acesso.caixa);
           await admin.from('email_pendentes_estados').update({ ultimo_envio_automatico: hoje }).eq('uf', cfg.uf);
-          estados.push({ uf: cfg.uf, enviado: true, fichas: m.fichas, antigas: m.antigas, sem_itens: m.semItens, destinatarios: para.length });
+          estados.push({ uf: cfg.uf, enviado: true, fichas: m.fichas, antigas: m.antigas, sem_itens: m.semItens, destinatarios: para.length, erro_imagem: m.erroImagem });
         } catch (e) {
           estados.push({ uf: cfg.uf, enviado: false, erro: e instanceof Error ? e.message : String(e) });
         }
@@ -111,8 +128,8 @@ Deno.serve(async (req) => {
     if (!liberado) return json({ error: `O estado ${uf || '(nenhum)'} não está liberado para o seu usuário` }, 403);
     const m = await relatorio(admin, uf);
     const { accessToken, caixa } = await acessoParaEnviar(admin);
-    await enviarComo(accessToken, { para, copia, assunto: m.assunto, html: m.html, anexos: [m.anexo] }, caixa);
-    return json({ enviado: true, fichas: m.fichas, antigas: m.antigas, sem_itens: m.semItens, destinatarios: para.length, copia: copia.length });
+    await enviarComo(accessToken, { para, copia, assunto: m.assunto, html: m.html, anexos: m.anexos }, caixa);
+    return json({ enviado: true, fichas: m.fichas, antigas: m.antigas, sem_itens: m.semItens, destinatarios: para.length, copia: copia.length, erro_imagem: m.erroImagem });
   } catch (e) {
     if (e instanceof ErroMicrosoft) return json({ error: e.message }, 502);
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);

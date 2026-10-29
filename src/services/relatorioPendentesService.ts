@@ -24,7 +24,11 @@ export async function salvarConfigPendentes(c: Omit<EmailPendentesEstado, 'ultim
   if (error) throw error;
 }
 
-export interface ResultadoEnvioPendentes { enviado: boolean; fichas: number; antigas: number; sem_itens: number; destinatarios: number; copia: number }
+export interface ResultadoEnvioPendentes {
+  enviado: boolean; fichas: number; antigas: number; sem_itens: number; destinatarios: number; copia: number;
+  /** A imagem do painel não pôde ser gerada (o e-mail saiu sem ela). */
+  erro_imagem?: string | null;
+}
 
 /** Envia agora o relatório do estado (Edge Function na produção; o próprio PC no localhost). */
 export async function enviarRelatorioPendentes(envio: { uf: string; destinatarios: string[]; copia: string[] }): Promise<ResultadoEnvioPendentes> {
@@ -50,21 +54,25 @@ export async function enviarRelatorioPendentes(envio: { uf: string; destinatario
   return data as ResultadoEnvioPendentes;
 }
 
-/** Fichas pendentes do estado, itens e links que o usuário pode ler (usado só no localhost). */
+/** Fichas do estado (todas, para o painel), itens e links das pendentes que o usuário pode ler (usado só no localhost). */
 async function dadosDosPendentes(uf: string) {
   const { data: fichas, error } = await supabase.from('fichas_epi')
-    .select('id, numero, nome_funcionario, matricula_snapshot, funcao, posto_snapshot, uf, empresa, motivo, created_at')
-    .neq('status', 'assinada').eq('uf', uf);
+    .select('id, numero, nome_funcionario, matricula_snapshot, funcao, posto_snapshot, uf, empresa, motivo, status, created_at')
+    .eq('uf', uf);
   if (error) throw new Error(error.message);
   const ids = (fichas ?? []).map(f => f.id);
-  const itens: { ficha_id: string }[] = [];
+  const pendentes = new Set((fichas ?? []).filter(f => f.status !== 'assinada').map(f => f.id));
+  const itens: { ficha_id: string; quantidade: number | null; recebido: boolean }[] = [];
   const tokens: { ficha_id: string; expira_em: string; usado: boolean; created_at: string }[] = [];
   for (let i = 0; i < ids.length; i += 100) {
     const lote = ids.slice(i, i + 100);
+    const lotePendente = lote.filter(id => pendentes.has(id));
     const [{ data: it, error: e1 }, { data: tk }] = await Promise.all([
-      supabase.from('fichas_epi_itens').select('ficha_id').in('ficha_id', lote),
+      supabase.from('fichas_epi_itens').select('ficha_id, quantidade, recebido').in('ficha_id', lote),
       // Os links podem não ser legíveis pelo usuário: sem eles, sai "Sem link".
-      supabase.from('assinatura_tokens').select('ficha_id, expira_em, usado, created_at').eq('tipo_ficha', 'epi').in('ficha_id', lote),
+      lotePendente.length
+        ? supabase.from('assinatura_tokens').select('ficha_id, expira_em, usado, created_at').eq('tipo_ficha', 'epi').in('ficha_id', lotePendente)
+        : Promise.resolve({ data: [] }),
     ]);
     if (e1) throw new Error(e1.message);
     itens.push(...(it ?? []));
