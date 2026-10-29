@@ -152,7 +152,7 @@ export default function SignaturePad({ label, onSave, initialValue, disabled, gr
             O grande é mais alto na tela, mas exporta 3:1 (imagem3por1). */}
         <canvas
           ref={canvasRef}
-          className={`block w-full touch-none select-none ${grande ? 'aspect-[3/2] max-h-[60vh]' : 'aspect-[3/1]'}`}
+          className={`block w-full touch-none select-none ${grande ? 'aspect-[3/2] sm:aspect-[5/2] max-h-[60vh]' : 'aspect-[3/1]'}`}
         />
       </div>
       {!disabled && (
