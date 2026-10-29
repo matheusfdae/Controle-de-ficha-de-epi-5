@@ -116,10 +116,10 @@ export function montarEmailPendentes(linhas: LinhaPendente[], ufs: string[], ago
     ]),
     [6, 10, 36, 12, 24, 28, 24, 14, 12, 10, 8, 16, 12]);
   return {
-    assunto: `Fichas pendentes de assinatura — ${formatarData(hoje)} — ${linhas.length} ficha(s)`,
+    assunto: `Fichas pendentes de assinatura${ufs.length === 1 ? ` — ${ufs[0]}` : ''} — ${formatarData(hoje)} — ${linhas.length} ficha(s)`,
     html,
     anexo: {
-      nome: `fichas-pendentes-${hoje}.xlsx`,
+      nome: `fichas-pendentes-${ufs.length === 1 ? `${ufs[0].toLowerCase()}-` : ''}${hoje}.xlsx`,
       tipo: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       base64: base64(xlsx),
     },

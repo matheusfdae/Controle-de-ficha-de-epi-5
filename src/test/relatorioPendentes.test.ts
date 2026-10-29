@@ -62,6 +62,12 @@ describe('relatório de fichas pendentes', () => {
     expect(m.anexo.base64.length).toBeGreaterThan(100);
   });
 
+  it('relatório de um estado leva a UF no assunto e no anexo', () => {
+    const m = montarEmailPendentes(calcularPendentes(fichas, itens, tokens, ['MT'], agora), ['MT'], agora);
+    expect(m.assunto).toBe('Fichas pendentes de assinatura — MT — 29/10/2026 — 1 ficha(s)');
+    expect(m.anexo.nome).toBe('fichas-pendentes-mt-2026-10-29.xlsx');
+  });
+
   it('sem pendentes, avisa no e-mail', () => {
     const m = montarEmailPendentes([], ['DF'], agora);
     expect(m.fichas).toBe(0);

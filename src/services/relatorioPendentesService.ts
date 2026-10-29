@@ -1,38 +1,39 @@
 import { supabase } from '@/integrations/supabase/client';
 
-/** Configurações > E-mail: destinatários e envio automático do relatório de fichas pendentes. */
-export interface EmailPendentesConfig {
+/** Configurações > E-mail: destinatários e envio automático do relatório de fichas pendentes, por estado. */
+export interface EmailPendentesEstado {
+  uf: string;
   destinatarios: string[];
   copia: string[];
   automatico: boolean;
   dia_semana: number;
-  ufs: string[];
   ultimo_envio_automatico: string | null;
 }
 
-const tabela = () => supabase.from('email_pendentes_config');
+const tabela = () => supabase.from('email_pendentes_estados');
 
-export async function lerConfigPendentes(): Promise<EmailPendentesConfig | null> {
-  const { data, error } = await tabela().select('*').eq('id', 1).maybeSingle();
+/** Configuração dos estados liberados para o usuário (RLS). */
+export async function listarConfigPendentes(): Promise<EmailPendentesEstado[]> {
+  const { data, error } = await tabela().select('*').order('uf');
   if (error) throw error;
-  return data as EmailPendentesConfig | null;
+  return (data ?? []) as EmailPendentesEstado[];
 }
 
-export async function salvarConfigPendentes(c: Omit<EmailPendentesConfig, 'ultimo_envio_automatico'>): Promise<void> {
-  const { error } = await tabela().update(c).eq('id', 1);
+export async function salvarConfigPendentes(c: Omit<EmailPendentesEstado, 'ultimo_envio_automatico'>): Promise<void> {
+  const { error } = await tabela().upsert(c, { onConflict: 'uf' });
   if (error) throw error;
 }
 
 export interface ResultadoEnvioPendentes { enviado: boolean; fichas: number; antigas: number; sem_itens: number; destinatarios: number; copia: number }
 
-/** Envia o relatório agora (Edge Function na produção; o próprio PC no localhost). */
-export async function enviarRelatorioPendentes(envio: { destinatarios: string[]; copia: string[]; ufs: string[] }): Promise<ResultadoEnvioPendentes> {
+/** Envia agora o relatório do estado (Edge Function na produção; o próprio PC no localhost). */
+export async function enviarRelatorioPendentes(envio: { uf: string; destinatarios: string[]; copia: string[] }): Promise<ResultadoEnvioPendentes> {
   if (import.meta.env.DEV) {
     // No localhost o servidor de teste não lê o banco: a tela manda o que já pode ler.
     const res = await fetch('/__email/enviar-relatorio-pendentes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...envio, ...(await dadosDosPendentes()) }),
+      body: JSON.stringify({ ...envio, ...(await dadosDosPendentes(envio.uf)) }),
     });
     const corpo = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(corpo.error || `Falha (${res.status})`);
@@ -49,11 +50,11 @@ export async function enviarRelatorioPendentes(envio: { destinatarios: string[];
   return data as ResultadoEnvioPendentes;
 }
 
-/** Fichas pendentes, itens e links que o usuário pode ler (usado só no localhost). */
-async function dadosDosPendentes() {
+/** Fichas pendentes do estado, itens e links que o usuário pode ler (usado só no localhost). */
+async function dadosDosPendentes(uf: string) {
   const { data: fichas, error } = await supabase.from('fichas_epi')
     .select('id, numero, nome_funcionario, matricula_snapshot, funcao, posto_snapshot, uf, empresa, motivo, created_at')
-    .neq('status', 'assinada');
+    .neq('status', 'assinada').eq('uf', uf);
   if (error) throw new Error(error.message);
   const ids = (fichas ?? []).map(f => f.id);
   const itens: { ficha_id: string }[] = [];
