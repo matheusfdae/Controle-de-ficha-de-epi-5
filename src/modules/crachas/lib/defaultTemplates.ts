@@ -35,6 +35,8 @@ const { fontFamily: FONT, corPrimaria: BLUE, corTextoNome: WHITE, corBorda: GRAY
  * Dimensões: 118.8mm × 96.1mm, tamanho real do Canva. Uma face só, em duas
  * colunas: esquerda = frente (foto/nome), direita = verso (dados) — dobra ao meio.
  * Posições medidas no crachá preenchido do mesmo PDF. font_size ≈ pt no PDF.
+ * Vigilância e Brigadista usam a mesma arte e os mesmos campos; só muda o
+ * terceiro campo da frente: CNV no vigilante, RE (matrícula) no brigadista.
  */
 const NAVY = '#0f243e';
 const NAVY_PILL = '#1d2647';
@@ -58,9 +60,13 @@ const pill = (overrides: Partial<Omit<CanvasElement, 'id'>>): Omit<CanvasElement
   ...overrides,
 });
 
-export const template5EstrelasImg: DefaultTemplate = {
-  name: '5 Estrelas - Vigilância',
-  description: 'Arte oficial do Canva em alta definição (frente e verso lado a lado)',
+const template5Estrelas = (
+  name: string,
+  description: string,
+  terceiroCampo: Partial<Omit<CanvasElement, 'id'>>,
+): DefaultTemplate => ({
+  name,
+  description,
   width_mm: 118.8,
   height_mm: 96.1,
   backgroundColor: '#FFFFFF',
@@ -86,7 +92,7 @@ export const template5EstrelasImg: DefaultTemplate = {
       borderWidth: 0,
     }),
     pill({ y: 71.61, fieldBinding: 'role' }),
-    pill({ y: 78.0, fieldBinding: 'employee_id', staticValue: 'RE: ' }),
+    pill({ y: 78.0, ...terceiroCampo }),
     pill({ y: 84.29, fieldBinding: 'blood_type', staticValue: 'TIPO SANGUÍNEO: ' }),
 
     // ══════════ COLUNA DIREITA (verso) ══════════
@@ -114,7 +120,19 @@ export const template5EstrelasImg: DefaultTemplate = {
       zIndex: 10, side: 'front', opacity: 1,
     },
   ],
-};
+});
+
+export const template5EstrelasImg = template5Estrelas(
+  '5 Estrelas - Vigilância',
+  'Arte oficial do Canva em alta definição (frente e verso lado a lado), com a CNV',
+  { fieldBinding: 'cnv', staticValue: 'CNV: ' },
+);
+
+export const template5EstrelasBrigadistaImg = template5Estrelas(
+  '5 Estrelas - Brigadista',
+  'Mesma arte da Vigilância, com o RE (matrícula) no lugar da CNV',
+  { fieldBinding: 'employee_id', staticValue: 'RE: ' },
+);
 
 /**
  * Template "SS Serviços - Manutenção e Limpeza"
@@ -417,6 +435,7 @@ export const templateBaluarteImg: DefaultTemplate = {
 
 export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
   template5EstrelasImg,
+  template5EstrelasBrigadistaImg,
   templateBaluarteImg,
   templateSsServicosImg,
   templateHcnImg,
