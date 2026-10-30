@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FilePlus2, Search, CalendarClock, Settings, ShieldCheck, LogOut, Users, Package, Briefcase, UserPlus, ClipboardSignature, HardHat, Shirt, FileSignature, MapPin, FileStack,
-  IdCard, Palette, Printer, History, BarChart3, Inbox, PenTool,
+  IdCard, Palette, Printer, History, BarChart3, Inbox, PenTool, ShoppingCart, ClipboardList, Map as MapIcon, TrendingUp, HandCoins, Gauge, Warehouse,
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -15,6 +15,8 @@ import { Badge } from '@/components/ui/badge';
 import { ModuleId, ActionId } from '@/lib/permissions';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import MinhaAssinatura from '@/components/MinhaAssinatura';
+import { supabase } from '@/integrations/supabase/client';
+import { minhasPendencias } from '@/modules/pedidos/lib/pedidosService';
 
 const baseItems: Array<{ title: string; guia: string; url: string; icon: typeof LayoutDashboard; end: boolean; module: ModuleId }> = [
   { title: 'Dashboard', guia: 'menu-dashboard', url: '/', icon: LayoutDashboard, end: true, module: 'dashboard' },
@@ -48,6 +50,17 @@ const crachaItems: Array<{ title: string; guia: string; url: string; icon: typeo
 
 // "Usuários" fica de fora daqui — continua exclusivo de Admin/RH (isAdmin),
 // não vira controlável pela matriz de permissões.
+// "Pedidos" também aparece para quem só é aprovador (sem a permissão do módulo).
+const pedidoItems: Array<{ title: string; guia: string; url: string; icon: typeof IdCard; end: boolean; action?: ActionId }> = [
+  { title: 'Pedidos', guia: 'menu-pedidos', url: '/pedidos', icon: ClipboardList, end: true },
+  { title: 'Estoque do Posto', guia: 'menu-pedidos-estoque', url: '/pedidos/estoque', icon: Warehouse, end: false },
+  { title: 'Painel Gerencial', guia: 'menu-pedidos-gerencial', url: '/pedidos/gerencial', icon: Gauge, end: false, action: 'view' },
+  { title: 'Teto por Posto', guia: 'menu-pedidos-painel', url: '/pedidos/painel', icon: MapIcon, end: false, action: 'view' },
+  { title: 'Variação de Preço', guia: 'menu-pedidos-precos', url: '/pedidos/precos', icon: TrendingUp, end: false, action: 'view' },
+  { title: 'Cobrança ao Cliente', guia: 'menu-pedidos-cobranca', url: '/pedidos/cobranca', icon: HandCoins, end: false, action: 'view' },
+  { title: 'Config. de Pedidos', guia: 'menu-pedidos-config', url: '/pedidos/configuracoes', icon: Settings, end: false, action: 'view' },
+];
+
 const adminItems: Array<{ title: string; guia: string; url: string; icon: typeof Package; end: boolean; module: ModuleId }> = [
   { title: 'Integração', guia: 'menu-integracao', url: '/integracao', icon: UserPlus, end: false, module: 'integracao' },
   { title: 'Estoque', guia: 'menu-estoque', url: '/estoque', icon: Package, end: false, module: 'estoque' },
@@ -72,6 +85,24 @@ export function AppSidebar() {
   const visibleUniformeItems = uniformeItems.filter(i => !i.module || can(i.module, i.action ?? 'view'));
   const visibleCrachaItems = crachaItems.filter(i => can('crachas', i.action ?? 'view'));
   const visibleAdminItems = adminItems.filter(i => can(i.module, 'view'));
+  const [aprovador, setAprovador] = useState(false);
+  const [pendencias, setPendencias] = useState(0);
+  useEffect(() => {
+    if (!user) return;
+    let vivo = true;
+    const atualizar = () => {
+      supabase.from('pedido_aprovadores').select('id', { count: 'exact', head: true }).eq('user_id', user.id)
+        .then(({ count }) => vivo && setAprovador((count ?? 0) > 0), () => undefined);
+      minhasPendencias().then(n => vivo && setPendencias(n));
+    };
+    atualizar();
+    const t = setInterval(atualizar, 5 * 60 * 1000);
+    // O sino de pedidos confere a cada minuto e avisa a contagem nova.
+    const doSino = (e: Event) => setPendencias((e as CustomEvent<number>).detail);
+    window.addEventListener('pedidos-pendencias', doSino);
+    return () => { vivo = false; clearInterval(t); window.removeEventListener('pedidos-pendencias', doSino); };
+  }, [user, pathname]);
+  const visiblePedidoItems = pedidoItems.filter(i => (i.action ? can('pedidos_material', i.action) : can('pedidos_material', 'view') || aprovador));
   const showAdminSection = isAdmin || visibleAdminItems.length > 0;
 
   return (
@@ -156,6 +187,29 @@ export function AppSidebar() {
                       <NavLink to={item.url} end={item.end} data-guia={item.guia} className="flex items-center gap-2.5">
                         <item.icon className="h-4 w-4" />
                         {!collapsed && <span className="text-sm">{item.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {visiblePedidoItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="flex items-center gap-1.5"><ShoppingCart className="h-3 w-3" /> Pedidos de Material</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visiblePedidoItems.map(item => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={isActive(item.url, item.end)} tooltip={item.title}>
+                      <NavLink to={item.url} end={item.end} data-guia={item.guia} className="flex items-center gap-2.5">
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span className="text-sm">{item.title}</span>}
+                        {!collapsed && item.url === '/pedidos' && pendencias > 0 && (
+                          <Badge className="ml-auto h-5 px-1.5 text-[11px]" title="Pedidos esperando a sua aprovação">{pendencias}</Badge>
+                        )}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

@@ -1045,6 +1045,114 @@ export type Database = {
           },
         ]
       }
+      materiais: {
+        Row: { id: string; nome: string; item_pai_id: string | null; unidade: string; categoria: string | null; is_epi: boolean; ativo: boolean; created_at: string; updated_at: string }
+        Insert: { id?: string; nome: string; item_pai_id?: string | null; unidade?: string; categoria?: string | null; is_epi?: boolean; ativo?: boolean }
+        Update: { id?: string; nome?: string; item_pai_id?: string | null; unidade?: string; categoria?: string | null; is_epi?: boolean; ativo?: boolean }
+        Relationships: []
+      }
+      posto_materiais: {
+        Row: { posto_id: string; material_id: string }
+        Insert: { posto_id: string; material_id: string }
+        Update: { posto_id?: string; material_id?: string }
+        Relationships: []
+      }
+      tabela_precos: {
+        Row: { id: string; nome: string; status: string; vigencia_inicio: string | null; vigencia_fim: string | null; publicada_em: string | null; criado_por: string | null; created_at: string }
+        Insert: { id?: string; nome: string; criado_por?: string | null }
+        Update: { nome?: string }
+        Relationships: []
+      }
+      tabela_precos_itens: {
+        Row: { tabela_id: string; material_id: string; preco: number }
+        Insert: { tabela_id: string; material_id: string; preco: number }
+        Update: { preco?: number }
+        Relationships: []
+      }
+      posto_tetos: {
+        Row: { id: string; posto_id: string; vigente_desde: string; valor: number; criado_por: string | null; created_at: string }
+        Insert: { id?: string; posto_id: string; vigente_desde: string; valor: number; criado_por?: string | null }
+        Update: { id?: string; posto_id?: string; vigente_desde?: string; valor?: number; criado_por?: string | null }
+        Relationships: []
+      }
+      estoque_plantoes: {
+        Row: { id: string; posto_id: string; uf: string; status: string; aberto_em: string; aberto_por: string | null; aberto_por_nome: string | null; fechado_em: string | null; fechado_por: string | null; fechado_por_nome: string | null; observacao_inicio: string | null; observacao_fim: string | null; assinatura: string | null; declaracao_aceita_em: string | null; tem_diferenca: boolean; created_at: string }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
+      estoque_plantao_itens: {
+        Row: { plantao_id: string; material_id: string; qtd_inicio: number; qtd_recebida: number; qtd_usada: number | null; qtd_fim: number | null; diferenca: number | null }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
+      estoque_plantao_fotos: {
+        Row: { plantao_id: string; momento: string; foto: string; tirada_em: string }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
+      estoque_posto: {
+        Row: { posto_id: string; material_id: string; quantidade: number; plantao_id: string | null; atualizado_em: string }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
+      pedido_config: {
+        Row: { id: number; avisar_email: boolean; link_sistema: string | null; emails_epi: string[]; dias_cobertura: number; updated_at: string }
+        Insert: { id?: number; avisar_email?: boolean; link_sistema?: string | null; emails_epi?: string[]; dias_cobertura?: number }
+        Update: { avisar_email?: boolean; link_sistema?: string | null; emails_epi?: string[]; dias_cobertura?: number }
+        Relationships: []
+      }
+      pedido_aprovadores: {
+        Row: { id: string; user_id: string; nivel: string; uf: string; postos: string[]; created_at: string }
+        Insert: { id?: string; user_id: string; nivel: string; uf: string; postos?: string[] }
+        Update: { id?: string; user_id?: string; nivel?: string; uf?: string; postos?: string[] }
+        Relationships: []
+      }
+      pedido_recorrencias: {
+        Row: { id: string; posto_id: string; frequencia: string; itens: Json; observacao: string | null; proxima_data: string; ativa: boolean; encerrada_em: string | null; encerrada_por: string | null; criado_por: string | null; origem_pedido_id: string | null; solicitante_senior_id: string | null; solicitante_nome: string; solicitante_matricula: string | null; solicitante_cargo: string | null; solicitante_telefone: string | null; created_at: string }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
+      pedidos_material: {
+        Row: { id: string; ano: number; numero: number; codigo: string; posto_id: string; uf: string; recorrencia_id: string | null; data_pedido: string; status: string; valor_estimado: number; valor_orcado: number | null; valor_real: number | null; excede_teto: boolean; sem_preco: boolean; tem_epi: boolean; data_aprovacao: string | null; faturada_em: string | null; cobrar_cliente: boolean; cobrado_em: string | null; cobrado_por: string | null; cobranca_ref: string | null; observacao: string | null; notificado_status: string | null; epi_avisado: boolean; solicitante_senior_id: string | null; solicitante_nome: string; solicitante_matricula: string | null; solicitante_cargo: string | null; solicitante_telefone: string | null; created_at: string; updated_at: string }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
+      pedidos_material_itens: {
+        Row: { id: string; pedido_id: string; material_id: string; quantidade_pedida: number; quantidade: number; preco_ref: number | null; preco_orcado: number | null }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
+      pedido_eventos: {
+        Row: { id: string; pedido_id: string; de_status: string | null; para_status: string; papel: string | null; comentario: string | null; payload: Json | null; usuario_id: string | null; usuario_nome: string | null; created_at: string }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
+      material_codigos_fornecedor: {
+        Row: { fornecedor_cnpj: string; codigo_fornecedor: string; material_id: string; fator: number; updated_at: string }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
+      material_compras: {
+        Row: { id: string; pedido_id: string | null; fornecedor_id: string | null; fornecedor_nome: string; fornecedor_cnpj: string | null; numero_nf: string | null; chave_acesso: string | null; data_compra: string; observacao: string | null; criado_por: string | null; created_at: string }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
+      material_compras_itens: {
+        Row: { id: string; compra_id: string; material_id: string; quantidade: number; valor_unitario: number; codigo_fornecedor: string | null; descricao_nf: string | null; unidade_nf: string | null; fator: number }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
       estoque_minimos: {
         Row: { epi_id: string; uf: string; minimo: number; updated_at: string }
         Insert: { epi_id: string; uf: string; minimo: number; updated_at?: string }
@@ -1939,6 +2047,7 @@ export type Database = {
           updated_at: string
           troca_uniforme_meses: number | null
           troca_uniforme_obrigatoria: boolean
+          sob_demanda: boolean
         }
         Insert: {
           apelidos?: string[]
@@ -1953,6 +2062,7 @@ export type Database = {
           updated_at?: string
           troca_uniforme_meses?: number | null
           troca_uniforme_obrigatoria?: boolean
+          sob_demanda?: boolean
         }
         Update: {
           apelidos?: string[]
@@ -1967,6 +2077,7 @@ export type Database = {
           updated_at?: string
           troca_uniforme_meses?: number | null
           troca_uniforme_obrigatoria?: boolean
+          sob_demanda?: boolean
         }
         Relationships: []
       }
@@ -2379,9 +2490,104 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      vw_material_precos: {
+        Row: { id: string; compra_id: string; pedido_id: string | null; data_compra: string; numero_nf: string | null; fornecedor_id: string | null; fornecedor_nome: string; fornecedor_cnpj: string | null; material_id: string; material_nome: string; unidade: string; categoria: string | null; quantidade: number; valor_unitario: number; valor_anterior: number | null; data_anterior: string | null; nf_anterior: string | null }
+        Relationships: []
+      }
     }
     Functions: {
+      pedido_material_identificar: {
+        Args: { _matricula: number | null; _cpf: string | null }
+        Returns: Json
+      }
+      pedido_material_enviar: {
+        Args: { _matricula: number | null; _cpf: string | null; _telefone: string; _posto_id: string; _itens: Json; _observacao?: string | null; _frequencia?: string }
+        Returns: Json
+      }
+      pedido_material_reenviar: {
+        Args: { _matricula: number | null; _cpf: string | null; _pedido_id: string; _itens: Json; _observacao?: string | null }
+        Returns: Json
+      }
+      pedido_material_cancelar: {
+        Args: { _matricula: number | null; _cpf: string | null; _pedido_id?: string | null; _recorrencia_id?: string | null }
+        Returns: Json
+      }
+      pedido_material_conferir: {
+        Args: { _pedido_id: string; _conferido: boolean; _comentario?: string | null; _quantidades?: Json | null }
+        Returns: Json
+      }
+      pedido_material_orcar: {
+        Args: { _pedido_id: string; _precos: Json; _comentario?: string | null }
+        Returns: Json
+      }
+      pedido_material_aprovar_excesso: {
+        Args: { _pedido_id: string; _aprovar: boolean; _comentario: string }
+        Returns: Json
+      }
+      pedido_material_cancelar_interno: {
+        Args: { _pedido_id: string; _motivo: string }
+        Returns: Json
+      }
+      pedidos_material_minhas_pendencias: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      pedidos_importar_planilha: {
+        Args: { _postos: Json; _teto_desde: string }
+        Returns: Json
+      }
+      estoque_abrir_plantao: {
+        Args: { _posto_id: string; _foto: string; _itens: Json; _observacao?: string | null }
+        Returns: string
+      }
+      estoque_fechar_plantao: {
+        Args: { _plantao_id: string; _foto: string; _itens: Json; _assinatura: string; _ciente: boolean; _observacao?: string | null }
+        Returns: Json
+      }
+      estoque_cancelar_plantao: {
+        Args: { _plantao_id: string }
+        Returns: undefined
+      }
+      estoque_analise_pedido: {
+        Args: { _pedido_id: string }
+        Returns: { material_id: string; estoque: number; consumo_dia: number; dias_estoque: number | null; dias_com_pedido: number | null; quantidade_pedido: number; alerta: boolean; sem_historico: boolean; limite_dias: number }[]
+      }
+      pedido_material_repetir: {
+        Args: { _pedido_id: string; _frequencia: string; _primeira?: string | null }
+        Returns: Json
+      }
+      pedido_material_encerrar_recorrencia: {
+        Args: { _recorrencia_id: string }
+        Returns: undefined
+      }
+      pedidos_material_minhas_tarefas: {
+        Args: Record<PropertyKey, never>
+        Returns: { id: string; codigo: string; status: string; posto: string; uf: string; valor: number; excede_teto: boolean; desde: string }[]
+      }
+      pedidos_material_marcar_cobrados: {
+        Args: { _ids: string[]; _cobrado: boolean; _referencia: string | null }
+        Returns: number
+      }
+      gerar_pedidos_recorrentes: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      nova_tabela_precos: {
+        Args: { _nome: string }
+        Returns: string
+      }
+      publicar_tabela_precos: {
+        Args: { _tabela_id: string; _inicio: string }
+        Returns: undefined
+      }
+      simular_tabela_precos: {
+        Args: { _tabela_id: string }
+        Returns: { posto_id: string; posto: string; uf: string; teto: number | null; media_atual: number; media_nova: number; excede: boolean }[]
+      }
+      material_compra_registrar: {
+        Args: { _pedido_id: string | null; _fornecedor_id: string | null; _fornecedor_nome: string | null; _numero_nf: string | null; _data_compra: string; _itens: Json; _observacao?: string | null; _fornecedor_cnpj?: string | null; _chave_acesso?: string | null }
+        Returns: string
+      }
       cracha_solicitacao_identificar: {
         Args: { _matricula: number | null; _cpf: string | null }
         Returns: Json

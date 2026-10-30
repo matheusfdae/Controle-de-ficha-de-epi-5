@@ -54,3 +54,6 @@ verify_jwt = false
 
 [functions.enviar-relatorio-pendentes]
 verify_jwt = false
+
+[functions.avisar-pedidos-material]
+verify_jwt = false
