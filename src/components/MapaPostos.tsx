@@ -168,7 +168,7 @@ export default function MapaPostos({
   }, [pontos]);
 
   return (
-    <div className={`relative ${className ?? ''}`}>
+    <div className={`relative isolate ${className ?? ''}`}>
       <div ref={divRef} tabIndex={0} style={{ height: altura }}
         className={`w-full rounded-lg border z-0 ${onEscolherPosicao ? 'cursor-crosshair' : ''}`} />
       {mostrarRelogio && <Relogio />}
