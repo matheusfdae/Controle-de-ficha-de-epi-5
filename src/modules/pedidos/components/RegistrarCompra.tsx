@@ -12,7 +12,7 @@ import { parseNFeXml } from '@/lib/nfe';
 import { formatarCnpj } from '@/lib/cnpj';
 import { listFornecedores, type Fornecedor } from '@/services/fornecedoresService';
 import {
-  codigosDoFornecedor, converterEmbalagem, formatarMoeda, formatarNumero, hojeBr, numeroPedido, registrarCompra,
+  codigosDoFornecedor, converterEmbalagem, formatarMoeda, formatarNumero, hojeBr, materiaisPediveis, nomeMaterial, registrarCompra,
   sugerirMaterial, type Material, type PedidoCompleto,
 } from '../lib/pedidosService';
 
@@ -52,7 +52,7 @@ export default function RegistrarCompra({ pedido, materiais, onFechar, onSalvo }
   const [linhas, setLinhas] = useState<Linha[]>(() => pedido
     ? pedido.itens.map(i => ({
       material_id: i.material_id, quantidade: String(i.quantidade),
-      valor: i.preco_estimado != null ? String(i.preco_estimado) : '', fator: '1',
+      valor: i.preco_orcado != null ? String(i.preco_orcado) : i.preco_ref != null ? String(i.preco_ref) : '', fator: '1',
     }))
     : [{ material_id: '', quantidade: '', valor: '', fator: '1' }]);
   const [salvando, setSalvando] = useState(false);
@@ -61,6 +61,8 @@ export default function RegistrarCompra({ pedido, materiais, onFechar, onSalvo }
   useEffect(() => { listFornecedores().then(setFornecedores).catch(() => setFornecedores([])); }, []);
 
   const unidade = (id: string) => materiais.find(m => m.id === id)?.unidade ?? '';
+  const pediveis = materiaisPediveis(materiais);
+  const opcoes = [...pediveis, ...materiais.filter(m => !pediveis.includes(m) && linhas.some(l => l.material_id === m.id))];
   const total = linhas.reduce((s, l) => { const v = valores(l); return s + (v.quantidade || 0) * (v.valor_unitario || 0); }, 0);
 
   const importarXml = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,7 +83,7 @@ export default function RegistrarCompra({ pedido, materiais, onFechar, onSalvo }
       setLinhas(nota.itens.map(i => {
         const lembrado = memoria.get(i.codigo);
         return {
-          material_id: lembrado?.material_id ?? sugerirMaterial(i.descricao, materiais) ?? '',
+          material_id: lembrado?.material_id ?? sugerirMaterial(i.descricao, pediveis.map(m => ({ id: m.id, nome: nomeMaterial(m, materiais) }))) ?? '',
           quantidade: '', valor: '', fator: String(lembrado?.fator ?? 1).replace('.', ','),
           lembrado: !!lembrado,
           nota: { codigo: i.codigo, descricao: i.descricao, unidade: i.unidade, quantidade: i.quantidade, valor: i.valorUnitario ?? 0 },
@@ -136,7 +138,7 @@ export default function RegistrarCompra({ pedido, materiais, onFechar, onSalvo }
     <Dialog open onOpenChange={o => !o && onFechar()}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{pedido ? `Compra do ${numeroPedido(pedido.numero)}` : 'Registrar compra avulsa'}</DialogTitle>
+          <DialogTitle>{pedido ? `Faturar ${pedido.codigo}` : 'Registrar compra avulsa'}</DialogTitle>
           <DialogDescription>Os valores unitários desta nota entram no relatório de variação de preço.</DialogDescription>
         </DialogHeader>
 
@@ -195,8 +197,8 @@ export default function RegistrarCompra({ pedido, materiais, onFechar, onSalvo }
                   <TableCell>
                     <Select value={l.material_id || undefined} onValueChange={val => mudar(idx, 'material_id', val)}>
                       <SelectTrigger className="h-8"><SelectValue placeholder="Material" /></SelectTrigger>
-                      <SelectContent>{materiais.filter(m => m.ativo || m.id === l.material_id).map(m =>
-                        <SelectItem key={m.id} value={m.id}>{m.nome} ({m.unidade})</SelectItem>)}</SelectContent>
+                      <SelectContent>{opcoes.filter(m => m.ativo || m.id === l.material_id).map(m =>
+                        <SelectItem key={m.id} value={m.id}>{nomeMaterial(m, materiais)} ({m.unidade})</SelectItem>)}</SelectContent>
                     </Select>
                     {l.lembrado && <span className="text-[11px] text-muted-foreground">lembrado das notas anteriores</span>}
                   </TableCell>
@@ -242,7 +244,7 @@ export default function RegistrarCompra({ pedido, materiais, onFechar, onSalvo }
         )}
         {faltando.length > 0 && (
           <p className="text-sm text-amber-700 dark:text-amber-400">
-            Itens do pedido que não estão nesta compra: {faltando.map(i => materiais.find(m => m.id === i.material_id)?.nome ?? '?').join(', ')}.
+            Itens do pedido que não estão nesta compra: {faltando.map(i => nomeMaterial(materiais.find(m => m.id === i.material_id), materiais)).join(', ')}.
           </p>
         )}
         <div className="flex justify-between items-center">

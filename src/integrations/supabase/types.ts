@@ -1046,9 +1046,27 @@ export type Database = {
         ]
       }
       materiais: {
-        Row: { id: string; nome: string; nome_chave: string; unidade: string; categoria: string | null; preco_referencia: number | null; ativo: boolean; created_at: string; updated_at: string }
-        Insert: { id?: string; nome: string; unidade?: string; categoria?: string | null; preco_referencia?: number | null; ativo?: boolean }
-        Update: { id?: string; nome?: string; unidade?: string; categoria?: string | null; preco_referencia?: number | null; ativo?: boolean }
+        Row: { id: string; nome: string; item_pai_id: string | null; unidade: string; categoria: string | null; is_epi: boolean; ativo: boolean; created_at: string; updated_at: string }
+        Insert: { id?: string; nome: string; item_pai_id?: string | null; unidade?: string; categoria?: string | null; is_epi?: boolean; ativo?: boolean }
+        Update: { id?: string; nome?: string; item_pai_id?: string | null; unidade?: string; categoria?: string | null; is_epi?: boolean; ativo?: boolean }
+        Relationships: []
+      }
+      posto_materiais: {
+        Row: { posto_id: string; material_id: string }
+        Insert: { posto_id: string; material_id: string }
+        Update: { posto_id?: string; material_id?: string }
+        Relationships: []
+      }
+      tabela_precos: {
+        Row: { id: string; nome: string; status: string; vigencia_inicio: string | null; vigencia_fim: string | null; publicada_em: string | null; criado_por: string | null; created_at: string }
+        Insert: { id?: string; nome: string; criado_por?: string | null }
+        Update: { nome?: string }
+        Relationships: []
+      }
+      tabela_precos_itens: {
+        Row: { tabela_id: string; material_id: string; preco: number }
+        Insert: { tabela_id: string; material_id: string; preco: number }
+        Update: { preco?: number }
         Relationships: []
       }
       posto_tetos: {
@@ -1057,10 +1075,10 @@ export type Database = {
         Update: { id?: string; posto_id?: string; vigente_desde?: string; valor?: number; criado_por?: string | null }
         Relationships: []
       }
-      pedido_alcadas: {
-        Row: { nivel: string; ordem: number; valor_acima_de: number | null; updated_at: string }
-        Insert: { nivel: string; ordem: number; valor_acima_de?: number | null }
-        Update: { nivel?: string; ordem?: number; valor_acima_de?: number | null }
+      pedido_config: {
+        Row: { id: number; avisar_email: boolean; link_sistema: string | null; emails_epi: string[]; updated_at: string }
+        Insert: { id?: number; avisar_email?: boolean; link_sistema?: string | null; emails_epi?: string[] }
+        Update: { avisar_email?: boolean; link_sistema?: string | null; emails_epi?: string[] }
         Relationships: []
       }
       pedido_aprovadores: {
@@ -1076,19 +1094,19 @@ export type Database = {
         Relationships: []
       }
       pedidos_material: {
-        Row: { id: string; numero: number; posto_id: string; uf: string; recorrencia_id: string | null; data_pedido: string; status: string; nivel_atual: string | null; niveis: string[]; valor_estimado: number; valor_real: number | null; acima_do_teto: boolean; sem_preco: boolean; notificado_nivel: string | null; data_aprovacao: string | null; aprovado_em: string | null; observacao: string | null; solicitante_senior_id: string | null; solicitante_nome: string; solicitante_matricula: string | null; solicitante_cargo: string | null; solicitante_telefone: string | null; created_at: string; updated_at: string }
+        Row: { id: string; ano: number; numero: number; codigo: string; posto_id: string; uf: string; recorrencia_id: string | null; data_pedido: string; status: string; valor_estimado: number; valor_orcado: number | null; valor_real: number | null; excede_teto: boolean; sem_preco: boolean; tem_epi: boolean; data_aprovacao: string | null; faturada_em: string | null; observacao: string | null; notificado_status: string | null; epi_avisado: boolean; solicitante_senior_id: string | null; solicitante_nome: string; solicitante_matricula: string | null; solicitante_cargo: string | null; solicitante_telefone: string | null; created_at: string; updated_at: string }
         Insert: { [_ in never]: never }
         Update: { [_ in never]: never }
         Relationships: []
       }
       pedidos_material_itens: {
-        Row: { id: string; pedido_id: string; material_id: string; quantidade: number; quantidade_pedida: number; preco_estimado: number | null }
+        Row: { id: string; pedido_id: string; material_id: string; quantidade_pedida: number; quantidade: number; preco_ref: number | null; preco_orcado: number | null }
         Insert: { [_ in never]: never }
         Update: { [_ in never]: never }
         Relationships: []
       }
-      pedido_aprovacoes: {
-        Row: { id: string; pedido_id: string; nivel: string; decisao: string; comentario: string | null; valor_no_momento: number | null; saldo_teto_no_momento: number | null; usuario_id: string | null; usuario_nome: string | null; created_at: string }
+      pedido_eventos: {
+        Row: { id: string; pedido_id: string; de_status: string | null; para_status: string; papel: string | null; comentario: string | null; payload: Json | null; usuario_id: string | null; usuario_nome: string | null; created_at: string }
         Insert: { [_ in never]: never }
         Update: { [_ in never]: never }
         Relationships: []
@@ -1097,12 +1115,6 @@ export type Database = {
         Row: { fornecedor_cnpj: string; codigo_fornecedor: string; material_id: string; fator: number; updated_at: string }
         Insert: { [_ in never]: never }
         Update: { [_ in never]: never }
-        Relationships: []
-      }
-      pedido_config: {
-        Row: { id: number; avisar_email: boolean; link_sistema: string | null; updated_at: string }
-        Insert: { id?: number; avisar_email?: boolean; link_sistema?: string | null }
-        Update: { avisar_email?: boolean; link_sistema?: string | null }
         Relationships: []
       }
       material_compras: {
@@ -2011,6 +2023,7 @@ export type Database = {
           updated_at: string
           troca_uniforme_meses: number | null
           troca_uniforme_obrigatoria: boolean
+          sob_demanda: boolean
         }
         Insert: {
           apelidos?: string[]
@@ -2025,6 +2038,7 @@ export type Database = {
           updated_at?: string
           troca_uniforme_meses?: number | null
           troca_uniforme_obrigatoria?: boolean
+          sob_demanda?: boolean
         }
         Update: {
           apelidos?: string[]
@@ -2039,6 +2053,7 @@ export type Database = {
           updated_at?: string
           troca_uniforme_meses?: number | null
           troca_uniforme_obrigatoria?: boolean
+          sob_demanda?: boolean
         }
         Relationships: []
       }
@@ -2465,12 +2480,28 @@ export type Database = {
         Args: { _matricula: number | null; _cpf: string | null; _telefone: string; _posto_id: string; _itens: Json; _observacao?: string | null; _frequencia?: string }
         Returns: Json
       }
+      pedido_material_reenviar: {
+        Args: { _matricula: number | null; _cpf: string | null; _pedido_id: string; _itens: Json; _observacao?: string | null }
+        Returns: Json
+      }
       pedido_material_cancelar: {
         Args: { _matricula: number | null; _cpf: string | null; _pedido_id?: string | null; _recorrencia_id?: string | null }
         Returns: Json
       }
-      pedido_material_decidir: {
-        Args: { _pedido_id: string; _aprovar: boolean; _comentario?: string | null; _quantidades?: Json | null }
+      pedido_material_conferir: {
+        Args: { _pedido_id: string; _conferido: boolean; _comentario?: string | null; _quantidades?: Json | null }
+        Returns: Json
+      }
+      pedido_material_orcar: {
+        Args: { _pedido_id: string; _precos: Json; _comentario?: string | null }
+        Returns: Json
+      }
+      pedido_material_aprovar_excesso: {
+        Args: { _pedido_id: string; _aprovar: boolean; _comentario: string }
+        Returns: Json
+      }
+      pedido_material_cancelar_interno: {
+        Args: { _pedido_id: string; _motivo: string }
         Returns: Json
       }
       pedidos_material_minhas_pendencias: {
@@ -2480,6 +2511,18 @@ export type Database = {
       gerar_pedidos_recorrentes: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      nova_tabela_precos: {
+        Args: { _nome: string }
+        Returns: string
+      }
+      publicar_tabela_precos: {
+        Args: { _tabela_id: string; _inicio: string }
+        Returns: undefined
+      }
+      simular_tabela_precos: {
+        Args: { _tabela_id: string }
+        Returns: { posto_id: string; posto: string; uf: string; teto: number | null; media_atual: number; media_nova: number; excede: boolean }[]
       }
       material_compra_registrar: {
         Args: { _pedido_id: string | null; _fornecedor_id: string | null; _fornecedor_nome: string | null; _numero_nf: string | null; _data_compra: string; _itens: Json; _observacao?: string | null; _fornecedor_cnpj?: string | null; _chave_acesso?: string | null }

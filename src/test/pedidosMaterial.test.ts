@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  chavePeriodo, classificarVariacao, numeroPedido, serieGastos, tetoNoMes, valorDoPedido,
+  catalogoDoPosto, chavePeriodo, classificarVariacao, materiaisPediveis, nomeMaterial, serieGastos, tetoNoMes,
+  valorDoPedido, variacaoTabela, type Material,
 } from '@/modules/pedidos/lib/pedidosService';
 
 const tetos = [
@@ -83,6 +84,35 @@ describe('classificarVariacao', () => {
   });
 });
 
-it('número do pedido', () => {
-  expect(numeroPedido(123)).toBe('PM-000123');
+describe('catálogo', () => {
+  const m = (id: string, nome: string, o: Partial<Material> = {}): Material =>
+    ({ id, nome, item_pai_id: null, unidade: 'un', categoria: null, is_epi: false, ativo: true, ...o });
+  const todos = [
+    m('det', 'Detergente'), m('d500', '500 ml', { item_pai_id: 'det' }), m('d5', '5 L', { item_pai_id: 'det', ativo: false }),
+    m('vas', 'Vassoura'), m('rodo', 'Rodo', { ativo: false }),
+    m('cera', 'Cera', { ativo: false }), m('c1', '1 L', { item_pai_id: 'cera' }),
+  ];
+  it('nome com o pai', () => {
+    expect(nomeMaterial(todos[1], todos)).toBe('Detergente — 500 ml');
+    expect(nomeMaterial(todos[3], todos)).toBe('Vassoura');
+  });
+  it('pai com variação ativa só agrupa; variação de pai inativo some', () => {
+    expect(materiaisPediveis(todos).map(x => x.id)).toEqual(['d500', 'vas']);
+  });
+  it('posto sob demanda só vê os itens liberados', () => {
+    const cat = [{ id: 'a', nome: 'A', unidade: 'un', categoria: null, grupo: null }, { id: 'b', nome: 'B', unidade: 'un', categoria: null, grupo: null }];
+    expect(catalogoDoPosto(cat, { id: 'p', nome: 'P', uf: 'DF', sob_demanda: true, itens: ['b'] }).map(x => x.id)).toEqual(['b']);
+    expect(catalogoDoPosto(cat, { id: 'p', nome: 'P', uf: 'DF', sob_demanda: false, itens: null })).toHaveLength(2);
+  });
+});
+
+it('orçado x tabela', () => {
+  expect(variacaoTabela(14, 10)).toBe(40);
+  expect(variacaoTabela(9.5, 10)).toBe(-5);
+  expect(variacaoTabela(10, null)).toBeNull();
+});
+
+it('valor que conta no teto: nota, orçado, estimado', () => {
+  expect(valorDoPedido({ valor_real: null, valor_orcado: 95, valor_estimado: 100 })).toBe(95);
+  expect(valorDoPedido({ valor_real: 90, valor_orcado: 95, valor_estimado: 100 })).toBe(90);
 });

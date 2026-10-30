@@ -3,32 +3,47 @@ import type { Json } from '@/integrations/supabase/types';
 import { normalizar } from '@/lib/nfe';
 
 /**
- * Pedido de material dos postos (migration 20261030120000_pedidos_material).
- * O líder pede pelo link público; a aprovação, a compra e os relatórios ficam
- * nas telas do sistema. Escritas de pedido/compra só pelas funções do banco.
+ * Pedidos — materiais de limpeza (migration 20261030120000_pedidos_material).
+ * O encarregado pede pelo link público; conferência, orçamento, aprovação do
+ * excesso de teto, faturamento e relatórios ficam nas telas do sistema.
+ * Mudança de etapa só pelas funções do banco.
  */
 
-// ---------- Rótulos ----------
+// ---------- Papéis e etapas ----------
 
-export type Nivel = 'supervisor' | 'gerente' | 'diretor' | 'compras';
-export const NIVEIS: { valor: Nivel; rotulo: string }[] = [
-  { valor: 'supervisor', rotulo: 'Supervisor' },
-  { valor: 'gerente', rotulo: 'Gerente' },
-  { valor: 'diretor', rotulo: 'Diretor' },
-  { valor: 'compras', rotulo: 'Compras' },
+export type Papel = 'supervisor' | 'compras' | 'comercial' | 'gerencia';
+export const PAPEIS: { valor: Papel; rotulo: string; descricao: string }[] = [
+  { valor: 'supervisor', rotulo: 'Supervisor', descricao: 'confere o material, ajusta quantidades ou devolve ao encarregado' },
+  { valor: 'compras', rotulo: 'Compras', descricao: 'orça, fatura e mantém itens, tabela de preços e tetos' },
+  { valor: 'comercial', rotulo: 'Comercial', descricao: 'aprova ou reprova pedido que excede o teto' },
+  { valor: 'gerencia', rotulo: 'Gerência', descricao: 'vê tudo do estado, aprova excesso e pode cancelar' },
 ];
-export const rotuloNivel = (n: string | null | undefined) => NIVEIS.find(x => x.valor === n)?.rotulo ?? n ?? '';
+export const rotuloPapel = (p: string | null | undefined) => PAPEIS.find(x => x.valor === p)?.rotulo ?? (p === 'encarregado' ? 'Encarregado' : p ?? '');
 
-export type StatusPedido = 'em_aprovacao' | 'aprovado' | 'comprado' | 'reprovado' | 'cancelado';
+export type StatusPedido = 'enviada' | 'devolvida' | 'em_orcamento' | 'aguardando_aprovacao' | 'a_faturar' | 'faturada' | 'reprovada' | 'cancelada';
 export const STATUS_PEDIDO: Record<StatusPedido, string> = {
-  em_aprovacao: 'Em aprovação',
-  aprovado: 'Aprovado (aguardando compra)',
-  comprado: 'Comprado',
-  reprovado: 'Reprovado',
-  cancelado: 'Cancelado',
+  enviada: 'Aguardando conferência',
+  devolvida: 'Devolvida ao encarregado',
+  em_orcamento: 'Em orçamento',
+  aguardando_aprovacao: 'Aguardando aprovação do excesso',
+  a_faturar: 'A faturar',
+  faturada: 'Faturada',
+  reprovada: 'Reprovada',
+  cancelada: 'Cancelada',
 };
-export const statusComNivel = (status: string, nivel: string | null) =>
-  status === 'em_aprovacao' && nivel ? `Aguardando ${rotuloNivel(nivel).toLowerCase()}` : STATUS_PEDIDO[status as StatusPedido] ?? status;
+/** Quem age em cada status (igual a _pm_responsaveis no banco). */
+export const RESPONSAVEIS: Partial<Record<StatusPedido, Papel[]>> = {
+  enviada: ['supervisor'], em_orcamento: ['compras'], aguardando_aprovacao: ['comercial', 'gerencia'], a_faturar: ['compras'],
+};
+/** Filas de trabalho, na ordem do fluxo. */
+export const FILAS: { status: StatusPedido; rotulo: string }[] = [
+  { status: 'enviada', rotulo: 'Conferência' },
+  { status: 'em_orcamento', rotulo: 'Orçamento' },
+  { status: 'aguardando_aprovacao', rotulo: 'Aprovação do excesso' },
+  { status: 'a_faturar', rotulo: 'Faturamento' },
+];
+/** Etapas da linha do tempo (sem desvios). */
+export const ETAPAS: StatusPedido[] = ['enviada', 'em_orcamento', 'aguardando_aprovacao', 'a_faturar', 'faturada'];
 
 export type Frequencia = 'unica' | 'diaria' | 'semanal' | 'quinzenal' | 'mensal';
 export const FREQUENCIAS: { valor: Frequencia; rotulo: string }[] = [
@@ -43,15 +58,14 @@ export const rotuloFrequencia = (f: string) => FREQUENCIAS.find(x => x.valor ===
 const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 export const formatarMoeda = (v: number | null | undefined) => (v == null ? '—' : moeda.format(v));
 export const formatarNumero = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
-export const numeroPedido = (n: number) => `PM-${String(n).padStart(6, '0')}`;
 export const dataBr = (iso: string | null | undefined) =>
   iso ? new Date(iso.length === 10 ? iso + 'T00:00:00' : iso).toLocaleDateString('pt-BR') : '';
 
 // ---------- Cálculos (puros, testados em src/test/pedidosMaterial.test.ts) ----------
 
-/** Valor que conta no teto: o real da compra quando houver, senão o estimado. */
-export const valorDoPedido = (p: { valor_real: number | null; valor_estimado: number }) =>
-  Number(p.valor_real ?? p.valor_estimado);
+/** Valor que conta no teto: nota, senão orçado, senão estimado (igual a _pm_valor). */
+export const valorDoPedido = (p: { valor_real: number | null; valor_orcado?: number | null; valor_estimado: number }) =>
+  Number(p.valor_real ?? p.valor_orcado ?? p.valor_estimado);
 
 /** Primeiro dia do mês (AAAA-MM-01) de uma data AAAA-MM-DD. */
 export const inicioDoMes = (data: string) => data.slice(0, 8) + '01';
@@ -108,7 +122,7 @@ function rotuloPeriodo(chave: string, ag: Agrupamento): string {
  * teto do mês do período.
  */
 export function serieGastos(
-  pedidos: { data_aprovacao: string | null; valor_real: number | null; valor_estimado: number }[],
+  pedidos: { data_aprovacao: string | null; valor_real: number | null; valor_orcado?: number | null; valor_estimado: number }[],
   inicio: string, fim: string, ag: Agrupamento,
   teto: (mes: string) => number | null,
 ): PontoSerie[] {
@@ -138,7 +152,7 @@ export const ROTULO_VARIACAO: Record<TipoVariacao, string> = {
   aumentou: 'Aumentou', manteve: 'Mesmo preço', baixou: 'Baixou', primeira: 'Primeira compra',
 };
 
-/** Compara o preço com a compra anterior (centavos de real, 4 casas como no banco). */
+/** Compara o preço com a compra anterior (4 casas, como no banco). */
 export function classificarVariacao(atual: number, anterior: number | null): { tipo: TipoVariacao; percentual: number | null } {
   if (anterior == null) return { tipo: 'primeira', percentual: null };
   const a = Math.round(Number(atual) * 10000);
@@ -148,10 +162,14 @@ export function classificarVariacao(atual: number, anterior: number | null): { t
   return { tipo: a > b ? 'aumentou' : 'baixou', percentual };
 }
 
+/** Variação do orçado em relação à tabela, em % (null sem os dois preços). */
+export const variacaoTabela = (orcado: number | null | undefined, tabela: number | null | undefined) =>
+  orcado == null || tabela == null || Number(tabela) === 0 ? null : Math.round(((Number(orcado) - Number(tabela)) / Number(tabela)) * 10000) / 100;
+
 /**
- * Material do catálogo mais parecido com a descrição da nota: todas as
- * palavras do nome do material aparecem na descrição (o nome mais longo
- * vence). Sem isso, nenhuma sugestão — melhor deixar em branco que errar.
+ * Item do catálogo mais parecido com a descrição da nota: todas as palavras
+ * do nome aparecem na descrição (o nome mais longo vence). Sem isso, nenhuma
+ * sugestão — melhor deixar em branco que errar.
  */
 export function sugerirMaterial(descricao: string, materiais: { id: string; nome: string; ativo?: boolean }[]): string | null {
   const desc = ` ${normalizar(descricao)} `;
@@ -172,18 +190,37 @@ export function converterEmbalagem(qtdNota: number, valorNota: number, fator: nu
   return { quantidade: Math.round(qtdNota * f * 100) / 100, valor_unitario: Math.round((valorNota / f) * 10000) / 10000 };
 }
 
+// ---------- Catálogo ----------
+
+export interface Material {
+  id: string; nome: string; item_pai_id: string | null; unidade: string; categoria: string | null; is_epi: boolean; ativo: boolean;
+}
+
+/** "Detergente — 500 ml" para variação; o nome para item sem pai (igual a _pm_nome_material). */
+export function nomeMaterial(m: Pick<Material, 'nome' | 'item_pai_id'> | undefined, todos: Pick<Material, 'id' | 'nome'>[]): string {
+  if (!m) return '—';
+  const pai = m.item_pai_id ? todos.find(x => x.id === m.item_pai_id) : undefined;
+  return pai ? `${pai.nome} — ${m.nome}` : m.nome;
+}
+
+/** Itens que podem ser pedidos/orçados: ativos e sem variações ativas (o pai só agrupa). */
+export const materiaisPediveis = (todos: Material[]) => todos.filter(m => m.ativo
+  && (!m.item_pai_id || todos.some(p => p.id === m.item_pai_id && p.ativo))
+  && !todos.some(f => f.item_pai_id === m.id && f.ativo));
+
 // ---------- Link público ----------
 
 export type Solicitante = { matricula: number; cpf?: undefined } | { cpf: string; matricula?: undefined };
 const soDigitos = (v: string) => v.replace(/\D/g, '');
 const solicitanteArgs = (s: Solicitante) => ({ _matricula: s.matricula ?? null, _cpf: s.cpf ? soDigitos(s.cpf) : null });
 
-export interface MaterialPublico { id: string; nome: string; unidade: string; categoria: string | null }
+export interface MaterialPublico { id: string; nome: string; unidade: string; categoria: string | null; grupo: string | null }
+export interface PostoPublico { id: string; nome: string; uf: string; sob_demanda: boolean; itens: string[] | null }
 export interface PedidoDoSolicitante {
-  id: string; numero: number; status: StatusPedido; nivel_atual: string | null; data_pedido: string;
-  criado_em: string; recorrente: boolean; posto: string; observacao: string | null;
-  itens: { nome: string; unidade: string; quantidade: number; quantidade_pedida: number }[] | null;
-  andamento: { nivel: string; decisao: 'aprovado' | 'reprovado'; em: string; comentario: string | null }[] | null;
+  id: string; codigo: string; status: StatusPedido; data_pedido: string; criado_em: string; posto_id: string;
+  recorrente: boolean; posto: string; observacao: string | null;
+  itens: { material_id: string; nome: string; unidade: string; quantidade: number; quantidade_pedida: number }[] | null;
+  historico: { status: StatusPedido; em: string; comentario: string | null }[] | null;
 }
 export interface RecorrenciaDoSolicitante {
   id: string; frequencia: Frequencia; proxima_data: string; posto: string;
@@ -191,13 +228,17 @@ export interface RecorrenciaDoSolicitante {
 }
 export interface Identificado {
   nome: string; cargo: string | null; uf: string | null; posto_sugerido: string | null;
-  postos: { id: string; nome: string; uf: string }[];
+  postos: PostoPublico[];
   materiais: MaterialPublico[];
   pedidos: PedidoDoSolicitante[];
   recorrencias: RecorrenciaDoSolicitante[];
 }
+export const nomePublico = (m: MaterialPublico) => (m.grupo ? `${m.grupo} — ${m.nome}` : m.nome);
+/** Catálogo do posto: posto sob demanda só vê os itens liberados. */
+export const catalogoDoPosto = (materiais: MaterialPublico[], posto: PostoPublico | undefined) =>
+  !posto?.sob_demanda ? materiais : materiais.filter(m => (posto.itens ?? []).includes(m.id));
 
-type FuncaoPublica = 'pedido_material_identificar' | 'pedido_material_enviar' | 'pedido_material_cancelar';
+type FuncaoPublica = 'pedido_material_identificar' | 'pedido_material_enviar' | 'pedido_material_cancelar' | 'pedido_material_reenviar';
 async function chamarPublica<T>(fn: FuncaoPublica, args: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.rpc(fn, args as never);
   if (error) throw new Error(error.message?.includes('Failed to fetch') ? 'Sem conexão com o servidor. Verifique a internet.' : error.message);
@@ -211,31 +252,42 @@ export const identificar = (s: Solicitante) => chamarPublica<Identificado>('pedi
 export const enviarPedido = (s: Solicitante, dados: {
   telefone: string; postoId: string; itens: { material_id: string; quantidade: number }[];
   observacao: string; frequencia: Frequencia;
-}) => chamarPublica<{ ok: true; numero: number; recorrente: boolean }>('pedido_material_enviar', {
+}) => chamarPublica<{ ok: true; codigo: string; recorrente: boolean }>('pedido_material_enviar', {
   ...solicitanteArgs(s), _telefone: soDigitos(dados.telefone), _posto_id: dados.postoId,
   _itens: dados.itens, _observacao: dados.observacao || null, _frequencia: dados.frequencia,
 });
 
+export const reenviarPedido = (s: Solicitante, pedidoId: string, itens: { material_id: string; quantidade: number }[], observacao: string) =>
+  chamarPublica<{ ok: true }>('pedido_material_reenviar', {
+    ...solicitanteArgs(s), _pedido_id: pedidoId, _itens: itens, _observacao: observacao || null,
+  });
+
 export const cancelarPedidoPublico = (s: Solicitante, alvo: { pedidoId?: string; recorrenciaId?: string }) =>
-  chamarPublica<{ ok: true; pedidos: PedidoDoSolicitante[] }>('pedido_material_cancelar', {
+  chamarPublica<{ ok: true }>('pedido_material_cancelar', {
     ...solicitanteArgs(s), _pedido_id: alvo.pedidoId ?? null, _recorrencia_id: alvo.recorrenciaId ?? null,
   });
 
 // ---------- Telas do sistema ----------
 
-export interface Material { id: string; nome: string; unidade: string; categoria: string | null; preco_referencia: number | null; ativo: boolean }
-export interface ItemPedido { id: string; pedido_id: string; material_id: string; quantidade: number; quantidade_pedida: number; preco_estimado: number | null }
-export interface Aprovacao { id: string; pedido_id: string; nivel: string; decisao: 'aprovado' | 'reprovado'; comentario: string | null; valor_no_momento: number | null; saldo_teto_no_momento: number | null; usuario_nome: string | null; created_at: string }
+export interface ItemPedido {
+  id: string; pedido_id: string; material_id: string; quantidade_pedida: number; quantidade: number;
+  preco_ref: number | null; preco_orcado: number | null;
+}
+export interface EventoPedido {
+  id: string; pedido_id: string; de_status: StatusPedido | null; para_status: StatusPedido; papel: string | null;
+  comentario: string | null; payload: { ajustes?: { item: string; de: number; para: number }[]; teto?: number | null; consumido?: number; valor_orcado?: number } | null;
+  usuario_nome: string | null; created_at: string;
+}
 export interface Compra { id: string; pedido_id: string | null; fornecedor_nome: string; fornecedor_cnpj: string | null; numero_nf: string | null; data_compra: string; observacao: string | null }
 export interface CompraItem { id: string; compra_id: string; material_id: string; quantidade: number; valor_unitario: number }
 export interface Pedido {
-  id: string; numero: number; posto_id: string; uf: string; recorrencia_id: string | null; data_pedido: string;
-  status: StatusPedido; nivel_atual: Nivel | null; niveis: Nivel[]; valor_estimado: number; valor_real: number | null;
-  acima_do_teto: boolean; sem_preco: boolean; data_aprovacao: string | null; aprovado_em: string | null;
+  id: string; codigo: string; ano: number; numero: number; posto_id: string; uf: string; recorrencia_id: string | null;
+  data_pedido: string; status: StatusPedido; valor_estimado: number; valor_orcado: number | null; valor_real: number | null;
+  excede_teto: boolean; sem_preco: boolean; tem_epi: boolean; data_aprovacao: string | null; faturada_em: string | null;
   observacao: string | null; solicitante_nome: string; solicitante_matricula: string | null;
   solicitante_cargo: string | null; solicitante_telefone: string | null; created_at: string;
 }
-export interface PedidoCompleto extends Pedido { itens: ItemPedido[]; aprovacoes: Aprovacao[]; compras: (Compra & { itens: CompraItem[] })[] }
+export interface PedidoCompleto extends Pedido { itens: ItemPedido[]; eventos: EventoPedido[]; compras: (Compra & { itens: CompraItem[] })[] }
 
 const num = <T extends Record<string, unknown>>(r: T, campos: (keyof T)[]) => {
   const c = { ...r };
@@ -243,31 +295,33 @@ const num = <T extends Record<string, unknown>>(r: T, campos: (keyof T)[]) => {
   return c;
 };
 
-/** Pedidos (com itens, aprovações e compras) criados ou aprovados desde `desde`, mais todos os em aberto. */
+const ABERTOS: StatusPedido[] = ['enviada', 'devolvida', 'em_orcamento', 'aguardando_aprovacao', 'a_faturar'];
+
+/** Pedidos (com itens, histórico e compras) criados ou aprovados desde `desde`, mais todos os em aberto. */
 export async function listPedidos(desde: string): Promise<PedidoCompleto[]> {
   // Recorrências vencidas viram pedidos antes de listar.
   await supabase.rpc('gerar_pedidos_recorrentes').then(() => undefined, () => undefined);
   const { data, error } = await supabase.from('pedidos_material').select('*')
-    .or(`data_pedido.gte.${desde},data_aprovacao.gte.${desde},status.in.(em_aprovacao,aprovado)`)
+    .or(`data_pedido.gte.${desde},data_aprovacao.gte.${desde},status.in.(${ABERTOS.join(',')})`)
     .order('created_at', { ascending: false }).limit(5000);
   if (error) throw error;
-  const pedidos = (data ?? []).map(p => num(p, ['numero', 'valor_estimado', 'valor_real'])) as unknown as Pedido[];
+  const pedidos = (data ?? []).map(p => num(p, ['valor_estimado', 'valor_orcado', 'valor_real'])) as unknown as Pedido[];
   const ids = pedidos.map(p => p.id);
   const itens: ItemPedido[] = [];
-  const aprovacoes: Aprovacao[] = [];
+  const eventos: EventoPedido[] = [];
   const compras: Compra[] = [];
   for (let i = 0; i < ids.length; i += 200) {
     const lote = ids.slice(i, i + 200);
-    const [it, ap, co] = await Promise.all([
+    const [it, ev, co] = await Promise.all([
       supabase.from('pedidos_material_itens').select('*').in('pedido_id', lote),
-      supabase.from('pedido_aprovacoes').select('*').in('pedido_id', lote).order('created_at'),
+      supabase.from('pedido_eventos').select('*').in('pedido_id', lote).order('created_at'),
       supabase.from('material_compras').select('*').in('pedido_id', lote).order('data_compra'),
     ]);
     if (it.error) throw it.error;
-    if (ap.error) throw ap.error;
+    if (ev.error) throw ev.error;
     if (co.error) throw co.error;
-    itens.push(...(it.data ?? []).map(x => num(x, ['quantidade', 'quantidade_pedida', 'preco_estimado'])) as ItemPedido[]);
-    aprovacoes.push(...(ap.data ?? []).map(x => num(x, ['valor_no_momento', 'saldo_teto_no_momento'])) as Aprovacao[]);
+    itens.push(...(it.data ?? []).map(x => num(x, ['quantidade', 'quantidade_pedida', 'preco_ref', 'preco_orcado'])) as ItemPedido[]);
+    eventos.push(...(ev.data ?? []) as unknown as EventoPedido[]);
     compras.push(...(co.data ?? []) as Compra[]);
   }
   const compraItens: CompraItem[] = [];
@@ -280,29 +334,43 @@ export async function listPedidos(desde: string): Promise<PedidoCompleto[]> {
   return pedidos.map(p => ({
     ...p,
     itens: itens.filter(i => i.pedido_id === p.id),
-    aprovacoes: aprovacoes.filter(a => a.pedido_id === p.id),
+    eventos: eventos.filter(e => e.pedido_id === p.id),
     compras: compras.filter(c => c.pedido_id === p.id).map(c => ({ ...c, itens: compraItens.filter(i => i.compra_id === c.id) })),
   }));
 }
 
-/** Pedidos aprovados (para teto e gráficos) com data de aprovação no período. */
+/** Pedidos que contam no teto (a faturar ou faturados) com data de aprovação no período. */
 export async function listGastos(inicio: string, fim: string) {
   const { data, error } = await supabase.from('pedidos_material')
-    .select('id, posto_id, uf, data_aprovacao, valor_estimado, valor_real')
-    .in('status', ['aprovado', 'comprado']).gte('data_aprovacao', inicio).lte('data_aprovacao', fim).limit(20000);
+    .select('id, posto_id, uf, data_aprovacao, valor_estimado, valor_orcado, valor_real')
+    .in('status', ['a_faturar', 'faturada']).gte('data_aprovacao', inicio).lte('data_aprovacao', fim).limit(20000);
   if (error) throw error;
-  return (data ?? []).map(p => num(p, ['valor_estimado', 'valor_real'])) as
-    { id: string; posto_id: string; uf: string; data_aprovacao: string; valor_estimado: number; valor_real: number | null }[];
+  return (data ?? []).map(p => num(p, ['valor_estimado', 'valor_orcado', 'valor_real'])) as
+    { id: string; posto_id: string; uf: string; data_aprovacao: string; valor_estimado: number; valor_orcado: number | null; valor_real: number | null }[];
 }
 
-export async function decidirPedido(pedidoId: string, aprovar: boolean, comentario: string, quantidades?: { item_id: string; quantidade: number }[]) {
-  const { data, error } = await supabase.rpc('pedido_material_decidir', {
-    _pedido_id: pedidoId, _aprovar: aprovar, _comentario: comentario.trim() || null,
-    _quantidades: quantidades?.length ? (quantidades as unknown as Json) : null,
-  });
+async function rpcFluxo<T>(fn: 'pedido_material_conferir' | 'pedido_material_orcar' | 'pedido_material_aprovar_excesso' | 'pedido_material_cancelar_interno', args: Record<string, unknown>) {
+  const { data, error } = await supabase.rpc(fn, args as never);
   if (error) throw new Error(error.message);
-  return data as { status: StatusPedido; nivel_atual: Nivel | null };
+  return data as T;
 }
+
+export const conferirPedido = (pedidoId: string, conferido: boolean, comentario: string, quantidades?: { item_id: string; quantidade: number }[]) =>
+  rpcFluxo<{ status: StatusPedido; excede_teto?: boolean }>('pedido_material_conferir', {
+    _pedido_id: pedidoId, _conferido: conferido, _comentario: comentario.trim() || null,
+    _quantidades: quantidades?.length ? quantidades : null,
+  });
+
+export const orcarPedido = (pedidoId: string, precos: { item_id: string; preco: number }[], comentario: string) =>
+  rpcFluxo<{ status: StatusPedido; valor_orcado: number; teto: number | null; consumido: number }>('pedido_material_orcar', {
+    _pedido_id: pedidoId, _precos: precos.map(p => ({ ...p, preco: Math.round(p.preco * 10000) / 10000 })), _comentario: comentario.trim() || null,
+  });
+
+export const aprovarExcesso = (pedidoId: string, aprovar: boolean, comentario: string) =>
+  rpcFluxo<{ status: StatusPedido }>('pedido_material_aprovar_excesso', { _pedido_id: pedidoId, _aprovar: aprovar, _comentario: comentario.trim() });
+
+export const cancelarPedido = (pedidoId: string, motivo: string) =>
+  rpcFluxo<{ status: StatusPedido }>('pedido_material_cancelar_interno', { _pedido_id: pedidoId, _motivo: motivo.trim() });
 
 export interface ItemCompra {
   material_id: string; quantidade: number; valor_unitario: number;
@@ -322,7 +390,7 @@ export async function registrarCompra(dados: {
   return data as string;
 }
 
-/** O que as notas anteriores do fornecedor ensinaram: código do produto -> material e embalagem. */
+/** O que as notas anteriores do fornecedor ensinaram: código do produto -> item e embalagem. */
 export async function codigosDoFornecedor(cnpj: string): Promise<Map<string, { material_id: string; fator: number }>> {
   const { data, error } = await supabase.from('material_codigos_fornecedor')
     .select('codigo_fornecedor, material_id, fator').eq('fornecedor_cnpj', cnpj);
@@ -339,20 +407,39 @@ export async function minhasPendencias(): Promise<number> {
 // ---------- Cadastro ----------
 
 export async function listMateriais(): Promise<Material[]> {
-  const { data, error } = await supabase.from('materiais').select('id, nome, unidade, categoria, preco_referencia, ativo').order('nome');
+  const { data, error } = await supabase.from('materiais').select('id, nome, item_pai_id, unidade, categoria, is_epi, ativo').order('nome');
   if (error) throw error;
-  return (data ?? []).map(m => num(m, ['preco_referencia'])) as Material[];
+  return (data ?? []) as Material[];
 }
 
 export async function salvarMaterial(m: Partial<Material> & { nome: string }) {
   const payload = {
-    nome: m.nome.trim(), unidade: (m.unidade ?? 'un').trim() || 'un', categoria: m.categoria?.trim() || null,
-    preco_referencia: m.preco_referencia ?? null, ativo: m.ativo ?? true,
+    nome: m.nome.trim(), item_pai_id: m.item_pai_id || null, unidade: (m.unidade ?? 'un').trim() || 'un',
+    categoria: m.categoria?.trim() || null, is_epi: !!m.is_epi, ativo: m.ativo ?? true,
   };
   const { error } = m.id
     ? await supabase.from('materiais').update(payload).eq('id', m.id)
     : await supabase.from('materiais').insert(payload);
-  if (error) throw new Error(error.code === '23505' ? 'Já existe um material com esse nome.' : error.message);
+  if (error) throw new Error(error.code === '23505' ? 'Já existe um item com esse nome (no mesmo grupo).' : error.message);
+}
+
+export async function listItensPorPosto(): Promise<{ posto_id: string; material_id: string }[]> {
+  const { data, error } = await supabase.from('posto_materiais').select('posto_id, material_id');
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** Marca o posto como sob demanda (ou não) e grava a lista de itens liberados. */
+export async function salvarPostoSobDemanda(postoId: string, sobDemanda: boolean, materialIds: string[]) {
+  const { data, error } = await supabase.from('postos').update({ sob_demanda: sobDemanda }).eq('id', postoId).select('id');
+  if (error) throw new Error(error.message);
+  if (!data?.length) throw new Error('Sem permissão para alterar o posto (precisa editar Configurações).');
+  const { error: e1 } = await supabase.from('posto_materiais').delete().eq('posto_id', postoId);
+  if (e1) throw new Error(e1.message);
+  if (sobDemanda && materialIds.length) {
+    const { error: e2 } = await supabase.from('posto_materiais').insert(materialIds.map(material_id => ({ posto_id: postoId, material_id })));
+    if (e2) throw new Error(e2.message);
+  }
 }
 
 export async function listTetos(): Promise<(TetoPosto & { id: string })[]> {
@@ -374,19 +461,7 @@ export async function excluirTeto(id: string) {
   if (error) throw new Error(error.message);
 }
 
-export async function listAlcadas() {
-  const { data, error } = await supabase.from('pedido_alcadas').select('nivel, ordem, valor_acima_de').order('ordem');
-  if (error) throw error;
-  return (data ?? []).map(a => num(a, ['valor_acima_de'])) as { nivel: Nivel; ordem: number; valor_acima_de: number | null }[];
-}
-
-export async function salvarAlcada(nivel: Nivel, valorAcimaDe: number | null) {
-  const { data, error } = await supabase.from('pedido_alcadas').update({ valor_acima_de: valorAcimaDe }).eq('nivel', nivel).select('nivel');
-  if (error) throw new Error(error.message);
-  if (!data?.length) throw new Error('Sem permissão para alterar a alçada.');
-}
-
-export interface Aprovador { id: string; user_id: string; nivel: Nivel; uf: string; postos: string[] }
+export interface Aprovador { id: string; user_id: string; nivel: Papel; uf: string; postos: string[] }
 
 export async function listAprovadores(): Promise<Aprovador[]> {
   const { data, error } = await supabase.from('pedido_aprovadores').select('id, user_id, nivel, uf, postos');
@@ -394,7 +469,7 @@ export async function listAprovadores(): Promise<Aprovador[]> {
   return (data ?? []) as Aprovador[];
 }
 
-export async function salvarAprovador(a: { user_id: string; nivel: Nivel; uf: string; postos: string[] }) {
+export async function salvarAprovador(a: { user_id: string; nivel: Papel; uf: string; postos: string[] }) {
   const { error } = await supabase.from('pedido_aprovadores').upsert(a, { onConflict: 'user_id,nivel,uf' });
   if (error) throw new Error(error.message);
 }
@@ -410,24 +485,89 @@ export async function listUsuarios(): Promise<{ id: string; nome: string; email:
   return (data ?? []).map(p => ({ id: p.id, nome: p.nome_completo || p.email || p.id, email: p.email }));
 }
 
-export interface ConfigAvisos { avisar_email: boolean; link_sistema: string | null }
+// ---------- Tabela de preços ----------
+
+export interface TabelaPrecos {
+  id: string; nome: string; status: 'rascunho' | 'vigente' | 'encerrada';
+  vigencia_inicio: string | null; vigencia_fim: string | null; publicada_em: string | null; created_at: string;
+}
+
+export async function listTabelas(): Promise<TabelaPrecos[]> {
+  const { data, error } = await supabase.from('tabela_precos').select('*').order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as TabelaPrecos[];
+}
+
+export async function precosDaTabela(tabelaId: string): Promise<Map<string, number>> {
+  const { data, error } = await supabase.from('tabela_precos_itens').select('material_id, preco').eq('tabela_id', tabelaId);
+  if (error) throw error;
+  return new Map((data ?? []).map(i => [i.material_id, Number(i.preco)]));
+}
+
+/** Preços da tabela vigente (para o orçamento comparar). */
+export async function precosVigentes(): Promise<Map<string, number>> {
+  const { data } = await supabase.from('tabela_precos').select('id').eq('status', 'vigente').maybeSingle();
+  return data ? precosDaTabela(data.id) : new Map();
+}
+
+export async function novaTabela(nome: string): Promise<string> {
+  const { data, error } = await supabase.rpc('nova_tabela_precos', { _nome: nome });
+  if (error) throw new Error(error.message);
+  return data as string;
+}
+
+/** Grava os preços do rascunho (preço vazio tira o item da tabela). */
+export async function salvarPrecos(tabelaId: string, precos: Map<string, number | null>) {
+  const apagar = [...precos].filter(([, v]) => v == null).map(([k]) => k);
+  const gravar = [...precos].filter(([, v]) => v != null).map(([material_id, preco]) => ({ tabela_id: tabelaId, material_id, preco: preco as number }));
+  if (apagar.length) {
+    const { error } = await supabase.from('tabela_precos_itens').delete().eq('tabela_id', tabelaId).in('material_id', apagar);
+    if (error) throw new Error(error.message);
+  }
+  if (gravar.length) {
+    const { error } = await supabase.from('tabela_precos_itens').upsert(gravar, { onConflict: 'tabela_id,material_id' });
+    if (error) throw new Error(error.message);
+  }
+}
+
+export async function excluirTabela(id: string) {
+  const { error } = await supabase.from('tabela_precos').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+export async function publicarTabela(id: string, inicio: string) {
+  const { error } = await supabase.rpc('publicar_tabela_precos', { _tabela_id: id, _inicio: inicio });
+  if (error) throw new Error(error.message);
+}
+
+export interface Simulacao { posto_id: string; posto: string; uf: string; teto: number | null; media_atual: number; media_nova: number; excede: boolean }
+
+export async function simularTabela(id: string): Promise<Simulacao[]> {
+  const { data, error } = await supabase.rpc('simular_tabela_precos', { _tabela_id: id });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Simulacao[]).map(s => num(s as unknown as Record<string, unknown>, ['teto', 'media_atual', 'media_nova']) as unknown as Simulacao);
+}
+
+// ---------- Avisos ----------
+
+export interface ConfigAvisos { avisar_email: boolean; link_sistema: string | null; emails_epi: string[] }
 
 export async function lerConfigAvisos(): Promise<ConfigAvisos> {
-  const { data, error } = await supabase.from('pedido_config').select('avisar_email, link_sistema').eq('id', 1).maybeSingle();
+  const { data, error } = await supabase.from('pedido_config').select('avisar_email, link_sistema, emails_epi').eq('id', 1).maybeSingle();
   if (error) throw error;
-  return data ?? { avisar_email: true, link_sistema: null };
+  return data ?? { avisar_email: true, link_sistema: null, emails_epi: [] };
 }
 
 export async function salvarConfigAvisos(c: ConfigAvisos) {
   const { data, error } = await supabase.from('pedido_config')
-    .update({ avisar_email: c.avisar_email, link_sistema: c.link_sistema?.trim().replace(/\/+$/, '') || null })
+    .update({ avisar_email: c.avisar_email, link_sistema: c.link_sistema?.trim().replace(/\/+$/, '') || null, emails_epi: c.emails_epi })
     .eq('id', 1).select('id');
   if (error) throw new Error(error.message);
   if (!data?.length) throw new Error('Sem permissão para alterar os avisos.');
 }
 
-/** Roda o aviso aos aprovadores agora (o agendador roda a cada 5 min). */
-export async function avisarAgora(): Promise<{ enviado: boolean; motivo?: string; emails?: number; pedidos?: number; sem_aprovador?: number[]; falhas?: string[] }> {
+/** Roda o aviso agora (o agendador roda a cada 5 min). */
+export async function avisarAgora(): Promise<{ enviado: boolean; motivo?: string; emails?: number; pedidos?: number; sem_destinatario?: string[]; falhas?: string[] }> {
   const { data, error } = await supabase.functions.invoke('avisar-pedidos-material', { body: { modo: 'manual' } });
   if (error) {
     let msg = '';

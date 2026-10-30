@@ -101,7 +101,7 @@ export default function PainelGastos() {
       <div className="max-w-7xl mx-auto space-y-6">
         <BackButton />
         <PageHeader title="Teto de Gastos por Posto" eyebrow="Pedidos"
-          description="Gasto = pedidos aprovados no mês (valor da nota quando já comprado, senão o estimado). Clique em um posto para ver o gráfico." />
+          description="Consumido = pedidos orçados e aprovados no mês (a faturar ou faturados), pelo valor da nota quando já faturado, senão o orçado. Clique em um posto para ver o gráfico." />
 
         <div className="flex flex-wrap items-end gap-3">
           <div>
