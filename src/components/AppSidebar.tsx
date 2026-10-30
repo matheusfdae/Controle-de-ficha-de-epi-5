@@ -95,7 +95,10 @@ export function AppSidebar() {
     };
     atualizar();
     const t = setInterval(atualizar, 5 * 60 * 1000);
-    return () => { vivo = false; clearInterval(t); };
+    // O sino de pedidos confere a cada minuto e avisa a contagem nova.
+    const doSino = (e: Event) => setPendencias((e as CustomEvent<number>).detail);
+    window.addEventListener('pedidos-pendencias', doSino);
+    return () => { vivo = false; clearInterval(t); window.removeEventListener('pedidos-pendencias', doSino); };
   }, [user, pathname]);
   const visiblePedidoItems = pedidoItems.filter(i => (i.action ? can('pedidos_material', i.action) : can('pedidos_material', 'view') || aprovador));
   const showAdminSection = isAdmin || visibleAdminItems.length > 0;

@@ -2508,6 +2508,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      pedidos_material_minhas_tarefas: {
+        Args: Record<PropertyKey, never>
+        Returns: { id: string; codigo: string; status: string; posto: string; uf: string; valor: number; excede_teto: boolean; desde: string }[]
+      }
       pedidos_material_marcar_cobrados: {
         Args: { _ids: string[]; _cobrado: boolean; _referencia: string | null }
         Returns: number

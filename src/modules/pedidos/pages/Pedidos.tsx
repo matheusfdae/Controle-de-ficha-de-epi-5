@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,6 +63,9 @@ export default function Pedidos() {
   const [statusFiltro, setStatusFiltro] = useState('todos');
   const [busca, setBusca] = useState('');
   const [aberto, setAberto] = useState<string | null>(null);
+  // Vindo do sino de pedidos (/pedidos?pedido=<id>): abre o pedido direto.
+  const [params, setParams] = useSearchParams();
+  const pedidoDaUrl = params.get('pedido');
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -80,6 +84,16 @@ export default function Pedidos() {
   }, [periodo]);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  const [recarregouPara, setRecarregouPara] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pedidoDaUrl || carregando) return;
+    if (pedidos.some(p => p.id === pedidoDaUrl)) setAberto(pedidoDaUrl);
+    // Pedido que chegou depois de a lista carregar: recarrega uma vez antes de desistir.
+    else if (recarregouPara !== pedidoDaUrl) { setRecarregouPara(pedidoDaUrl); carregar(); return; }
+    else toast.info('Este pedido não está mais na sua lista.');
+    setParams(p => { p.delete('pedido'); return p; }, { replace: true });
+  }, [pedidoDaUrl, carregando, pedidos, setParams, recarregouPara, carregar]);
 
   const nomePosto = useCallback((id: string) => postos.find(p => p.id === id)?.nome ?? '—', [postos]);
   const meus = useMemo(() => aprovadores.filter(a => a.user_id === user?.id), [aprovadores, user?.id]);
@@ -221,7 +235,7 @@ export default function Pedidos() {
           minhaVez={minhaVez(pedidoAberto)}
           podeCancelar={!['faturada', 'cancelada', 'reprovada'].includes(pedidoAberto.status) && temPapel(['compras', 'gerencia'], pedidoAberto)}
           podeFaturar={['a_faturar', 'faturada'].includes(pedidoAberto.status) && (temPapel(['compras'], pedidoAberto) || can('pedidos_material', 'create'))}
-          onFechar={() => setAberto(null)} onAtualizado={async () => { setAberto(null); await carregar(); }} />
+          onFechar={() => setAberto(null)} onAtualizado={async () => { setAberto(null); await carregar(); window.dispatchEvent(new Event('pedidos-atualizados')); }} />
       )}
     </div>
   );

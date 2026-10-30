@@ -994,6 +994,23 @@ BEGIN
   RETURN jsonb_build_object('status', 'cancelada');
 END $$;
 
+-- Pedidos que esperam o usuário atual, com a etapa (sino e avisos na tela).
+-- desde = quando o pedido entrou na etapa atual.
+CREATE OR REPLACE FUNCTION public.pedidos_material_minhas_tarefas()
+RETURNS TABLE (id uuid, codigo text, status text, posto text, uf text, valor numeric, excede_teto boolean, desde timestamptz)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT p.id, p.codigo, p.status, po.nome, p.uf, public._pm_valor(p), p.excede_teto,
+    coalesce((SELECT max(e.created_at) FROM pedido_eventos e WHERE e.pedido_id = p.id AND e.para_status = p.status), p.created_at)
+  FROM pedidos_material p JOIN postos po ON po.id = p.posto_id
+  WHERE cardinality(public._pm_responsaveis(p.status)) > 0
+    AND EXISTS (SELECT 1 FROM pedido_aprovadores a
+                WHERE a.user_id = public.current_profile_id() AND a.uf = p.uf
+                  AND a.nivel = ANY (public._pm_responsaveis(p.status))
+                  AND (a.postos = '{}' OR p.posto_id = ANY (a.postos)))
+  ORDER BY 8 DESC
+  LIMIT 200
+$$;
+
 -- Cobrança ao cliente (postos sob demanda): marca ou desmarca pedidos
 -- faturados como já cobrados, com a referência da fatura/nota ao cliente.
 CREATE OR REPLACE FUNCTION public.pedidos_material_marcar_cobrados(_ids uuid[], _cobrado boolean, _referencia text)
@@ -1259,7 +1276,7 @@ BEGIN
     'public.material_compra_registrar(uuid, uuid, text, text, date, jsonb, text, text, text)',
     'public.nova_tabela_precos(text)', 'public.publicar_tabela_precos(uuid, date)',
     'public.simular_tabela_precos(uuid)', 'public.pedidos_material_minhas_pendencias()',
-    'public.pedidos_material_marcar_cobrados(uuid[], boolean, text)'] LOOP
+    'public.pedidos_material_marcar_cobrados(uuid[], boolean, text)', 'public.pedidos_material_minhas_tarefas()'] LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC, anon', f);
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO authenticated', f);
   END LOOP;

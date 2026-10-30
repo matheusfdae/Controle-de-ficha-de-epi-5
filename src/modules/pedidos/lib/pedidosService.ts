@@ -398,6 +398,22 @@ export function resumoCobranca(linhas: Pick<LinhaCobranca, 'posto_id' | 'valor' 
     .sort((a, b) => b.a_cobrar - a.a_cobrar || b.cobrado - a.cobrado);
 }
 
+export interface Tarefa {
+  id: string; codigo: string; status: StatusPedido; posto: string; uf: string; valor: number; excede_teto: boolean; desde: string;
+}
+
+/** Pedidos que esperam o usuário atual (pelo papel dele), da etapa mais recente para a mais antiga. */
+export async function minhasTarefas(): Promise<Tarefa[]> {
+  const { data, error } = await supabase.rpc('pedidos_material_minhas_tarefas');
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(t => ({ ...t, valor: Number(t.valor) })) as Tarefa[];
+}
+
+/** O que a pessoa precisa fazer com um pedido nesta etapa. */
+export const ACAO_DA_ETAPA: Partial<Record<StatusPedido, string>> = {
+  enviada: 'Conferir', em_orcamento: 'Orçar', aguardando_aprovacao: 'Aprovar o excesso de teto', a_faturar: 'Faturar',
+};
+
 export async function marcarCobrados(ids: string[], cobrado: boolean, referencia: string) {
   const { data, error } = await supabase.rpc('pedidos_material_marcar_cobrados', {
     _ids: ids, _cobrado: cobrado, _referencia: referencia.trim() || null,
