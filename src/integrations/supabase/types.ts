@@ -1094,7 +1094,7 @@ export type Database = {
         Relationships: []
       }
       pedidos_material: {
-        Row: { id: string; ano: number; numero: number; codigo: string; posto_id: string; uf: string; recorrencia_id: string | null; data_pedido: string; status: string; valor_estimado: number; valor_orcado: number | null; valor_real: number | null; excede_teto: boolean; sem_preco: boolean; tem_epi: boolean; data_aprovacao: string | null; faturada_em: string | null; observacao: string | null; notificado_status: string | null; epi_avisado: boolean; solicitante_senior_id: string | null; solicitante_nome: string; solicitante_matricula: string | null; solicitante_cargo: string | null; solicitante_telefone: string | null; created_at: string; updated_at: string }
+        Row: { id: string; ano: number; numero: number; codigo: string; posto_id: string; uf: string; recorrencia_id: string | null; data_pedido: string; status: string; valor_estimado: number; valor_orcado: number | null; valor_real: number | null; excede_teto: boolean; sem_preco: boolean; tem_epi: boolean; data_aprovacao: string | null; faturada_em: string | null; cobrar_cliente: boolean; cobrado_em: string | null; cobrado_por: string | null; cobranca_ref: string | null; observacao: string | null; notificado_status: string | null; epi_avisado: boolean; solicitante_senior_id: string | null; solicitante_nome: string; solicitante_matricula: string | null; solicitante_cargo: string | null; solicitante_telefone: string | null; created_at: string; updated_at: string }
         Insert: { [_ in never]: never }
         Update: { [_ in never]: never }
         Relationships: []
@@ -2506,6 +2506,10 @@ export type Database = {
       }
       pedidos_material_minhas_pendencias: {
         Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      pedidos_material_marcar_cobrados: {
+        Args: { _ids: string[]; _cobrado: boolean; _referencia: string | null }
         Returns: number
       }
       gerar_pedidos_recorrentes: {

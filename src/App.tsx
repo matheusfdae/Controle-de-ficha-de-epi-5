@@ -52,6 +52,7 @@ const PedidoMaterialPublico = lazy(() => import('./modules/pedidos/pages/PedidoM
 const Pedidos             = lazy(() => import('./modules/pedidos/pages/Pedidos'));
 const PedidosPainel       = lazy(() => import('./modules/pedidos/pages/PainelGastos'));
 const PedidosPrecos       = lazy(() => import('./modules/pedidos/pages/RelatorioPrecos'));
+const PedidosCobranca     = lazy(() => import('./modules/pedidos/pages/CobrancaCliente'));
 const PedidosConfig       = lazy(() => import('./modules/pedidos/pages/ConfigPedidos'));
 
 const queryClient = new QueryClient({
@@ -161,6 +162,7 @@ function AppRoutes() {
           <Route path="/pedidos"               element={<Pedidos />} />
           <Route path="/pedidos/painel"        element={<RequireModule module="pedidos_material"><PedidosPainel /></RequireModule>} />
           <Route path="/pedidos/precos"        element={<RequireModule module="pedidos_material"><PedidosPrecos /></RequireModule>} />
+          <Route path="/pedidos/cobranca"      element={<RequireModule module="pedidos_material"><PedidosCobranca /></RequireModule>} />
           <Route path="/pedidos/configuracoes" element={<RequireModule module="pedidos_material"><PedidosConfig /></RequireModule>} />
         </Route>
         <Route path="*" element={<NotFound />} />

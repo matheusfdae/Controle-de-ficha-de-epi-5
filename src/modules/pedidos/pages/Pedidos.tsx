@@ -202,6 +202,7 @@ export default function Pedidos() {
                           <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3 w-3" /> Excede o teto</Badge>
                         )}
                         {p.tem_epi && <Badge variant="outline" className="gap-1"><HardHat className="h-3 w-3" /> EPI</Badge>}
+                        {p.cobrar_cliente && <Badge variant="outline">Cobrar do cliente</Badge>}
                         {p.sem_preco && p.status !== 'faturada' && <Badge variant="outline">Item fora da tabela</Badge>}
                         {minhaVez(p) && <Badge className="bg-primary text-primary-foreground">Sua vez</Badge>}
                       </div>
@@ -257,7 +258,7 @@ function DetalhePedido({ pedido: p, posto, materiais, tabela, saldo, minhaVez, p
   };
   const totalAgora = Math.round(p.itens.reduce((s, i) => s + qtd(i.id, i.quantidade) * (preco(i) ?? 0), 0) * 100) / 100;
   const valorTeto = ['enviada', 'em_orcamento', 'devolvida'].includes(p.status) ? totalAgora : valorDoPedido(p);
-  const excede = saldo.teto != null && saldo.consumido + valorTeto > saldo.teto;
+  const excede = !p.cobrar_cliente && saldo.teto != null && saldo.consumido + valorTeto > saldo.teto;
 
   const agir = async (fn: () => Promise<unknown>, ok: string) => {
     setSalvando(true);
@@ -314,6 +315,7 @@ function DetalhePedido({ pedido: p, posto, materiais, tabela, saldo, minhaVez, p
             <ClipboardList className="h-5 w-5 text-primary" /> {p.codigo}
             <Badge className={`${COR_STATUS[p.status]} border-0`}>{STATUS_PEDIDO[p.status]}</Badge>
             {p.tem_epi && <Badge variant="outline" className="gap-1"><HardHat className="h-3 w-3" /> Tem item de EPI</Badge>}
+            {p.cobrar_cliente && <Badge variant="outline">Cobrar do cliente</Badge>}
           </DialogTitle>
           <DialogDescription>
             {posto} ({p.uf}) · pedido em {dataBr(p.data_pedido)} por {p.solicitante_nome}
@@ -339,13 +341,20 @@ function DetalhePedido({ pedido: p, posto, materiais, tabela, saldo, minhaVez, p
           })}
         </ol>
 
-        <div className="grid gap-3 sm:grid-cols-4 text-sm">
-          <Info rotulo="Teto do mês" valor={saldo.teto == null ? 'Sem teto' : formatarMoeda(saldo.teto)} />
-          <Info rotulo="Consumido no mês (outros)" valor={formatarMoeda(saldo.consumido)} />
-          <Info rotulo={orcando ? 'Este pedido (orçado)' : 'Este pedido'} valor={formatarMoeda(valorTeto)} />
-          <Info rotulo="Saldo depois deste" valor={saldo.teto == null ? '—' : formatarMoeda(saldo.teto - saldo.consumido - valorTeto)}
-            destaque={excede ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400'} />
-        </div>
+        {p.cobrar_cliente ? (
+          <p className="text-sm text-muted-foreground">
+            Posto sob demanda: este pedido é cobrado do cliente pelo custo (valor das notas) e não conta no teto do posto.
+            {p.cobrado_em && ` Cobrado em ${new Date(p.cobrado_em).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}${p.cobranca_ref ? ` (${p.cobranca_ref})` : ''}.`}
+          </p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-4 text-sm">
+            <Info rotulo="Teto do mês" valor={saldo.teto == null ? 'Sem teto' : formatarMoeda(saldo.teto)} />
+            <Info rotulo="Consumido no mês (outros)" valor={formatarMoeda(saldo.consumido)} />
+            <Info rotulo={orcando ? 'Este pedido (orçado)' : 'Este pedido'} valor={formatarMoeda(valorTeto)} />
+            <Info rotulo="Saldo depois deste" valor={saldo.teto == null ? '—' : formatarMoeda(saldo.teto - saldo.consumido - valorTeto)}
+              destaque={excede ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400'} />
+          </div>
+        )}
         {excede && !['faturada', 'cancelada', 'reprovada'].includes(p.status) && (
           <p className="text-sm text-destructive flex items-center gap-1"><AlertTriangle className="h-4 w-4" />
             Provável excesso de teto: depois do orçamento, o pedido vai para a aprovação do comercial/gerência.</p>

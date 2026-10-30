@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  catalogoDoPosto, chavePeriodo, classificarVariacao, materiaisPediveis, nomeMaterial, serieGastos, tetoNoMes,
+  catalogoDoPosto, chavePeriodo, classificarVariacao, materiaisPediveis, nomeMaterial, resumoCobranca, serieGastos, tetoNoMes,
   valorDoPedido, variacaoTabela, type Material,
 } from '@/modules/pedidos/lib/pedidosService';
 
@@ -115,4 +115,16 @@ it('orçado x tabela', () => {
 it('valor que conta no teto: nota, orçado, estimado', () => {
   expect(valorDoPedido({ valor_real: null, valor_orcado: 95, valor_estimado: 100 })).toBe(95);
   expect(valorDoPedido({ valor_real: 90, valor_orcado: 95, valor_estimado: 100 })).toBe(90);
+});
+
+it('cobrança ao cliente: a cobrar e já cobrado por posto', () => {
+  const r = resumoCobranca([
+    { posto_id: 'a', valor: 10.1, cobrado_em: null }, { posto_id: 'a', valor: 20.2, cobrado_em: null },
+    { posto_id: 'b', valor: 100, cobrado_em: '2026-10-30T12:00:00Z' }, { posto_id: 'c', valor: 5, cobrado_em: null },
+  ]);
+  expect(r).toEqual([
+    { posto_id: 'a', pedidos: 2, a_cobrar: 30.3, cobrado: 0 },
+    { posto_id: 'c', pedidos: 1, a_cobrar: 5, cobrado: 0 },
+    { posto_id: 'b', pedidos: 1, a_cobrar: 0, cobrado: 100 },
+  ]);
 });

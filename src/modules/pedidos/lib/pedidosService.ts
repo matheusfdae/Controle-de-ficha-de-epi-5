@@ -284,6 +284,7 @@ export interface Pedido {
   id: string; codigo: string; ano: number; numero: number; posto_id: string; uf: string; recorrencia_id: string | null;
   data_pedido: string; status: StatusPedido; valor_estimado: number; valor_orcado: number | null; valor_real: number | null;
   excede_teto: boolean; sem_preco: boolean; tem_epi: boolean; data_aprovacao: string | null; faturada_em: string | null;
+  cobrar_cliente: boolean; cobrado_em: string | null; cobranca_ref: string | null;
   observacao: string | null; solicitante_nome: string; solicitante_matricula: string | null;
   solicitante_cargo: string | null; solicitante_telefone: string | null; created_at: string;
 }
@@ -339,14 +340,70 @@ export async function listPedidos(desde: string): Promise<PedidoCompleto[]> {
   }));
 }
 
-/** Pedidos que contam no teto (a faturar ou faturados) com data de aprovação no período. */
+/** Pedidos que contam no teto (a faturar ou faturados, fora os cobrados do cliente) com data de aprovação no período. */
 export async function listGastos(inicio: string, fim: string) {
   const { data, error } = await supabase.from('pedidos_material')
     .select('id, posto_id, uf, data_aprovacao, valor_estimado, valor_orcado, valor_real')
-    .in('status', ['a_faturar', 'faturada']).gte('data_aprovacao', inicio).lte('data_aprovacao', fim).limit(20000);
+    .in('status', ['a_faturar', 'faturada']).eq('cobrar_cliente', false)
+    .gte('data_aprovacao', inicio).lte('data_aprovacao', fim).limit(20000);
   if (error) throw error;
   return (data ?? []).map(p => num(p, ['valor_estimado', 'valor_orcado', 'valor_real'])) as
     { id: string; posto_id: string; uf: string; data_aprovacao: string; valor_estimado: number; valor_orcado: number | null; valor_real: number | null }[];
+}
+
+// ---------- Cobrança ao cliente (postos sob demanda) ----------
+
+export interface LinhaCobranca {
+  id: string; codigo: string; posto_id: string; uf: string; data_pedido: string; faturada_em: string;
+  valor: number; cobrado_em: string | null; cobranca_ref: string | null; solicitante_nome: string;
+  notas: { numero_nf: string | null; fornecedor_nome: string; data_compra: string }[];
+}
+
+/** Pedidos faturados de postos sob demanda com faturamento no período (datas de Brasília). */
+export async function listCobranca(inicio: string, fim: string): Promise<LinhaCobranca[]> {
+  const ate = new Date(fim + 'T12:00:00Z');
+  ate.setUTCDate(ate.getUTCDate() + 1);
+  const { data, error } = await supabase.from('pedidos_material')
+    .select('id, codigo, posto_id, uf, data_pedido, faturada_em, valor_real, cobrado_em, cobranca_ref, solicitante_nome')
+    .eq('cobrar_cliente', true).eq('status', 'faturada')
+    .gte('faturada_em', `${inicio}T00:00:00-03:00`).lt('faturada_em', `${ate.toISOString().slice(0, 10)}T00:00:00-03:00`)
+    .order('faturada_em').limit(5000);
+  if (error) throw error;
+  const ids = (data ?? []).map(p => p.id);
+  const notas: { pedido_id: string | null; numero_nf: string | null; fornecedor_nome: string; data_compra: string }[] = [];
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data: c, error: e } = await supabase.from('material_compras')
+      .select('pedido_id, numero_nf, fornecedor_nome, data_compra').in('pedido_id', ids.slice(i, i + 200)).order('data_compra');
+    if (e) throw e;
+    notas.push(...(c ?? []));
+  }
+  return (data ?? []).map(p => ({
+    id: p.id, codigo: p.codigo, posto_id: p.posto_id, uf: p.uf, data_pedido: p.data_pedido, faturada_em: p.faturada_em as string,
+    valor: Number(p.valor_real ?? 0), cobrado_em: p.cobrado_em, cobranca_ref: p.cobranca_ref, solicitante_nome: p.solicitante_nome,
+    notas: notas.filter(n => n.pedido_id === p.id).map(({ numero_nf, fornecedor_nome, data_compra }) => ({ numero_nf, fornecedor_nome, data_compra })),
+  }));
+}
+
+/** Total a cobrar e já cobrado por posto, do maior a cobrar para o menor. */
+export function resumoCobranca(linhas: Pick<LinhaCobranca, 'posto_id' | 'valor' | 'cobrado_em'>[]) {
+  const por = new Map<string, { posto_id: string; pedidos: number; a_cobrar: number; cobrado: number }>();
+  for (const l of linhas) {
+    const r = por.get(l.posto_id) ?? { posto_id: l.posto_id, pedidos: 0, a_cobrar: 0, cobrado: 0 };
+    r.pedidos++;
+    if (l.cobrado_em) r.cobrado += l.valor; else r.a_cobrar += l.valor;
+    por.set(l.posto_id, r);
+  }
+  const c = (v: number) => Math.round(v * 100) / 100;
+  return [...por.values()].map(r => ({ ...r, a_cobrar: c(r.a_cobrar), cobrado: c(r.cobrado) }))
+    .sort((a, b) => b.a_cobrar - a.a_cobrar || b.cobrado - a.cobrado);
+}
+
+export async function marcarCobrados(ids: string[], cobrado: boolean, referencia: string) {
+  const { data, error } = await supabase.rpc('pedidos_material_marcar_cobrados', {
+    _ids: ids, _cobrado: cobrado, _referencia: referencia.trim() || null,
+  });
+  if (error) throw new Error(error.message);
+  return data as number;
 }
 
 async function rpcFluxo<T>(fn: 'pedido_material_conferir' | 'pedido_material_orcar' | 'pedido_material_aprovar_excesso' | 'pedido_material_cancelar_interno', args: Record<string, unknown>) {

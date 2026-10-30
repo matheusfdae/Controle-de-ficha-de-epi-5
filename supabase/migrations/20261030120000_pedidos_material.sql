@@ -226,6 +226,12 @@ CREATE TABLE IF NOT EXISTS public.pedidos_material (
   -- Uma recorrência gera no máximo um pedido por data.
   CONSTRAINT pedidos_material_recorrencia_data_key UNIQUE (recorrencia_id, data_pedido)
 );
+-- Posto sob demanda: o pedido é cobrado do cliente pelo custo (valor da nota)
+-- e não consome o teto. cobrado_* = já foi para a fatura do cliente.
+ALTER TABLE public.pedidos_material ADD COLUMN IF NOT EXISTS cobrar_cliente boolean NOT NULL DEFAULT false;
+ALTER TABLE public.pedidos_material ADD COLUMN IF NOT EXISTS cobrado_em timestamptz;
+ALTER TABLE public.pedidos_material ADD COLUMN IF NOT EXISTS cobrado_por uuid REFERENCES public.profiles(id) ON DELETE SET NULL;
+ALTER TABLE public.pedidos_material ADD COLUMN IF NOT EXISTS cobranca_ref text;
 CREATE INDEX IF NOT EXISTS idx_pedidos_material_posto ON public.pedidos_material (posto_id, data_aprovacao);
 CREATE INDEX IF NOT EXISTS idx_pedidos_material_status ON public.pedidos_material (status);
 CREATE INDEX IF NOT EXISTS idx_pedidos_material_solicitante ON public.pedidos_material (solicitante_senior_id, created_at DESC);
@@ -328,11 +334,11 @@ RETURNS numeric LANGUAGE sql IMMUTABLE AS $$
   SELECT coalesce(_p.valor_real, _p.valor_orcado, _p.valor_estimado)
 $$;
 
--- Consumido do posto no mês (fora o pedido `_exceto`).
+-- Consumido do posto no mês (fora o pedido `_exceto` e os cobrados do cliente).
 CREATE OR REPLACE FUNCTION public.gasto_do_posto(_posto_id uuid, _mes date, _exceto uuid DEFAULT NULL)
 RETURNS numeric LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT coalesce(sum(public._pm_valor(p)), 0) FROM pedidos_material p
-  WHERE p.posto_id = _posto_id AND p.status IN ('a_faturar', 'faturada')
+  WHERE p.posto_id = _posto_id AND p.status IN ('a_faturar', 'faturada') AND NOT p.cobrar_cliente
     AND p.id IS DISTINCT FROM _exceto
     AND p.data_aprovacao >= date_trunc('month', _mes)::date
     AND p.data_aprovacao < (date_trunc('month', _mes) + interval '1 month')::date
@@ -517,7 +523,7 @@ BEGIN
     tem_epi = EXISTS (SELECT 1 FROM pedidos_material_itens i JOIN materiais m ON m.id = i.material_id WHERE i.pedido_id = p.id AND m.is_epi)
   WHERE p.id = _pedido_id RETURNING * INTO _p;
   _teto := public.teto_do_posto(_p.posto_id, _hoje);
-  UPDATE pedidos_material SET excede_teto = _teto IS NOT NULL
+  UPDATE pedidos_material SET excede_teto = NOT _p.cobrar_cliente AND _teto IS NOT NULL
     AND public.gasto_do_posto(_p.posto_id, _hoje, _p.id) + coalesce(_p.valor_orcado, _p.valor_estimado) > _teto
   WHERE id = _pedido_id RETURNING * INTO _p;
   RETURN _p;
@@ -538,9 +544,10 @@ BEGIN
   ON CONFLICT (ano) DO UPDATE SET ultimo = pedido_numeracao.ultimo + 1
   RETURNING ultimo INTO _num;
 
-  INSERT INTO pedidos_material (ano, numero, posto_id, uf, recorrencia_id, data_pedido, observacao,
+  INSERT INTO pedidos_material (ano, numero, posto_id, uf, recorrencia_id, data_pedido, observacao, cobrar_cliente,
     solicitante_senior_id, solicitante_nome, solicitante_matricula, solicitante_cargo, solicitante_telefone)
   VALUES (_ano, _num, _posto.id, _posto.uf, _recorrencia_id, _data, nullif(left(trim(coalesce(_observacao, '')), 1000), ''),
+    coalesce(_posto.sob_demanda, false),
     _sol_id, _sol_nome, _sol_matricula, _sol_cargo, _sol_telefone)
   RETURNING * INTO _p;
 
@@ -987,6 +994,35 @@ BEGIN
   RETURN jsonb_build_object('status', 'cancelada');
 END $$;
 
+-- Cobrança ao cliente (postos sob demanda): marca ou desmarca pedidos
+-- faturados como já cobrados, com a referência da fatura/nota ao cliente.
+CREATE OR REPLACE FUNCTION public.pedidos_material_marcar_cobrados(_ids uuid[], _cobrado boolean, _referencia text)
+RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  _p public.pedidos_material;
+  _ref text := nullif(left(trim(coalesce(_referencia, '')), 200), '');
+  _n integer := 0;
+BEGIN
+  IF NOT public._pm_gestor() THEN RAISE EXCEPTION 'Sem permissão para marcar a cobrança.'; END IF;
+  IF _cobrado AND _ref IS NULL THEN RAISE EXCEPTION 'Informe a referência da cobrança (nº da fatura ou nota ao cliente).'; END IF;
+  FOR _p IN SELECT * FROM pedidos_material WHERE id = ANY (coalesce(_ids, '{}')) FOR UPDATE LOOP
+    IF NOT public._pm_ve(_p.uf, _p.posto_id) THEN RAISE EXCEPTION 'Pedido não encontrado.'; END IF;
+    IF NOT _p.cobrar_cliente OR _p.status <> 'faturada' THEN
+      RAISE EXCEPTION 'O pedido % não é um pedido faturado de posto sob demanda.', _p.codigo;
+    END IF;
+    CONTINUE WHEN (_p.cobrado_em IS NOT NULL) = _cobrado AND _p.cobranca_ref IS NOT DISTINCT FROM CASE WHEN _cobrado THEN _ref END;
+    UPDATE pedidos_material SET cobrado_em = CASE WHEN _cobrado THEN now() END,
+      cobrado_por = CASE WHEN _cobrado THEN public.current_profile_id() END,
+      cobranca_ref = CASE WHEN _cobrado THEN _ref END
+    WHERE id = _p.id;
+    PERFORM public._pm_evento(_p.id, 'faturada', 'faturada', NULL,
+      CASE WHEN _cobrado THEN 'Cobrado do cliente · ' || _ref ELSE 'Cobrança ao cliente desfeita' END);
+    _n := _n + 1;
+  END LOOP;
+  RETURN _n;
+END $$;
+
 -- Quantos pedidos esperam o usuário atual (aviso no menu).
 CREATE OR REPLACE FUNCTION public.pedidos_material_minhas_pendencias()
 RETURNS integer LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
@@ -1050,7 +1086,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   WITH consumo AS (
     SELECT p.posto_id, i.material_id, sum(i.quantidade) / 3.0 AS qtd_mes
     FROM pedidos_material p JOIN pedidos_material_itens i ON i.pedido_id = p.id
-    WHERE p.status IN ('a_faturar', 'faturada') AND p.data_aprovacao >= public._pm_hoje() - 90
+    WHERE p.status IN ('a_faturar', 'faturada') AND NOT p.cobrar_cliente AND p.data_aprovacao >= public._pm_hoje() - 90
     GROUP BY 1, 2),
   vigente AS (SELECT id FROM tabela_precos WHERE status = 'vigente'),
   por_posto AS (
@@ -1222,7 +1258,8 @@ BEGIN
     'public.pedido_material_cancelar_interno(uuid, text)',
     'public.material_compra_registrar(uuid, uuid, text, text, date, jsonb, text, text, text)',
     'public.nova_tabela_precos(text)', 'public.publicar_tabela_precos(uuid, date)',
-    'public.simular_tabela_precos(uuid)', 'public.pedidos_material_minhas_pendencias()'] LOOP
+    'public.simular_tabela_precos(uuid)', 'public.pedidos_material_minhas_pendencias()',
+    'public.pedidos_material_marcar_cobrados(uuid[], boolean, text)'] LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC, anon', f);
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO authenticated', f);
   END LOOP;
