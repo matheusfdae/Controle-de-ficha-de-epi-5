@@ -78,6 +78,20 @@ DROP TRIGGER IF EXISTS trg_pedido_alcadas_updated ON public.pedido_alcadas;
 CREATE TRIGGER trg_pedido_alcadas_updated BEFORE UPDATE ON public.pedido_alcadas
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+-- ---------- Avisos por e-mail (uma linha só) ----------
+CREATE TABLE IF NOT EXISTS public.pedido_config (
+  id integer PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  avisar_email boolean NOT NULL DEFAULT true,
+  -- Endereço do sistema para o botão do e-mail (ex.: https://epi.empresa.com.br).
+  link_sistema text,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO public.pedido_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+DROP TRIGGER IF EXISTS trg_pedido_config_updated ON public.pedido_config;
+CREATE TRIGGER trg_pedido_config_updated BEFORE UPDATE ON public.pedido_config
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
 -- ---------- Quem aprova cada nível (por estado; postos vazio = todos do estado) ----------
 CREATE TABLE IF NOT EXISTS public.pedido_aprovadores (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -127,6 +141,8 @@ CREATE TABLE IF NOT EXISTS public.pedidos_material (
   acima_do_teto boolean NOT NULL DEFAULT false,
   -- Algum item sem preço (nem compra anterior, nem preço de referência).
   sem_preco boolean NOT NULL DEFAULT false,
+  -- Último nível que já recebeu o aviso por e-mail (função avisar-pedidos-material).
+  notificado_nivel text,
   data_aprovacao date,
   aprovado_em timestamptz,
   observacao text,
@@ -182,21 +198,46 @@ CREATE TABLE IF NOT EXISTS public.material_compras (
   fornecedor_nome text NOT NULL CHECK (trim(fornecedor_nome) <> ''),
   fornecedor_cnpj text,
   numero_nf text,
+  -- Chave de 44 dígitos quando a nota veio do XML.
+  chave_acesso text CHECK (chave_acesso ~ '^\d{44}$'),
   data_compra date NOT NULL,
   observacao text,
   criado_por uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_material_compras_pedido ON public.material_compras (pedido_id);
+-- A mesma nota não entra duas vezes no mesmo pedido (nem duas vezes como avulsa).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_material_compras_chave
+  ON public.material_compras (chave_acesso, coalesce(pedido_id, '00000000-0000-0000-0000-000000000000'::uuid))
+  WHERE chave_acesso IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS public.material_compras_itens (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   compra_id uuid NOT NULL REFERENCES public.material_compras(id) ON DELETE CASCADE,
   material_id uuid NOT NULL REFERENCES public.materiais(id),
+  -- Na unidade do material (já convertida pelo fator da embalagem).
   quantidade numeric(12, 2) NOT NULL CHECK (quantidade > 0),
-  valor_unitario numeric(14, 4) NOT NULL CHECK (valor_unitario >= 0)
+  valor_unitario numeric(14, 4) NOT NULL CHECK (valor_unitario >= 0),
+  -- Como veio na nota (XML): código, descrição, unidade e quantas unidades
+  -- do material vêm em 1 unidade da nota (ex.: 1 CX = 12 un).
+  codigo_fornecedor text,
+  descricao_nf text,
+  unidade_nf text,
+  fator numeric(12, 4) NOT NULL DEFAULT 1 CHECK (fator > 0)
 );
 CREATE INDEX IF NOT EXISTS idx_material_compras_itens_material ON public.material_compras_itens (material_id);
+
+-- "Memória" da importação: código do produto no fornecedor -> material e
+-- fator da embalagem. Aprendida a cada compra; a próxima nota do mesmo
+-- fornecedor vem pré-preenchida.
+CREATE TABLE IF NOT EXISTS public.material_codigos_fornecedor (
+  fornecedor_cnpj text NOT NULL,
+  codigo_fornecedor text NOT NULL,
+  material_id uuid NOT NULL REFERENCES public.materiais(id) ON DELETE CASCADE,
+  fator numeric(12, 4) NOT NULL DEFAULT 1 CHECK (fator > 0),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (fornecedor_cnpj, codigo_fornecedor)
+);
 
 -- =========================================================
 -- Regras de cálculo
@@ -263,6 +304,7 @@ $$;
 ALTER TABLE public.materiais ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.posto_tetos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pedido_alcadas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pedido_config ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pedido_aprovadores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pedido_recorrencias ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pedidos_material ENABLE ROW LEVEL SECURITY;
@@ -270,6 +312,7 @@ ALTER TABLE public.pedidos_material_itens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pedido_aprovacoes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.material_compras ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.material_compras_itens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.material_codigos_fornecedor ENABLE ROW LEVEL SECURITY;
 
 -- Quem enxerga o módulo (ou aprova algo) lê o catálogo e a alçada.
 DROP POLICY IF EXISTS "materiais select" ON public.materiais;
@@ -284,6 +327,14 @@ DROP POLICY IF EXISTS "pedido_alcadas select" ON public.pedido_alcadas;
 CREATE POLICY "pedido_alcadas select" ON public.pedido_alcadas FOR SELECT TO authenticated USING (true);
 DROP POLICY IF EXISTS "pedido_alcadas update" ON public.pedido_alcadas;
 CREATE POLICY "pedido_alcadas update" ON public.pedido_alcadas FOR UPDATE TO authenticated
+  USING (public.has_permission(public.current_profile_id(), 'pedidos_material', 'edit'))
+  WITH CHECK (public.has_permission(public.current_profile_id(), 'pedidos_material', 'edit'));
+
+DROP POLICY IF EXISTS "pedido_config select" ON public.pedido_config;
+CREATE POLICY "pedido_config select" ON public.pedido_config FOR SELECT TO authenticated
+  USING (public.has_permission(public.current_profile_id(), 'pedidos_material', 'view'));
+DROP POLICY IF EXISTS "pedido_config update" ON public.pedido_config;
+CREATE POLICY "pedido_config update" ON public.pedido_config FOR UPDATE TO authenticated
   USING (public.has_permission(public.current_profile_id(), 'pedidos_material', 'edit'))
   WITH CHECK (public.has_permission(public.current_profile_id(), 'pedidos_material', 'edit'));
 
@@ -331,6 +382,10 @@ CREATE POLICY "material_compras select" ON public.material_compras FOR SELECT TO
 DROP POLICY IF EXISTS "material_compras_itens select" ON public.material_compras_itens;
 CREATE POLICY "material_compras_itens select" ON public.material_compras_itens FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM public.material_compras c WHERE c.id = compra_id));
+-- Memória do XML: lê quem registra compra (compras ou permissão de criar). Escrita só pela função.
+DROP POLICY IF EXISTS "material_codigos_fornecedor select" ON public.material_codigos_fornecedor;
+CREATE POLICY "material_codigos_fornecedor select" ON public.material_codigos_fornecedor FOR SELECT TO authenticated
+  USING (public.has_permission(public.current_profile_id(), 'pedidos_material', 'create') OR public._pm_aprovador_algum());
 
 -- =========================================================
 -- Criar pedido (interna: usada pelo link público e pela recorrência)
@@ -720,11 +775,16 @@ $$;
 
 -- =========================================================
 -- Compra (nota) — do pedido aprovado ou avulsa (só para registrar preço)
--- _itens = [{material_id, quantidade, valor_unitario}]
+-- _itens = [{material_id, quantidade, valor_unitario,
+--            codigo_fornecedor?, descricao_nf?, unidade_nf?, fator?}]
+-- quantidade e valor_unitario já na unidade do material.
 -- =========================================================
+-- Assinatura de uma versão anterior desta migration (sem CNPJ/chave).
+DROP FUNCTION IF EXISTS public.material_compra_registrar(uuid, uuid, text, text, date, jsonb, text);
 CREATE OR REPLACE FUNCTION public.material_compra_registrar(
   _pedido_id uuid, _fornecedor_id uuid, _fornecedor_nome text, _numero_nf text,
-  _data_compra date, _itens jsonb, _observacao text DEFAULT NULL)
+  _data_compra date, _itens jsonb, _observacao text DEFAULT NULL,
+  _fornecedor_cnpj text DEFAULT NULL, _chave_acesso text DEFAULT NULL)
 RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
@@ -733,6 +793,8 @@ DECLARE
   _f public.fornecedores;
   _id uuid;
   _e jsonb;
+  _cnpj text := nullif(regexp_replace(coalesce(_fornecedor_cnpj, ''), '\D', '', 'g'), '');
+  _chave text := nullif(regexp_replace(coalesce(_chave_acesso, ''), '\D', '', 'g'), '');
 BEGIN
   IF _pedido_id IS NOT NULL THEN
     SELECT * INTO _p FROM pedidos_material WHERE id = _pedido_id FOR UPDATE;
@@ -751,11 +813,21 @@ BEGIN
   IF _data_compra IS NULL OR _data_compra > public._pm_hoje() + 1 THEN
     RAISE EXCEPTION 'Data da compra inválida.';
   END IF;
+  IF _cnpj IS NOT NULL AND _cnpj !~ '^\d{14}$' THEN RAISE EXCEPTION 'CNPJ do fornecedor inválido.'; END IF;
+  IF _chave IS NOT NULL AND _chave !~ '^\d{44}$' THEN RAISE EXCEPTION 'Chave da NF-e inválida.'; END IF;
   IF _fornecedor_id IS NOT NULL THEN
     SELECT * INTO _f FROM fornecedores WHERE id = _fornecedor_id;
     IF _f.id IS NULL THEN RAISE EXCEPTION 'Fornecedor não encontrado.'; END IF;
-  ELSIF nullif(trim(coalesce(_fornecedor_nome, '')), '') IS NULL THEN
+  ELSIF _cnpj IS NOT NULL THEN
+    -- Fornecedor já cadastrado com esse CNPJ: usa o cadastro.
+    SELECT * INTO _f FROM fornecedores WHERE cnpj = _cnpj;
+  END IF;
+  IF _f.id IS NULL AND nullif(trim(coalesce(_fornecedor_nome, '')), '') IS NULL THEN
     RAISE EXCEPTION 'Informe o fornecedor.';
+  END IF;
+  IF _chave IS NOT NULL AND EXISTS (SELECT 1 FROM material_compras WHERE chave_acesso = _chave
+       AND pedido_id IS NOT DISTINCT FROM _pedido_id) THEN
+    RAISE EXCEPTION 'Esta nota já foi registrada %.', CASE WHEN _pedido_id IS NULL THEN 'como compra avulsa' ELSE 'neste pedido' END;
   END IF;
   IF _itens IS NULL OR jsonb_typeof(_itens) <> 'array' OR jsonb_array_length(_itens) = 0 THEN
     RAISE EXCEPTION 'Informe os itens da nota.';
@@ -768,15 +840,34 @@ BEGIN
        OR (_e ->> 'valor_unitario')::numeric < 0 THEN
       RAISE EXCEPTION 'Quantidade e valor unitário de todos os itens são obrigatórios.';
     END IF;
+    IF coalesce((_e ->> 'fator')::numeric, 1) <= 0 THEN
+      RAISE EXCEPTION 'Fator da embalagem inválido.';
+    END IF;
   END LOOP;
 
-  INSERT INTO material_compras (pedido_id, fornecedor_id, fornecedor_nome, fornecedor_cnpj, numero_nf, data_compra, observacao, criado_por)
-  VALUES (_pedido_id, _f.id, coalesce(_f.nome, trim(_fornecedor_nome)), _f.cnpj,
-          nullif(trim(coalesce(_numero_nf, '')), ''), _data_compra, nullif(trim(coalesce(_observacao, '')), ''), _uid)
+  _cnpj := coalesce(_f.cnpj, _cnpj);
+  INSERT INTO material_compras (pedido_id, fornecedor_id, fornecedor_nome, fornecedor_cnpj, numero_nf, chave_acesso,
+    data_compra, observacao, criado_por)
+  VALUES (_pedido_id, _f.id, coalesce(_f.nome, trim(_fornecedor_nome)), _cnpj,
+          nullif(trim(coalesce(_numero_nf, '')), ''), _chave, _data_compra, nullif(trim(coalesce(_observacao, '')), ''), _uid)
   RETURNING id INTO _id;
-  INSERT INTO material_compras_itens (compra_id, material_id, quantidade, valor_unitario)
-  SELECT _id, (e ->> 'material_id')::uuid, (e ->> 'quantidade')::numeric, (e ->> 'valor_unitario')::numeric
+  INSERT INTO material_compras_itens (compra_id, material_id, quantidade, valor_unitario,
+    codigo_fornecedor, descricao_nf, unidade_nf, fator)
+  SELECT _id, (e ->> 'material_id')::uuid, (e ->> 'quantidade')::numeric, (e ->> 'valor_unitario')::numeric,
+    nullif(trim(coalesce(e ->> 'codigo_fornecedor', '')), ''), nullif(left(trim(coalesce(e ->> 'descricao_nf', '')), 300), ''),
+    nullif(trim(coalesce(e ->> 'unidade_nf', '')), ''), coalesce((e ->> 'fator')::numeric, 1)
   FROM jsonb_array_elements(_itens) e;
+
+  -- Aprende código do fornecedor -> material (e a embalagem) para a próxima nota.
+  IF _cnpj IS NOT NULL THEN
+    INSERT INTO material_codigos_fornecedor (fornecedor_cnpj, codigo_fornecedor, material_id, fator)
+    SELECT DISTINCT ON (trim(e ->> 'codigo_fornecedor')) _cnpj, trim(e ->> 'codigo_fornecedor'),
+      (e ->> 'material_id')::uuid, coalesce((e ->> 'fator')::numeric, 1)
+    FROM jsonb_array_elements(_itens) e
+    WHERE nullif(trim(coalesce(e ->> 'codigo_fornecedor', '')), '') IS NOT NULL
+    ON CONFLICT (fornecedor_cnpj, codigo_fornecedor)
+      DO UPDATE SET material_id = EXCLUDED.material_id, fator = EXCLUDED.fator, updated_at = now();
+  END IF;
 
   IF _pedido_id IS NOT NULL THEN
     UPDATE pedidos_material SET status = 'comprado',
@@ -827,8 +918,8 @@ GRANT EXECUTE ON FUNCTION public.pedido_material_cancelar(integer, text, uuid, u
 GRANT EXECUTE ON FUNCTION public.gerar_pedidos_recorrentes() TO anon, authenticated;
 REVOKE ALL ON FUNCTION public.pedido_material_decidir(uuid, boolean, text, jsonb) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.pedido_material_decidir(uuid, boolean, text, jsonb) TO authenticated;
-REVOKE ALL ON FUNCTION public.material_compra_registrar(uuid, uuid, text, text, date, jsonb, text) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.material_compra_registrar(uuid, uuid, text, text, date, jsonb, text) TO authenticated;
+REVOKE ALL ON FUNCTION public.material_compra_registrar(uuid, uuid, text, text, date, jsonb, text, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.material_compra_registrar(uuid, uuid, text, text, date, jsonb, text, text, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.pedidos_material_minhas_pendencias() TO authenticated;
 -- Teto e gasto saem por posto sem conferir acesso: só para uso interno.
 REVOKE ALL ON FUNCTION public.teto_do_posto(uuid, date) FROM PUBLIC, anon, authenticated;

@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
+import { normalizar } from '@/lib/nfe';
 
 /**
  * Pedido de material dos postos (migration 20261030120000_pedidos_material).
@@ -147,6 +148,30 @@ export function classificarVariacao(atual: number, anterior: number | null): { t
   return { tipo: a > b ? 'aumentou' : 'baixou', percentual };
 }
 
+/**
+ * Material do catálogo mais parecido com a descrição da nota: todas as
+ * palavras do nome do material aparecem na descrição (o nome mais longo
+ * vence). Sem isso, nenhuma sugestão — melhor deixar em branco que errar.
+ */
+export function sugerirMaterial(descricao: string, materiais: { id: string; nome: string; ativo?: boolean }[]): string | null {
+  const desc = ` ${normalizar(descricao)} `;
+  let melhor: { id: string; peso: number } | null = null;
+  for (const m of materiais) {
+    if (m.ativo === false) continue;
+    const palavras = normalizar(m.nome).split(' ').filter(p => p.length >= 2);
+    if (!palavras.length || !palavras.every(p => desc.includes(` ${p} `) || desc.includes(` ${p}s `))) continue;
+    const peso = palavras.join('').length;
+    if (!melhor || peso > melhor.peso) melhor = { id: m.id, peso };
+  }
+  return melhor?.id ?? null;
+}
+
+/** Converte um item da nota para a unidade do material (1 unidade da nota = `fator` do material). */
+export function converterEmbalagem(qtdNota: number, valorNota: number, fator: number) {
+  const f = fator > 0 ? fator : 1;
+  return { quantidade: Math.round(qtdNota * f * 100) / 100, valor_unitario: Math.round((valorNota / f) * 10000) / 10000 };
+}
+
 // ---------- Link público ----------
 
 export type Solicitante = { matricula: number; cpf?: undefined } | { cpf: string; matricula?: undefined };
@@ -279,17 +304,30 @@ export async function decidirPedido(pedidoId: string, aprovar: boolean, comentar
   return data as { status: StatusPedido; nivel_atual: Nivel | null };
 }
 
+export interface ItemCompra {
+  material_id: string; quantidade: number; valor_unitario: number;
+  codigo_fornecedor?: string | null; descricao_nf?: string | null; unidade_nf?: string | null; fator?: number;
+}
+
 export async function registrarCompra(dados: {
-  pedidoId: string | null; fornecedorId: string | null; fornecedorNome: string; numeroNf: string; data: string;
-  itens: { material_id: string; quantidade: number; valor_unitario: number }[]; observacao: string;
+  pedidoId: string | null; fornecedorId: string | null; fornecedorNome: string; fornecedorCnpj?: string | null;
+  chaveAcesso?: string | null; numeroNf: string; data: string; itens: ItemCompra[]; observacao: string;
 }) {
   const { data, error } = await supabase.rpc('material_compra_registrar', {
     _pedido_id: dados.pedidoId, _fornecedor_id: dados.fornecedorId, _fornecedor_nome: dados.fornecedorNome || null,
     _numero_nf: dados.numeroNf || null, _data_compra: dados.data, _itens: dados.itens as unknown as Json,
-    _observacao: dados.observacao || null,
+    _observacao: dados.observacao || null, _fornecedor_cnpj: dados.fornecedorCnpj || null, _chave_acesso: dados.chaveAcesso || null,
   });
   if (error) throw new Error(error.message);
   return data as string;
+}
+
+/** O que as notas anteriores do fornecedor ensinaram: código do produto -> material e embalagem. */
+export async function codigosDoFornecedor(cnpj: string): Promise<Map<string, { material_id: string; fator: number }>> {
+  const { data, error } = await supabase.from('material_codigos_fornecedor')
+    .select('codigo_fornecedor, material_id, fator').eq('fornecedor_cnpj', cnpj);
+  if (error) return new Map();
+  return new Map((data ?? []).map(c => [c.codigo_fornecedor, { material_id: c.material_id, fator: Number(c.fator) }]));
 }
 
 export async function minhasPendencias(): Promise<number> {
@@ -370,6 +408,35 @@ export async function listUsuarios(): Promise<{ id: string; nome: string; email:
   const { data, error } = await supabase.from('profiles').select('id, nome_completo, email').eq('ativo', true).order('nome_completo');
   if (error) throw error;
   return (data ?? []).map(p => ({ id: p.id, nome: p.nome_completo || p.email || p.id, email: p.email }));
+}
+
+export interface ConfigAvisos { avisar_email: boolean; link_sistema: string | null }
+
+export async function lerConfigAvisos(): Promise<ConfigAvisos> {
+  const { data, error } = await supabase.from('pedido_config').select('avisar_email, link_sistema').eq('id', 1).maybeSingle();
+  if (error) throw error;
+  return data ?? { avisar_email: true, link_sistema: null };
+}
+
+export async function salvarConfigAvisos(c: ConfigAvisos) {
+  const { data, error } = await supabase.from('pedido_config')
+    .update({ avisar_email: c.avisar_email, link_sistema: c.link_sistema?.trim().replace(/\/+$/, '') || null })
+    .eq('id', 1).select('id');
+  if (error) throw new Error(error.message);
+  if (!data?.length) throw new Error('Sem permissão para alterar os avisos.');
+}
+
+/** Roda o aviso aos aprovadores agora (o agendador roda a cada 5 min). */
+export async function avisarAgora(): Promise<{ enviado: boolean; motivo?: string; emails?: number; pedidos?: number; sem_aprovador?: number[]; falhas?: string[] }> {
+  const { data, error } = await supabase.functions.invoke('avisar-pedidos-material', { body: { modo: 'manual' } });
+  if (error) {
+    let msg = '';
+    if ('context' in error) {
+      try { msg = (await (error.context as Response).json()).error; } catch { /* corpo não é JSON */ }
+    }
+    throw new Error(msg || error.message);
+  }
+  return data;
 }
 
 // ---------- Relatório de preços ----------

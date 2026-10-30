@@ -14,7 +14,7 @@ import {
   ROTULO_VARIACAO, classificarVariacao, dataBr, formatarMoeda, formatarNumero, hojeBr, listMateriais, listPrecos,
   type LinhaPreco, type Material, type TipoVariacao,
 } from '../lib/pedidosService';
-import { RegistrarCompra } from './Pedidos';
+import RegistrarCompra from '../components/RegistrarCompra';
 
 /**
  * Variação de preço: cada item de nota comparado com a compra anterior do

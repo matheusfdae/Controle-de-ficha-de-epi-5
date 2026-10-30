@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Pencil, Plus, Save, Search, Trash2 } from 'lucide-react';
+import { Loader2, Mail, Pencil, Plus, Save, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import BackButton from '@/components/BackButton';
 import PageHeader from '@/components/PageHeader';
@@ -16,7 +16,7 @@ import EstadoSelect from '@/components/EstadoSelect';
 import { useAuth } from '@/contexts/AuthContext';
 import { listPostos, type Posto } from '@/services/postosService';
 import {
-  NIVEIS, dataBr, excluirAprovador, excluirTeto, formatarMoeda, hojeBr, listAlcadas, listAprovadores, listMateriais,
+  NIVEIS, avisarAgora, dataBr, excluirAprovador, lerConfigAvisos, salvarConfigAvisos, excluirTeto, formatarMoeda, hojeBr, listAlcadas, listAprovadores, listMateriais,
   listTetos, listUsuarios, rotuloNivel, salvarAlcada, salvarAprovador, salvarMaterial, salvarTeto, tetoNoMes,
   type Aprovador, type Material, type Nivel, type TetoPosto,
 } from '../lib/pedidosService';
@@ -38,11 +38,13 @@ export default function ConfigPedidos() {
             <TabsTrigger value="tetos">Teto por posto</TabsTrigger>
             <TabsTrigger value="alcada">Alçada</TabsTrigger>
             <TabsTrigger value="aprovadores">Aprovadores</TabsTrigger>
+            <TabsTrigger value="avisos">Avisos por e-mail</TabsTrigger>
           </TabsList>
           <TabsContent value="materiais" className="mt-4"><Materiais podeEditar={podeEditar} /></TabsContent>
           <TabsContent value="tetos" className="mt-4"><Tetos podeEditar={podeEditar} /></TabsContent>
           <TabsContent value="alcada" className="mt-4"><Alcada podeEditar={podeEditar} /></TabsContent>
           <TabsContent value="aprovadores" className="mt-4"><Aprovadores podeEditar={podeEditar} /></TabsContent>
+          <TabsContent value="avisos" className="mt-4"><Avisos podeEditar={podeEditar} /></TabsContent>
         </Tabs>
       </div>
     </div>
@@ -375,6 +377,79 @@ function Aprovadores({ podeEditar }: { podeEditar: boolean }) {
             ))}
           </TableBody>
         </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------- Avisos ----------
+
+function Avisos({ podeEditar }: { podeEditar: boolean }) {
+  const [ligado, setLigado] = useState(true);
+  const [link, setLink] = useState('');
+  const [carregado, setCarregado] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+  useEffect(() => {
+    lerConfigAvisos().then(c => {
+      setLigado(c.avisar_email);
+      setLink(c.link_sistema ?? '');
+      setCarregado(true);
+    }).catch(e => toast.error(e.message));
+  }, []);
+
+  const salvar = async () => {
+    if (link.trim() && !/^https?:\/\/\S+$/.test(link.trim())) return toast.error('O link precisa começar com http:// ou https://');
+    setSalvando(true);
+    try {
+      await salvarConfigAvisos({ avisar_email: ligado, link_sistema: link });
+      toast.success('Avisos salvos.');
+    } catch (e) { toast.error((e as Error).message); } finally { setSalvando(false); }
+  };
+
+  const testar = async () => {
+    setEnviando(true);
+    try {
+      const r = await avisarAgora();
+      if (!r.enviado) toast.info(r.motivo ?? 'Nada para avisar agora.');
+      else toast.success(`${r.emails} e-mail(s) enviado(s), ${r.pedidos} pedido(s) avisado(s).`);
+      if (r.sem_aprovador?.length) toast.warning(`Sem aprovador com e-mail para: ${r.sem_aprovador.map(n => `PM-${String(n).padStart(6, '0')}`).join(', ')}`);
+      if (r.falhas?.length) toast.error(`Falhou: ${r.falhas.join('; ')}`);
+    } catch (e) { toast.error((e as Error).message); } finally { setEnviando(false); }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Avisos por e-mail aos aprovadores</CardTitle>
+        <CardDescription>
+          Quando um pedido chega ao nível de alguém, essa pessoa recebe um e-mail (um só, com todos os pedidos novos dela).
+          Sai pela conta Microsoft conectada em Configurações &gt; E-mail, a cada 5 minutos, depois de rodar
+          <code className="mx-1">configurar-email.sh</code> na VM. O e-mail usado é o do cadastro do usuário.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!carregado ? <Loader2 className="h-5 w-5 animate-spin" /> : <>
+          <div className="flex items-center gap-2">
+            <Switch id="avisar" checked={ligado} disabled={!podeEditar} onCheckedChange={setLigado} />
+            <Label htmlFor="avisar">Enviar avisos</Label>
+          </div>
+          <div className="max-w-lg">
+            <Label htmlFor="link">Endereço do sistema (para o botão "Abrir os pedidos" do e-mail)</Label>
+            <div className="flex gap-2">
+              <Input id="link" value={link} disabled={!podeEditar} placeholder="https://..." onChange={e => setLink(e.target.value)} />
+              {podeEditar && <Button type="button" variant="outline" onClick={() => setLink(window.location.origin)}>Usar este</Button>}
+            </div>
+          </div>
+          {podeEditar && (
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={salvar} disabled={salvando} className="gap-2">{salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar</Button>
+              <Button variant="outline" onClick={testar} disabled={enviando} className="gap-2">
+                {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />} Avisar agora
+              </Button>
+            </div>
+          )}
+        </>}
       </CardContent>
     </Card>
   );

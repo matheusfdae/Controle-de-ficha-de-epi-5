@@ -15,13 +15,13 @@ import BackButton from '@/components/BackButton';
 import PageHeader from '@/components/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { listPostos, type Posto } from '@/services/postosService';
-import { listFornecedores, type Fornecedor } from '@/services/fornecedoresService';
 import {
   STATUS_PEDIDO, dataBr, decidirPedido, formatarMoeda, formatarNumero, hojeBr, inicioDoMes, listAprovadores,
-  listGastos, listMateriais, listPedidos, listTetos, numeroPedido, registrarCompra, rotuloNivel, statusComNivel,
+  listGastos, listMateriais, listPedidos, listTetos, numeroPedido, rotuloNivel, statusComNivel,
   tetoNoMes, valorDoPedido,
   type Aprovador, type Material, type PedidoCompleto, type StatusPedido, type TetoPosto,
 } from '../lib/pedidosService';
+import RegistrarCompra from '../components/RegistrarCompra';
 
 /**
  * Pedidos de material: o que espera a minha aprovação, o que espera compra e
@@ -381,120 +381,5 @@ function Info({ rotulo, valor, destaque }: { rotulo: string; valor: string; dest
       <p className="text-xs text-muted-foreground">{rotulo}</p>
       <p className={`font-semibold tabular-nums ${destaque ?? ''}`}>{valor}</p>
     </div>
-  );
-}
-
-/** Nota da compra do pedido: fornecedor, NF, data e o preço pago em cada item. */
-export function RegistrarCompra({ pedido, materiais, onFechar, onSalvo }: {
-  pedido: PedidoCompleto | null; materiais: Material[]; onFechar: () => void; onSalvo: () => Promise<void>;
-}) {
-  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
-  const [fornecedor, setFornecedor] = useState('');
-  const [nf, setNf] = useState('');
-  const [data, setData] = useState(hojeBr());
-  const [observacao, setObservacao] = useState('');
-  const [itens, setItens] = useState(() => pedido
-    ? pedido.itens.map(i => ({
-      material_id: i.material_id, quantidade: String(i.quantidade), valor: i.preco_estimado != null ? String(i.preco_estimado) : '',
-    }))
-    : [{ material_id: '', quantidade: '', valor: '' }]);
-  const [salvando, setSalvando] = useState(false);
-
-  useEffect(() => { listFornecedores().then(setFornecedores).catch(() => setFornecedores([])); }, []);
-
-  const n = (v: string) => Number(v.replace(',', '.'));
-  const total = itens.reduce((s, i) => s + (n(i.quantidade) || 0) * (n(i.valor) || 0), 0);
-
-  const salvar = async () => {
-    if (!fornecedor.trim()) return toast.error('Informe o fornecedor.');
-    if (itens.some(i => !i.material_id || !(n(i.quantidade) > 0) || i.valor === '' || !(n(i.valor) >= 0))) {
-      return toast.error('Preencha material, quantidade e valor unitário de todos os itens.');
-    }
-    const cadastrado = fornecedores.find(f => f.nome.trim().toLowerCase() === fornecedor.trim().toLowerCase());
-    setSalvando(true);
-    try {
-      await registrarCompra({
-        pedidoId: pedido?.id ?? null, fornecedorId: cadastrado?.id ?? null, fornecedorNome: fornecedor.trim(),
-        numeroNf: nf.trim(), data, observacao,
-        itens: itens.map(i => ({ material_id: i.material_id, quantidade: n(i.quantidade), valor_unitario: n(i.valor) })),
-      });
-      toast.success('Compra registrada.');
-      await onSalvo();
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setSalvando(false);
-    }
-  };
-
-  const mudar = (idx: number, campo: 'material_id' | 'quantidade' | 'valor', v: string) =>
-    setItens(is => is.map((i, j) => (j === idx ? { ...i, [campo]: v } : i)));
-
-  return (
-    <Dialog open onOpenChange={o => !o && onFechar()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{pedido ? `Compra do ${numeroPedido(pedido.numero)}` : 'Registrar compra avulsa'}</DialogTitle>
-          <DialogDescription>Os valores unitários desta nota entram no relatório de variação de preço.</DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="sm:col-span-3">
-            <Label htmlFor="forn">Fornecedor *</Label>
-            <Input id="forn" list="lista-fornecedores" value={fornecedor} onChange={e => setFornecedor(e.target.value)} />
-            <datalist id="lista-fornecedores">{fornecedores.map(f => <option key={f.id} value={f.nome} />)}</datalist>
-          </div>
-          <div>
-            <Label htmlFor="nf">Nº da nota</Label>
-            <Input id="nf" value={nf} onChange={e => setNf(e.target.value)} />
-          </div>
-          <div>
-            <Label htmlFor="data-compra">Data da compra *</Label>
-            <Input id="data-compra" type="date" value={data} max={hojeBr()} onChange={e => setData(e.target.value)} />
-          </div>
-        </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Material</TableHead>
-              <TableHead className="w-28 text-right">Qtd.</TableHead>
-              <TableHead className="w-32 text-right">Valor unit. (R$)</TableHead>
-              <TableHead className="w-10" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {itens.map((i, idx) => (
-              <TableRow key={idx}>
-                <TableCell>
-                  <Select value={i.material_id || undefined} onValueChange={v => mudar(idx, 'material_id', v)}>
-                    <SelectTrigger className="h-8"><SelectValue placeholder="Material" /></SelectTrigger>
-                    <SelectContent>{materiais.map(m => <SelectItem key={m.id} value={m.id}>{m.nome} ({m.unidade})</SelectItem>)}</SelectContent>
-                  </Select>
-                </TableCell>
-                <TableCell><Input className="h-8 text-right" inputMode="decimal" value={i.quantidade} onChange={e => mudar(idx, 'quantidade', e.target.value.replace(/[^\d.,]/g, ''))} /></TableCell>
-                <TableCell><Input className="h-8 text-right" inputMode="decimal" value={i.valor} onChange={e => mudar(idx, 'valor', e.target.value.replace(/[^\d.,]/g, ''))} /></TableCell>
-                <TableCell>
-                  <Button variant="ghost" size="icon" aria-label="Remover item" disabled={itens.length === 1}
-                    onClick={() => setItens(is => is.filter((_, j) => j !== idx))}><X className="h-4 w-4" /></Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        <div className="flex justify-between items-center">
-          <Button variant="outline" size="sm" onClick={() => setItens(is => [...is, { material_id: '', quantidade: '', valor: '' }])}>Adicionar item</Button>
-          <p className="text-sm">Total da nota: <strong className="tabular-nums">{formatarMoeda(total)}</strong></p>
-        </div>
-        <div>
-          <Label htmlFor="obs-compra">Observação</Label>
-          <Textarea id="obs-compra" rows={2} value={observacao} onChange={e => setObservacao(e.target.value)} />
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onFechar}>Cancelar</Button>
-          <Button onClick={salvar} disabled={salvando} className="gap-2">
-            {salvando && <Loader2 className="h-4 w-4 animate-spin" />} Registrar compra
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
