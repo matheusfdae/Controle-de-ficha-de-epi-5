@@ -648,6 +648,7 @@ function Avisos({ podeEditar }: { podeEditar: boolean }) {
   const [ligado, setLigado] = useState(true);
   const [link, setLink] = useState('');
   const [emailsEpi, setEmailsEpi] = useState('');
+  const [diasCobertura, setDiasCobertura] = useState('30');
   const [carregado, setCarregado] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -656,6 +657,7 @@ function Avisos({ podeEditar }: { podeEditar: boolean }) {
       setLigado(c.avisar_email);
       setLink(c.link_sistema ?? '');
       setEmailsEpi((c.emails_epi ?? []).join('\n'));
+      setDiasCobertura(String(c.dias_cobertura ?? 30));
       setCarregado(true);
     }).catch(e => toast.error(e.message));
   }, []);
@@ -665,9 +667,11 @@ function Avisos({ podeEditar }: { podeEditar: boolean }) {
     const lista = emailsEpi.split(/[\s,;]+/).map(e => e.trim().toLowerCase()).filter(Boolean);
     const invalido = lista.find(e => !EMAIL.test(e));
     if (invalido) return toast.error(`E-mail inválido: ${invalido}`);
+    const dias = Number(diasCobertura);
+    if (!Number.isInteger(dias) || dias < 1 || dias > 365) return toast.error('Dias de cobertura: de 1 a 365.');
     setSalvando(true);
     try {
-      await salvarConfigAvisos({ avisar_email: ligado, link_sistema: link, emails_epi: [...new Set(lista)] });
+      await salvarConfigAvisos({ avisar_email: ligado, link_sistema: link, emails_epi: [...new Set(lista)], dias_cobertura: dias });
       toast.success('Avisos salvos.');
     } catch (e) { toast.error((e as Error).message); } finally { setSalvando(false); }
   };
@@ -712,6 +716,13 @@ function Avisos({ podeEditar }: { podeEditar: boolean }) {
             <Textarea id="epi-emails" rows={3} disabled={!podeEditar} value={emailsEpi} onChange={e => setEmailsEpi(e.target.value)}
               placeholder={'seguranca@empresa.com.br\ncompras@empresa.com.br'} />
             <p className="text-xs text-muted-foreground mt-1">Um por linha (ou separados por vírgula). Em branco, ninguém recebe.</p>
+          </div>
+          <div className="max-w-lg">
+            <Label htmlFor="dias-cob">Alerta de pedido acima do consumo (dias)</Label>
+            <Input id="dias-cob" type="number" min={1} max={365} className="w-28" disabled={!podeEditar} value={diasCobertura} onChange={e => setDiasCobertura(e.target.value)} />
+            <p className="text-xs text-muted-foreground mt-1">
+              Na conferência, o item ganha alerta quando o estoque do posto mais o pedido durariam mais que isso pelo consumo lançado nos plantões.
+            </p>
           </div>
           {podeEditar && (
             <div className="flex flex-wrap gap-2">

@@ -24,6 +24,7 @@ import {
 } from '../lib/pedidosService';
 import RegistrarCompra from '../components/RegistrarCompra';
 import { ListaRepeticoes, RepetirPedido } from '../components/Repeticoes';
+import AnaliseEstoque from '../components/AnaliseEstoque';
 
 /**
  * Pedidos de material: filas por etapa (conferência, orçamento, aprovação do
@@ -392,6 +393,7 @@ function DetalhePedido({ pedido: p, posto, materiais, tabela, saldo, minhaVez, p
           <p className="text-sm text-destructive flex items-center gap-1"><AlertTriangle className="h-4 w-4" />
             Provável excesso de teto: depois do orçamento, o pedido vai para a aprovação do comercial/gerência.</p>
         )}
+        {!['faturada', 'cancelada', 'reprovada'].includes(p.status) && <AnaliseEstoque pedidoId={p.id} materiais={materiais} />}
 
         <Table>
           <TableHeader>

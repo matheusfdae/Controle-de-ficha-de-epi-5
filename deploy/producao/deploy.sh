@@ -56,6 +56,7 @@ MIGRACOES=(
   "20261028130000_assinatura_por_usuario.sql|SELECT to_regclass('public.assinaturas_usuario') IS NOT NULL"
   "20261029120000_email_pendentes.sql|SELECT to_regclass('public.email_pendentes_estados') IS NOT NULL"
   "20261030120000_pedidos_material.sql|SELECT to_regclass('public.pedidos_material') IS NOT NULL"
+  "20261031120000_estoque_posto.sql|SELECT to_regclass('public.estoque_plantoes') IS NOT NULL"
 )
 PENDENTES=()
 echo ">>> Migrations:"

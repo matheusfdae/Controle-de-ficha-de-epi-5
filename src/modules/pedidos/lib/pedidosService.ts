@@ -660,17 +660,17 @@ export async function simularTabela(id: string): Promise<Simulacao[]> {
 
 // ---------- Avisos ----------
 
-export interface ConfigAvisos { avisar_email: boolean; link_sistema: string | null; emails_epi: string[] }
+export interface ConfigAvisos { avisar_email: boolean; link_sistema: string | null; emails_epi: string[]; dias_cobertura: number }
 
 export async function lerConfigAvisos(): Promise<ConfigAvisos> {
-  const { data, error } = await supabase.from('pedido_config').select('avisar_email, link_sistema, emails_epi').eq('id', 1).maybeSingle();
+  const { data, error } = await supabase.from('pedido_config').select('avisar_email, link_sistema, emails_epi, dias_cobertura').eq('id', 1).maybeSingle();
   if (error) throw error;
-  return data ?? { avisar_email: true, link_sistema: null, emails_epi: [] };
+  return data ?? { avisar_email: true, link_sistema: null, emails_epi: [], dias_cobertura: 30 };
 }
 
 export async function salvarConfigAvisos(c: ConfigAvisos) {
   const { data, error } = await supabase.from('pedido_config')
-    .update({ avisar_email: c.avisar_email, link_sistema: c.link_sistema?.trim().replace(/\/+$/, '') || null, emails_epi: c.emails_epi })
+    .update({ avisar_email: c.avisar_email, link_sistema: c.link_sistema?.trim().replace(/\/+$/, '') || null, emails_epi: c.emails_epi, dias_cobertura: c.dias_cobertura })
     .eq('id', 1).select('id');
   if (error) throw new Error(error.message);
   if (!data?.length) throw new Error('Sem permissão para alterar os avisos.');

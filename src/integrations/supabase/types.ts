@@ -1075,10 +1075,34 @@ export type Database = {
         Update: { id?: string; posto_id?: string; vigente_desde?: string; valor?: number; criado_por?: string | null }
         Relationships: []
       }
+      estoque_plantoes: {
+        Row: { id: string; posto_id: string; uf: string; status: string; aberto_em: string; aberto_por: string | null; aberto_por_nome: string | null; fechado_em: string | null; fechado_por: string | null; fechado_por_nome: string | null; observacao_inicio: string | null; observacao_fim: string | null; assinatura: string | null; declaracao_aceita_em: string | null; tem_diferenca: boolean; created_at: string }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
+      estoque_plantao_itens: {
+        Row: { plantao_id: string; material_id: string; qtd_inicio: number; qtd_recebida: number; qtd_usada: number | null; qtd_fim: number | null; diferenca: number | null }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
+      estoque_plantao_fotos: {
+        Row: { plantao_id: string; momento: string; foto: string; tirada_em: string }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
+      estoque_posto: {
+        Row: { posto_id: string; material_id: string; quantidade: number; plantao_id: string | null; atualizado_em: string }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
       pedido_config: {
-        Row: { id: number; avisar_email: boolean; link_sistema: string | null; emails_epi: string[]; updated_at: string }
-        Insert: { id?: number; avisar_email?: boolean; link_sistema?: string | null; emails_epi?: string[] }
-        Update: { avisar_email?: boolean; link_sistema?: string | null; emails_epi?: string[] }
+        Row: { id: number; avisar_email: boolean; link_sistema: string | null; emails_epi: string[]; dias_cobertura: number; updated_at: string }
+        Insert: { id?: number; avisar_email?: boolean; link_sistema?: string | null; emails_epi?: string[]; dias_cobertura?: number }
+        Update: { avisar_email?: boolean; link_sistema?: string | null; emails_epi?: string[]; dias_cobertura?: number }
         Relationships: []
       }
       pedido_aprovadores: {
@@ -2507,6 +2531,22 @@ export type Database = {
       pedidos_material_minhas_pendencias: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      estoque_abrir_plantao: {
+        Args: { _posto_id: string; _foto: string; _itens: Json; _observacao?: string | null }
+        Returns: string
+      }
+      estoque_fechar_plantao: {
+        Args: { _plantao_id: string; _foto: string; _itens: Json; _assinatura: string; _ciente: boolean; _observacao?: string | null }
+        Returns: Json
+      }
+      estoque_cancelar_plantao: {
+        Args: { _plantao_id: string }
+        Returns: undefined
+      }
+      estoque_analise_pedido: {
+        Args: { _pedido_id: string }
+        Returns: { material_id: string; estoque: number; consumo_dia: number; dias_estoque: number | null; dias_com_pedido: number | null; quantidade_pedido: number; alerta: boolean; sem_historico: boolean; limite_dias: number }[]
       }
       pedido_material_repetir: {
         Args: { _pedido_id: string; _frequencia: string; _primeira?: string | null }
