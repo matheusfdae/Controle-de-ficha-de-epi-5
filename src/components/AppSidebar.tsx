@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FilePlus2, Search, CalendarClock, Settings, ShieldCheck, LogOut, Users, Package, Briefcase, UserPlus, ClipboardSignature, HardHat, Shirt, FileSignature, MapPin, FileStack,
-  IdCard, Palette, Printer, History, BarChart3, Inbox, PenTool, ShoppingCart, ClipboardList, Map as MapIcon, TrendingUp, HandCoins,
+  IdCard, Palette, Printer, History, BarChart3, Inbox, PenTool, ShoppingCart, ClipboardList, Map as MapIcon, TrendingUp, HandCoins, Gauge,
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -53,6 +53,7 @@ const crachaItems: Array<{ title: string; guia: string; url: string; icon: typeo
 // "Pedidos" também aparece para quem só é aprovador (sem a permissão do módulo).
 const pedidoItems: Array<{ title: string; guia: string; url: string; icon: typeof IdCard; end: boolean; action?: ActionId }> = [
   { title: 'Pedidos', guia: 'menu-pedidos', url: '/pedidos', icon: ClipboardList, end: true },
+  { title: 'Painel Gerencial', guia: 'menu-pedidos-gerencial', url: '/pedidos/gerencial', icon: Gauge, end: false, action: 'view' },
   { title: 'Teto por Posto', guia: 'menu-pedidos-painel', url: '/pedidos/painel', icon: MapIcon, end: false, action: 'view' },
   { title: 'Variação de Preço', guia: 'menu-pedidos-precos', url: '/pedidos/precos', icon: TrendingUp, end: false, action: 'view' },
   { title: 'Cobrança ao Cliente', guia: 'menu-pedidos-cobranca', url: '/pedidos/cobranca', icon: HandCoins, end: false, action: 'view' },
