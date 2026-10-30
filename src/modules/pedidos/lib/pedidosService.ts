@@ -234,9 +234,9 @@ export interface Identificado {
   recorrencias: RecorrenciaDoSolicitante[];
 }
 export const nomePublico = (m: MaterialPublico) => (m.grupo ? `${m.grupo} — ${m.nome}` : m.nome);
-/** Catálogo do posto: posto sob demanda só vê os itens liberados. */
+/** Catálogo do posto: posto com lista própria (ou sob demanda) só vê os itens da lista. */
 export const catalogoDoPosto = (materiais: MaterialPublico[], posto: PostoPublico | undefined) =>
-  !posto?.sob_demanda ? materiais : materiais.filter(m => (posto.itens ?? []).includes(m.id));
+  posto?.itens == null ? materiais : materiais.filter(m => posto.itens!.includes(m.id));
 
 type FuncaoPublica = 'pedido_material_identificar' | 'pedido_material_enviar' | 'pedido_material_cancelar' | 'pedido_material_reenviar';
 async function chamarPublica<T>(fn: FuncaoPublica, args: Record<string, unknown>): Promise<T> {
@@ -433,6 +433,15 @@ export function proximaData(data: string, frequencia: Exclude<Frequencia, 'unica
     d.setUTCDate(Math.min(dia, new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate()));
   } else d.setUTCDate(d.getUTCDate() + ({ diaria: 1, semanal: 7, quinzenal: 14 } as const)[frequencia]);
   return d.toISOString().slice(0, 10);
+}
+
+// ---------- Importação da planilha de material por posto ----------
+
+export async function importarPlanilha(postos: { posto_id: string | null; criar: { nome: string; uf: string } | null; teto: string | null;
+  itens: { nome: string; unidade: string | null }[] }[], tetoDesde: string) {
+  const { data, error } = await supabase.rpc('pedidos_importar_planilha', { _postos: postos as unknown as Json, _teto_desde: tetoDesde });
+  if (error) throw new Error(error.message);
+  return data as { postos_criados: number; itens_criados: number; listas: number; itens_nas_listas: number; tetos: number };
 }
 
 export interface Tarefa {

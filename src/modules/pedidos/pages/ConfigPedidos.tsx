@@ -24,6 +24,7 @@ import {
   salvarPostoSobDemanda, salvarPrecos, salvarTeto, simularTabela, tetoNoMes,
   type Aprovador, type Material, type Papel, type Simulacao, type TabelaPrecos, type TetoPosto,
 } from '../lib/pedidosService';
+import ImportarPlanilha from '../components/ImportarPlanilha';
 
 /** Configuração dos pedidos: itens, tabela de preços, tetos, postos sob demanda, papéis e avisos. */
 export default function ConfigPedidos() {
@@ -47,9 +48,10 @@ export default function ConfigPedidos() {
             <TabsTrigger value="itens">Itens</TabsTrigger>
             <TabsTrigger value="precos">Tabela de preços</TabsTrigger>
             <TabsTrigger value="tetos">Teto por posto</TabsTrigger>
-            <TabsTrigger value="demanda">Postos sob demanda</TabsTrigger>
+            <TabsTrigger value="demanda">Itens por posto</TabsTrigger>
             <TabsTrigger value="papeis">Papéis</TabsTrigger>
             <TabsTrigger value="avisos">Avisos por e-mail</TabsTrigger>
+            <TabsTrigger value="importar">Importar planilha</TabsTrigger>
           </TabsList>
           <TabsContent value="itens" className="mt-4"><Itens podeEditar={gestor} /></TabsContent>
           <TabsContent value="precos" className="mt-4"><Precos podeEditar={gestor} /></TabsContent>
@@ -57,6 +59,7 @@ export default function ConfigPedidos() {
           <TabsContent value="demanda" className="mt-4"><SobDemanda podeEditar={gestor && can('configuracoes', 'edit')} /></TabsContent>
           <TabsContent value="papeis" className="mt-4"><Papeis podeEditar={podeEditar} /></TabsContent>
           <TabsContent value="avisos" className="mt-4"><Avisos podeEditar={podeEditar} /></TabsContent>
+          <TabsContent value="importar" className="mt-4"><ImportarPlanilha podeEditar={gestor} /></TabsContent>
         </Tabs>
       </div>
     </div>
@@ -457,7 +460,7 @@ function Tetos({ podeEditar }: { podeEditar: boolean }) {
   );
 }
 
-// ---------- Postos sob demanda ----------
+// ---------- Itens por posto (e sob demanda) ----------
 
 function SobDemanda({ podeEditar }: { podeEditar: boolean }) {
   const [postos, setPostos] = useState<(Posto & { sob_demanda?: boolean })[]>([]);
@@ -478,7 +481,7 @@ function SobDemanda({ podeEditar }: { podeEditar: boolean }) {
   };
 
   const salvar = async () => {
-    if (marcado && itens.length === 0) return toast.error('Marque os itens liberados para o posto.');
+    if (marcado && itens.length === 0) return toast.error('Posto sob demanda precisa da lista de itens.');
     setSalvando(true);
     try {
       await salvarPostoSobDemanda(postoId, marcado, itens);
@@ -493,10 +496,11 @@ function SobDemanda({ podeEditar }: { podeEditar: boolean }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Postos sob demanda</CardTitle>
+        <CardTitle className="text-lg">Itens por posto</CardTitle>
         <CardDescription>
-          Posto sob demanda só vê, no link do encarregado, os itens liberados para ele. Os demais postos veem o catálogo inteiro.
-          {sobDemanda.length > 0 && <> Hoje: {sobDemanda.map(p => p.nome).join(', ')}.</>}
+          Posto com lista só vê, no link do encarregado, os itens da lista dele; posto sem lista vê o catálogo inteiro. A lista pode vir da
+          aba Importar planilha. Posto sob demanda tem os pedidos cobrados do cliente e não conta no teto.
+          {sobDemanda.length > 0 && <> Sob demanda hoje: {sobDemanda.map(p => p.nome).join(', ')}.</>}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -504,16 +508,23 @@ function SobDemanda({ podeEditar }: { podeEditar: boolean }) {
           <Label>Posto</Label>
           <Select value={postoId || undefined} onValueChange={escolher}>
             <SelectTrigger><SelectValue placeholder="Escolha o posto" /></SelectTrigger>
-            <SelectContent>{postos.map(p => <SelectItem key={p.id} value={p.id}>{p.nome} ({p.uf}){p.sob_demanda ? ' — sob demanda' : ''}</SelectItem>)}</SelectContent>
+            <SelectContent>{postos.map(p => {
+              const n = liberados.filter(l => l.posto_id === p.id).length;
+              return <SelectItem key={p.id} value={p.id}>{p.nome} ({p.uf}){n ? ` — ${n} itens` : ' — catálogo inteiro'}{p.sob_demanda ? ' · sob demanda' : ''}</SelectItem>;
+            })}</SelectContent>
           </Select>
         </div>
         {postoId && (
           <>
             <div className="flex items-center gap-2">
               <Switch id="sob" checked={marcado} disabled={!podeEditar} onCheckedChange={setMarcado} />
-              <Label htmlFor="sob">Posto sob demanda</Label>
+              <Label htmlFor="sob">Posto sob demanda (cobrado do cliente, fora do teto)</Label>
             </div>
-            {marcado && (
+            <p className="text-sm text-muted-foreground">
+              Lista do posto: {itens.length ? `${itens.length} item(ns) marcados` : 'vazia (o encarregado vê o catálogo inteiro)'}.
+              {itens.length > 0 && <button type="button" className="ml-2 text-primary hover:underline" disabled={!podeEditar} onClick={() => setItens([])}>Limpar lista</button>}
+            </p>
+            {(
               <div className="max-h-72 overflow-y-auto rounded-md border p-2 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
                 {pediveis.map(m => (
                   <label key={m.id} className="flex items-center gap-2 text-sm">

@@ -569,13 +569,13 @@ BEGIN
 END $$;
 
 -- Item que pode ser pedido: ativo, sem variações ativas (o pai só agrupa) e,
--- em posto sob demanda, liberado para o posto.
+-- quando o posto tem lista própria (ou é sob demanda), está na lista do posto.
 CREATE OR REPLACE FUNCTION public._pm_pedivel(_material_id uuid, _posto public.postos)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT EXISTS (SELECT 1 FROM materiais m WHERE m.id = _material_id AND m.ativo
       AND (m.item_pai_id IS NULL OR EXISTS (SELECT 1 FROM materiais p WHERE p.id = m.item_pai_id AND p.ativo))
       AND NOT EXISTS (SELECT 1 FROM materiais f WHERE f.item_pai_id = m.id AND f.ativo))
-    AND (NOT coalesce(_posto.sob_demanda, false)
+    AND (NOT (coalesce(_posto.sob_demanda, false) OR EXISTS (SELECT 1 FROM posto_materiais WHERE posto_id = _posto.id))
          OR EXISTS (SELECT 1 FROM posto_materiais WHERE posto_id = _posto.id AND material_id = _material_id))
 $$;
 
@@ -700,10 +700,11 @@ BEGIN
   RETURN jsonb_build_object(
     'nome', _s.nome, 'cargo', _s.cargo, 'uf', _s.uf,
     'posto_sugerido', public._pm_posto_do_colaborador(_s),
-    -- Posto sob demanda leva a lista dos itens liberados.
+    -- Posto com lista própria (ou sob demanda) leva a lista: o encarregado só vê esses itens.
     'postos', (SELECT coalesce(jsonb_agg(jsonb_build_object('id', p.id, 'nome', p.nome, 'uf', p.uf,
                  'sob_demanda', p.sob_demanda,
-                 'itens', CASE WHEN p.sob_demanda THEN (SELECT coalesce(jsonb_agg(pm.material_id), '[]')
+                 'itens', CASE WHEN p.sob_demanda OR EXISTS (SELECT 1 FROM posto_materiais x WHERE x.posto_id = p.id)
+                               THEN (SELECT coalesce(jsonb_agg(pm.material_id), '[]')
                                                          FROM posto_materiais pm WHERE pm.posto_id = p.id) END)
                  ORDER BY p.nome), '[]')
                FROM postos p WHERE p.ativo AND (_s.uf IS NULL OR p.uf = _s.uf)),

@@ -2532,6 +2532,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      pedidos_importar_planilha: {
+        Args: { _postos: Json; _teto_desde: string }
+        Returns: Json
+      }
       estoque_abrir_plantao: {
         Args: { _posto_id: string; _foto: string; _itens: Json; _observacao?: string | null }
         Returns: string

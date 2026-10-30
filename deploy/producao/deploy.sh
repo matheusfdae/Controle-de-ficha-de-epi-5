@@ -57,6 +57,7 @@ MIGRACOES=(
   "20261029120000_email_pendentes.sql|SELECT to_regclass('public.email_pendentes_estados') IS NOT NULL"
   "20261030120000_pedidos_material.sql|SELECT to_regclass('public.pedidos_material') IS NOT NULL"
   "20261031120000_estoque_posto.sql|SELECT to_regclass('public.estoque_plantoes') IS NOT NULL"
+  "20261031130000_importar_planilha_postos.sql|SELECT to_regprocedure('public.pedidos_importar_planilha(jsonb,date)') IS NOT NULL"
 )
 PENDENTES=()
 echo ">>> Migrations:"
