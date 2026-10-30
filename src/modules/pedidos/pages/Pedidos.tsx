@@ -18,11 +18,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { listPostos, type Posto } from '@/services/postosService';
 import {
   ETAPAS, FILAS, RESPONSAVEIS, STATUS_PEDIDO, aprovarExcesso, cancelarPedido, conferirPedido, dataBr, formatarMoeda,
-  formatarNumero, hojeBr, inicioDoMes, listAprovadores, listGastos, listMateriais, listPedidos, listTetos, nomeMaterial,
+  formatarNumero, hojeBr, inicioDoMes, listAprovadores, listGastos, listMateriais, listPedidos, listRecorrencias, listTetos, listUsuarios, nomeMaterial,
   orcarPedido, precosVigentes, rotuloPapel, tetoNoMes, valorDoPedido, variacaoTabela,
-  type Aprovador, type Material, type Papel, type PedidoCompleto, type StatusPedido, type TetoPosto,
+  type Aprovador, type Material, type Papel, type PedidoCompleto, type Recorrencia, type StatusPedido, type TetoPosto,
 } from '../lib/pedidosService';
 import RegistrarCompra from '../components/RegistrarCompra';
+import { ListaRepeticoes, RepetirPedido } from '../components/Repeticoes';
 
 /**
  * Pedidos de material: filas por etapa (conferência, orçamento, aprovação do
@@ -63,6 +64,8 @@ export default function Pedidos() {
   const [statusFiltro, setStatusFiltro] = useState('todos');
   const [busca, setBusca] = useState('');
   const [aberto, setAberto] = useState<string | null>(null);
+  const [recorrencias, setRecorrencias] = useState<Recorrencia[]>([]);
+  const [usuarios, setUsuarios] = useState<{ id: string; nome: string }[]>([]);
   // Vindo do sino de pedidos (/pedidos?pedido=<id>): abre o pedido direto.
   const [params, setParams] = useSearchParams();
   const pedidoDaUrl = params.get('pedido');
@@ -76,6 +79,8 @@ export default function Pedidos() {
         listGastos(inicioDoMes(hoje), hoje), listAprovadores(), precosVigentes(),
       ]);
       setPedidos(p); setPostos(po); setMateriais(m); setTetos(t); setGastosMes(g); setAprovadores(a); setTabela(tb);
+      const [rec, us] = await Promise.all([listRecorrencias(), listUsuarios().catch(() => [])]);
+      setRecorrencias(rec); setUsuarios(us);
     } catch (e) {
       toast.error('Erro ao carregar os pedidos: ' + (e as Error).message);
     } finally {
@@ -144,6 +149,7 @@ export default function Pedidos() {
                 <TabsTrigger key={f.status} value={f.status}>{f.rotulo} ({pedidos.filter(p => p.status === f.status).length})</TabsTrigger>
               ))}
               <TabsTrigger value="todos">Todos</TabsTrigger>
+              <TabsTrigger value="repeticoes" className="gap-1"><Repeat className="h-3.5 w-3.5" /> Repetições ({recorrencias.length})</TabsTrigger>
             </TabsList>
           </Tabs>
           <div className="flex flex-wrap gap-2">
@@ -171,6 +177,12 @@ export default function Pedidos() {
           </div>
         </div>
 
+        {aba === 'repeticoes' ? (
+          <ListaRepeticoes recorrencias={recorrencias} materiais={materiais} nomePosto={nomePosto}
+            nomeUsuario={id => usuarios.find(u => u.id === id)?.nome ?? 'Supervisor'}
+            podeEncerrar={r => { const po = postos.find(x => x.id === r.posto_id); return !!po && temPapel(['supervisor', 'compras', 'gerencia'], { uf: po.uf, posto_id: po.id }); }}
+            onMudou={carregar} />
+        ) : (
         <Card>
           <CardContent className="p-0 overflow-x-auto">
             <Table>
@@ -227,6 +239,7 @@ export default function Pedidos() {
             </Table>
           </CardContent>
         </Card>
+        )}
       </div>
 
       {pedidoAberto && (
@@ -235,16 +248,22 @@ export default function Pedidos() {
           minhaVez={minhaVez(pedidoAberto)}
           podeCancelar={!['faturada', 'cancelada', 'reprovada'].includes(pedidoAberto.status) && temPapel(['compras', 'gerencia'], pedidoAberto)}
           podeFaturar={['a_faturar', 'faturada'].includes(pedidoAberto.status) && (temPapel(['compras'], pedidoAberto) || can('pedidos_material', 'create'))}
+          repeticao={recorrencias.find(r => r.origem_pedido_id === pedidoAberto.id || r.id === pedidoAberto.recorrencia_id)}
+          podeRepetir={!['cancelada', 'reprovada', 'devolvida'].includes(pedidoAberto.status) && temPapel(['supervisor', 'gerencia'], pedidoAberto)}
+          podeEncerrarRepeticao={temPapel(['supervisor', 'compras', 'gerencia'], pedidoAberto)}
+          onRepeticao={carregar}
           onFechar={() => setAberto(null)} onAtualizado={async () => { setAberto(null); await carregar(); window.dispatchEvent(new Event('pedidos-atualizados')); }} />
       )}
     </div>
   );
 }
 
-function DetalhePedido({ pedido: p, posto, materiais, tabela, saldo, minhaVez, podeCancelar, podeFaturar, onFechar, onAtualizado }: {
+function DetalhePedido({ pedido: p, posto, materiais, tabela, saldo, minhaVez, podeCancelar, podeFaturar, repeticao, podeRepetir,
+  podeEncerrarRepeticao, onRepeticao, onFechar, onAtualizado }: {
   pedido: PedidoCompleto; posto: string; materiais: Material[]; tabela: Map<string, number>;
   saldo: { teto: number | null; consumido: number };
   minhaVez: boolean; podeCancelar: boolean; podeFaturar: boolean;
+  repeticao: Recorrencia | undefined; podeRepetir: boolean; podeEncerrarRepeticao: boolean; onRepeticao: () => Promise<void>;
   onFechar: () => void; onAtualizado: () => Promise<void>;
 }) {
   const [quantidades, setQuantidades] = useState<Record<string, string>>(
@@ -422,6 +441,8 @@ function DetalhePedido({ pedido: p, posto, materiais, tabela, saldo, minhaVez, p
         </Table>
         {p.observacao && <p className="text-sm"><span className="text-muted-foreground">Observação do encarregado:</span> {p.observacao}</p>}
 
+        <RepetirPedido pedidoId={p.id} repeticao={repeticao} podeRepetir={podeRepetir} podeEncerrar={podeEncerrarRepeticao} onMudou={onRepeticao} />
+
         <div className="space-y-1">
           <p className="text-sm font-semibold">Histórico</p>
           <ol className="text-sm space-y-1">
@@ -429,9 +450,15 @@ function DetalhePedido({ pedido: p, posto, materiais, tabela, saldo, minhaVez, p
               <li key={e.id} className="flex gap-2">
                 <span className="text-muted-foreground whitespace-nowrap">{new Date(e.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</span>
                 <span>
-                  <strong>{STATUS_PEDIDO[e.para_status]}</strong>
-                  {e.usuario_nome && ` — ${e.usuario_nome}`}{e.papel && ` (${rotuloPapel(e.papel)})`}
-                  {e.comentario && <span className="block text-muted-foreground">“{e.comentario}”</span>}
+                  {e.de_status === e.para_status ? (
+                    <><strong>{e.comentario}</strong>{e.usuario_nome && ` — ${e.usuario_nome}`}</>
+                  ) : (
+                    <>
+                      <strong>{STATUS_PEDIDO[e.para_status]}</strong>
+                      {e.usuario_nome && ` — ${e.usuario_nome}`}{e.papel && ` (${rotuloPapel(e.papel)})`}
+                      {e.comentario && <span className="block text-muted-foreground">“{e.comentario}”</span>}
+                    </>
+                  )}
                   {e.payload?.ajustes?.length ? (
                     <span className="block text-muted-foreground text-xs">
                       Ajustes: {e.payload.ajustes.map(a => `${a.item}: ${formatarNumero(Number(a.de))} → ${formatarNumero(Number(a.para))}`).join('; ')}

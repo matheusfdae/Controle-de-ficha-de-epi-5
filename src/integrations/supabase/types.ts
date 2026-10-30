@@ -1088,7 +1088,7 @@ export type Database = {
         Relationships: []
       }
       pedido_recorrencias: {
-        Row: { id: string; posto_id: string; frequencia: string; itens: Json; observacao: string | null; proxima_data: string; ativa: boolean; encerrada_em: string | null; solicitante_senior_id: string | null; solicitante_nome: string; solicitante_matricula: string | null; solicitante_cargo: string | null; solicitante_telefone: string | null; created_at: string }
+        Row: { id: string; posto_id: string; frequencia: string; itens: Json; observacao: string | null; proxima_data: string; ativa: boolean; encerrada_em: string | null; encerrada_por: string | null; criado_por: string | null; origem_pedido_id: string | null; solicitante_senior_id: string | null; solicitante_nome: string; solicitante_matricula: string | null; solicitante_cargo: string | null; solicitante_telefone: string | null; created_at: string }
         Insert: { [_ in never]: never }
         Update: { [_ in never]: never }
         Relationships: []
@@ -2507,6 +2507,14 @@ export type Database = {
       pedidos_material_minhas_pendencias: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      pedido_material_repetir: {
+        Args: { _pedido_id: string; _frequencia: string; _primeira?: string | null }
+        Returns: Json
+      }
+      pedido_material_encerrar_recorrencia: {
+        Args: { _recorrencia_id: string }
+        Returns: undefined
       }
       pedidos_material_minhas_tarefas: {
         Args: Record<PropertyKey, never>

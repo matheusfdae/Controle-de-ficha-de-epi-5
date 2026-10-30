@@ -185,6 +185,12 @@ CREATE TABLE IF NOT EXISTS public.pedido_numeracao (
   ultimo integer NOT NULL
 );
 
+-- Repetição programada pelo supervisor/gerência a partir de um pedido
+-- (criado_por NULL = o encarregado pediu pelo link).
+ALTER TABLE public.pedido_recorrencias ADD COLUMN IF NOT EXISTS criado_por uuid REFERENCES public.profiles(id) ON DELETE SET NULL;
+ALTER TABLE public.pedido_recorrencias ADD COLUMN IF NOT EXISTS encerrada_por text;
+ALTER TABLE public.pedido_recorrencias ADD COLUMN IF NOT EXISTS origem_pedido_id uuid;
+
 -- ---------- Pedido ----------
 CREATE TABLE IF NOT EXISTS public.pedidos_material (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -804,7 +810,7 @@ BEGIN
     PERFORM public._pm_evento(_pedido_id, _de, 'cancelada', 'encarregado', 'Cancelado pelo encarregado', NULL, _s.nome);
   END IF;
   IF _recorrencia_id IS NOT NULL THEN
-    UPDATE pedido_recorrencias SET ativa = false, encerrada_em = now()
+    UPDATE pedido_recorrencias SET ativa = false, encerrada_em = now(), encerrada_por = _s.nome || ' (encarregado)'
     WHERE id = _recorrencia_id AND solicitante_senior_id = _s.id AND ativa;
     IF NOT FOUND THEN RAISE EXCEPTION 'Pedido recorrente não encontrado.'; END IF;
   END IF;
@@ -992,6 +998,70 @@ BEGIN
   UPDATE pedidos_material SET status = 'cancelada' WHERE id = _p.id;
   PERFORM public._pm_evento(_p.id, _p.status, 'cancelada', NULL, _motivo);
   RETURN jsonb_build_object('status', 'cancelada');
+END $$;
+
+-- Supervisor/gerência: repete um pedido (itens e quantidades atuais) com a
+-- frequência escolhida. Cada repetição é um pedido novo que passa pela
+-- conferência normalmente.
+CREATE OR REPLACE FUNCTION public.pedido_material_repetir(_pedido_id uuid, _frequencia text, _primeira date DEFAULT NULL)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  _p public.pedidos_material;
+  _hoje date := public._pm_hoje();
+  _data date;
+  _id uuid;
+  _rotulo text;
+BEGIN
+  SELECT * INTO _p FROM pedidos_material WHERE id = _pedido_id;
+  IF _p.id IS NULL OR NOT public._pm_ve(_p.uf, _p.posto_id) THEN RAISE EXCEPTION 'Pedido não encontrado.'; END IF;
+  IF NOT public._pm_tem_papel(ARRAY['supervisor', 'gerencia'], _p.uf, _p.posto_id) THEN
+    RAISE EXCEPTION 'Só o supervisor ou a gerência do posto programa a repetição.';
+  END IF;
+  IF _frequencia IS NULL OR _frequencia NOT IN ('diaria', 'semanal', 'quinzenal', 'mensal') THEN
+    RAISE EXCEPTION 'Escolha a frequência.';
+  END IF;
+  IF _p.status IN ('cancelada', 'reprovada', 'devolvida') THEN
+    RAISE EXCEPTION 'Pedido cancelado, reprovado ou devolvido não pode ser repetido.';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pedido_recorrencias WHERE ativa AND (origem_pedido_id = _p.id OR id = _p.recorrencia_id)) THEN
+    RAISE EXCEPTION 'Este pedido já se repete. Encerre a repetição atual antes de programar outra.';
+  END IF;
+  _data := coalesce(_primeira, public._pm_proxima(_hoje, _frequencia));
+  IF _data <= _hoje THEN RAISE EXCEPTION 'A primeira repetição tem de ser depois de hoje.'; END IF;
+  IF _data > _hoje + 90 THEN RAISE EXCEPTION 'A primeira repetição tem de ser nos próximos 90 dias.'; END IF;
+
+  INSERT INTO pedido_recorrencias (posto_id, frequencia, itens, observacao, proxima_data, criado_por, origem_pedido_id,
+    solicitante_senior_id, solicitante_nome, solicitante_matricula, solicitante_cargo, solicitante_telefone)
+  SELECT _p.posto_id, _frequencia,
+    (SELECT jsonb_agg(jsonb_build_object('material_id', i.material_id, 'quantidade', i.quantidade))
+     FROM pedidos_material_itens i WHERE i.pedido_id = _p.id),
+    _p.observacao, _data, public.current_profile_id(), _p.id,
+    _p.solicitante_senior_id, _p.solicitante_nome, _p.solicitante_matricula, _p.solicitante_cargo, _p.solicitante_telefone
+  RETURNING id INTO _id;
+
+  _rotulo := CASE _frequencia WHEN 'diaria' THEN 'todo dia' WHEN 'semanal' THEN 'toda semana'
+    WHEN 'quinzenal' THEN 'a cada 15 dias' ELSE 'todo mês' END;
+  PERFORM public._pm_evento(_p.id, _p.status, _p.status, NULL,
+    format('Repetição programada: %s, a partir de %s', _rotulo, to_char(_data, 'DD/MM/YYYY')));
+  RETURN jsonb_build_object('id', _id, 'proxima_data', _data);
+END $$;
+
+-- Encerrar uma repetição pelo sistema: supervisor, compras ou gerência do posto.
+CREATE OR REPLACE FUNCTION public.pedido_material_encerrar_recorrencia(_recorrencia_id uuid)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE _r public.pedido_recorrencias; _uf text;
+BEGIN
+  SELECT * INTO _r FROM pedido_recorrencias WHERE id = _recorrencia_id;
+  SELECT uf INTO _uf FROM postos WHERE id = _r.posto_id;
+  IF _r.id IS NULL OR NOT public._pm_tem_papel(ARRAY['supervisor', 'compras', 'gerencia'], _uf, _r.posto_id) THEN
+    RAISE EXCEPTION 'Repetição não encontrada.';
+  END IF;
+  IF NOT _r.ativa THEN RETURN; END IF;
+  UPDATE pedido_recorrencias SET ativa = false, encerrada_em = now(),
+    encerrada_por = (SELECT nome_completo FROM profiles WHERE id = public.current_profile_id())
+  WHERE id = _r.id;
 END $$;
 
 -- Pedidos que esperam o usuário atual, com a etapa (sino e avisos na tela).
@@ -1276,7 +1346,8 @@ BEGIN
     'public.material_compra_registrar(uuid, uuid, text, text, date, jsonb, text, text, text)',
     'public.nova_tabela_precos(text)', 'public.publicar_tabela_precos(uuid, date)',
     'public.simular_tabela_precos(uuid)', 'public.pedidos_material_minhas_pendencias()',
-    'public.pedidos_material_marcar_cobrados(uuid[], boolean, text)', 'public.pedidos_material_minhas_tarefas()'] LOOP
+    'public.pedidos_material_marcar_cobrados(uuid[], boolean, text)', 'public.pedidos_material_minhas_tarefas()',
+    'public.pedido_material_repetir(uuid, text, date)', 'public.pedido_material_encerrar_recorrencia(uuid)'] LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC, anon', f);
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO authenticated', f);
   END LOOP;

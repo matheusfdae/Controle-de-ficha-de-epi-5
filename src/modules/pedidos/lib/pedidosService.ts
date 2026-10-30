@@ -398,6 +398,43 @@ export function resumoCobranca(linhas: Pick<LinhaCobranca, 'posto_id' | 'valor' 
     .sort((a, b) => b.a_cobrar - a.a_cobrar || b.cobrado - a.cobrado);
 }
 
+// ---------- Repetições (pedidos recorrentes) ----------
+
+export interface Recorrencia {
+  id: string; posto_id: string; frequencia: Exclude<Frequencia, 'unica'>; itens: { material_id: string; quantidade: number }[];
+  observacao: string | null; proxima_data: string; ativa: boolean; encerrada_em: string | null; encerrada_por: string | null;
+  criado_por: string | null; origem_pedido_id: string | null; solicitante_nome: string; created_at: string;
+}
+
+export async function listRecorrencias(): Promise<Recorrencia[]> {
+  const { data, error } = await supabase.from('pedido_recorrencias').select('*').eq('ativa', true).order('proxima_data');
+  if (error) throw error;
+  return (data ?? []).map(r => ({ ...r, itens: ((r.itens ?? []) as { material_id: string; quantidade: number }[])
+    .map(i => ({ material_id: i.material_id, quantidade: Number(i.quantidade) })) })) as Recorrencia[];
+}
+
+export async function repetirPedido(pedidoId: string, frequencia: Exclude<Frequencia, 'unica'>, primeira: string) {
+  const { data, error } = await supabase.rpc('pedido_material_repetir', { _pedido_id: pedidoId, _frequencia: frequencia, _primeira: primeira });
+  if (error) throw new Error(error.message);
+  return data as { id: string; proxima_data: string };
+}
+
+export async function encerrarRecorrencia(id: string) {
+  const { error } = await supabase.rpc('pedido_material_encerrar_recorrencia', { _recorrencia_id: id });
+  if (error) throw new Error(error.message);
+}
+
+/** Próxima data de uma frequência a partir de `data` (igual a _pm_proxima). */
+export function proximaData(data: string, frequencia: Exclude<Frequencia, 'unica'>) {
+  const d = new Date(data + 'T12:00:00Z');
+  if (frequencia === 'mensal') {
+    const dia = d.getUTCDate();
+    d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + 1);
+    d.setUTCDate(Math.min(dia, new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate()));
+  } else d.setUTCDate(d.getUTCDate() + ({ diaria: 1, semanal: 7, quinzenal: 14 } as const)[frequencia]);
+  return d.toISOString().slice(0, 10);
+}
+
 export interface Tarefa {
   id: string; codigo: string; status: StatusPedido; posto: string; uf: string; valor: number; excede_teto: boolean; desde: string;
 }
