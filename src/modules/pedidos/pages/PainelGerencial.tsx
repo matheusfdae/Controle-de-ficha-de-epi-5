@@ -23,7 +23,7 @@ import {
   COR_SITUACAO, ROTULO_SITUACAO, gastoMensal, indicadores, mesesAte, porEtapa, porPosto, rotuloMes, tempoPorEtapa, topItens,
   type LinhaPosto, type Situacao,
 } from '../lib/gerencial';
-import Torres3D from '../components/Torres3D';
+import BarrasPostos3D from '../components/BarrasPostos3D';
 
 /**
  * Painel Gerencial dos pedidos de material: indicadores do mês, vista 3D dos
@@ -170,11 +170,11 @@ export default function PainelGerencial() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Postos em 3D: gasto x teto de {rotuloMes(mes)}</CardTitle>
-            <CardDescription>Cada torre é um posto. A altura é o gasto do mês e a caixa tracejada vai até o teto: torre saindo da caixa = acima do teto.</CardDescription>
+            <CardTitle className="text-base">Uso do teto por posto — {rotuloMes(mes)}</CardTitle>
+            <CardDescription>Do menor para o maior uso. Clique numa barra para ver todos os pedidos do posto no mês.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Torres3D linhas={linhas} onEscolher={() => navigate('/pedidos/painel')} />
+            <BarrasPostos3D linhas={linhas} onEscolher={l => navigate(`/pedidos/posto/${l.id}?mes=${mes}`)} />
           </CardContent>
         </Card>
 
@@ -278,7 +278,7 @@ export default function PainelGerencial() {
                   {linhas.map((l: LinhaPosto) => {
                     const Icone = ICONE_SITUACAO[l.situacao];
                     return (
-                      <TableRow key={l.id}>
+                      <TableRow key={l.id} className="cursor-pointer" onClick={() => navigate(`/pedidos/posto/${l.id}?mes=${mes}`)}>
                         <TableCell className="font-medium">{l.nome} <span className="text-xs text-muted-foreground">{l.uf}</span></TableCell>
                         <TableCell className="text-right tabular-nums">{l.teto == null ? '—' : formatarMoeda(l.teto)}</TableCell>
                         <TableCell className="text-right tabular-nums">{formatarMoeda(l.gasto)}</TableCell>

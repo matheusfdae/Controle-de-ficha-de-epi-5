@@ -55,6 +55,7 @@ const PedidosPrecos       = lazy(() => import('./modules/pedidos/pages/Relatorio
 const PedidosCobranca     = lazy(() => import('./modules/pedidos/pages/CobrancaCliente'));
 const PedidosGerencial    = lazy(() => import('./modules/pedidos/pages/PainelGerencial'));
 const PedidosEstoque      = lazy(() => import('./modules/pedidos/pages/EstoquePosto'));
+const PedidosDoPosto      = lazy(() => import('./modules/pedidos/pages/PedidosDoPosto'));
 const PedidosConfig       = lazy(() => import('./modules/pedidos/pages/ConfigPedidos'));
 
 const queryClient = new QueryClient({
@@ -163,6 +164,7 @@ function AppRoutes() {
           {/* Sem RequireModule: aprovador sem a permissão do módulo também decide (o banco filtra o que ele vê). */}
           <Route path="/pedidos"               element={<Pedidos />} />
           <Route path="/pedidos/estoque"       element={<PedidosEstoque />} />
+          <Route path="/pedidos/posto/:postoId" element={<PedidosDoPosto />} />
           <Route path="/pedidos/painel"        element={<RequireModule module="pedidos_material"><PedidosPainel /></RequireModule>} />
           <Route path="/pedidos/precos"        element={<RequireModule module="pedidos_material"><PedidosPrecos /></RequireModule>} />
           <Route path="/pedidos/cobranca"      element={<RequireModule module="pedidos_material"><PedidosCobranca /></RequireModule>} />
