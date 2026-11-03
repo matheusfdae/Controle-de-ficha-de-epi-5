@@ -1,35 +1,52 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { LinhaPosto } from '../lib/gerencial';
 
 /**
  * Pedidos do mês por posto em barras 3D (estilo infográfico, só CSS): altura =
  * número de pedidos, do menor para o maior, número da posição na frente, total
  * e nome do posto acima, ligados por uma linha. Clique abre os pedidos do posto
- * no mês.
+ * no mês. Cabe na largura do cartão: as barras estreitam até um mínimo e, daí
+ * para baixo (celular), o desenho todo diminui — sem rolagem para o lado.
  */
 
-const LARG = 64;      // frente da barra
-const FUNDO = 16;     // profundidade (topo e lateral)
-const PASSO = 136;    // espaço por barra
-const ALTURA = 280;   // altura do maior valor
+const PASSO_MAX = 136; // espaço por barra
+const PASSO_MIN = 96;
+const ALTURA = 280;    // altura do maior valor
 const MAX_BARRAS = 10;
 
 const AZUL = { frente: 'linear-gradient(90deg, #1b5fbf 0%, #2a78d6 55%, #3b8ce8 100%)', topo: '#6aaef5', lado: '#164f9f' };
 
 export default function BarrasPostos3D({ linhas, onEscolher }: { linhas: LinhaPosto[]; onEscolher: (l: LinhaPosto) => void }) {
   const [foco, setFoco] = useState<string | null>(null);
+  const caixa = useRef<HTMLDivElement>(null);
+  const [disponivel, setDisponivel] = useState(PASSO_MAX * MAX_BARRAS + 40);
+  useEffect(() => {
+    const el = caixa.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setDisponivel(e.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const ordenadas = [...linhas].sort((a, b) => a.pedidos - b.pedidos || a.linhas - b.linhas);
-  const barras = ordenadas.slice(-MAX_BARRAS);
-  if (!barras.length) return <p className="text-sm text-muted-foreground py-16 text-center">Nenhum pedido neste mês.</p>;
+  // Tela estreita (celular): só os 5 que mais pediram, para continuar legível.
+  const barras = ordenadas.slice(-(disponivel < 600 ? 5 : MAX_BARRAS));
+  if (!barras.length) return <div ref={caixa}><p className="text-sm text-muted-foreground py-16 text-center">Nenhum pedido neste mês.</p></div>;
 
   const maior = Math.max(...barras.map(b => b.pedidos)) * 1.08;
   const h = (n: number) => Math.max(10, (n / maior) * ALTURA);
+  const PASSO = Math.max(PASSO_MIN, Math.min(PASSO_MAX, (disponivel - 40) / barras.length));
+  const LARG = Math.round(PASSO * 0.47);   // frente da barra
+  const FUNDO = Math.round(PASSO * 0.12);  // profundidade (topo e lateral)
+  const ROTULO = PASSO - 10;               // caixa do total e do nome
+  const rotuloEsq = -(ROTULO - LARG - FUNDO) / 2;
   const largura = barras.length * PASSO + 40;
+  const escala = Math.min(1, disponivel / largura);
+  const alturaTotal = ALTURA + 210;
 
   return (
-    <div className="space-y-2">
-      <div className="overflow-x-auto pb-2">
-        <div className="relative mx-auto" style={{ width: largura, height: ALTURA + 210 }}
+    <div ref={caixa} className="space-y-2">
+      <div className="pb-2" style={{ height: alturaTotal * escala + 8 }}>
+        <div className="relative mx-auto" style={{ width: largura, height: alturaTotal, transform: escala < 1 ? `scale(${escala})` : undefined, transformOrigin: 'top left' }}
           role="img" aria-label={`Pedidos do mês de ${barras.length} postos, do menor para o maior`}>
           <div className="absolute left-0 right-0 h-px bg-border" style={{ bottom: 70 }} />
 
@@ -44,14 +61,14 @@ export default function BarrasPostos3D({ linhas, onEscolher }: { linhas: LinhaPo
                 className="absolute text-left focus-visible:outline-none group"
                 style={{ left: x, bottom: 70, width: LARG + FUNDO, height: alt + FUNDO + 130, transition: 'transform .2s', transform: ativo ? 'translateY(-4px)' : undefined }}>
                 {/* Total e nome, ligados à barra por uma linha */}
-                <span className="absolute left-[-16px] w-[124px] rounded-md bg-card/95 px-1.5 py-1 z-10" style={{ bottom: alt + FUNDO + 40 }}>
+                <span className="absolute rounded-md bg-card/95 px-1.5 py-1 z-10" style={{ left: rotuloEsq, width: ROTULO, bottom: alt + FUNDO + 40 }}>
                   <span className="block text-2xl font-extrabold tabular-nums leading-none text-[#1f6fd1] dark:text-[#5aa2f0]">
                     {b.pedidos} <span className="text-xs font-semibold">pedido{b.pedidos === 1 ? '' : 's'}</span>
                   </span>
                   <span className="mt-1 block border-b border-current pb-1 text-[10.5px] leading-tight text-muted-foreground line-clamp-2">{b.nome}</span>
                 </span>
                 <svg className="absolute overflow-visible pointer-events-none" style={{ left: 0, bottom: alt + FUNDO, width: 1, height: 1 }}>
-                  <line x1={-16 + 100} y1={-40} x2={LARG / 2 + FUNDO / 2} y2={-4} stroke="currentColor" strokeWidth={1} className="text-[#2a78d6]" />
+                  <line x1={rotuloEsq + ROTULO - 24} y1={-40} x2={LARG / 2 + FUNDO / 2} y2={-4} stroke="currentColor" strokeWidth={1} className="text-[#2a78d6]" />
                 </svg>
 
                 {/* Barra: frente, topo e lateral */}
