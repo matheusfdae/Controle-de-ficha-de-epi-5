@@ -7,13 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle2, ClipboardList, Loader2, LogOut, Pencil, Plus, Repeat, Send, ShoppingCart, Trash2, UserCheck, X } from 'lucide-react';
+import { CheckCircle2, ClipboardList, Loader2, LogOut, Pencil, Plus, Repeat, Search, Send, ShoppingCart, Trash2, UserCheck, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cpfValido, formatarCpf, formatarTelefone, matriculaValida, soDigitos } from '@/modules/crachas/lib/solicitacaoService';
 import {
   FREQUENCIAS, STATUS_PEDIDO, cancelarPedidoPublico, catalogoDoPosto, dataBr, enviarPedido, formatarNumero, identificar,
   nomePublico, reenviarPedido, rotuloFrequencia,
-  type Frequencia, type Identificado, type MaterialPublico, type PedidoDoSolicitante, type Solicitante,
+  type Frequencia, type Identificado, type MaterialPublico, type PedidoDoSolicitante, type PostoPublico, type Solicitante,
 } from '../lib/pedidosService';
 
 /**
@@ -45,6 +45,14 @@ const STATUS_ENCARREGADO: Record<string, string> = {
 
 interface Linha { material_id: string; quantidade: string }
 const linhaVazia = (): Linha => ({ material_id: '', quantidade: '' });
+/**
+ * Posto com lista: já vem uma linha por item, o encarregado só digita a
+ * quantidade (mantém o que já foi digitado). Sem lista: uma linha em branco.
+ */
+const linhasDoPosto = (posto: PostoPublico | undefined, catalogo: MaterialPublico[], atuais: Linha[] = []): Linha[] =>
+  posto?.itens == null || catalogo.length === 0
+    ? [linhaVazia()]
+    : catalogo.map(m => ({ material_id: m.id, quantidade: atuais.find(l => l.material_id === m.id)?.quantidade ?? '' }));
 
 /** Linhas de itens (posto + materiais) usadas no pedido novo e na correção do devolvido. */
 function ListaItens({ linhas, setLinhas, catalogo }: {
@@ -103,10 +111,60 @@ function ListaItens({ linhas, setLinhas, catalogo }: {
   );
 }
 
-/** Converte as linhas; devolve a mensagem de erro em vez dos itens quando algo não confere. */
+/** Sem acento e em minúsculas, para a busca. */
+const chaveBusca = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+/**
+ * Lista do posto (já vem com todos os itens dele): nome inteiro, quantidade à
+ * direita e busca no topo. Feita para o celular.
+ */
+function ListaDoPosto({ linhas, setLinhas, catalogo }: {
+  linhas: Linha[]; setLinhas: (f: (ls: Linha[]) => Linha[]) => void; catalogo: MaterialPublico[];
+}) {
+  const [busca, setBusca] = useState('');
+  const mudar = (id: string, valor: string) =>
+    setLinhas(ls => ls.map(l => (l.material_id === id ? { ...l, quantidade: valor.replace(/[^\d.,]/g, '').slice(0, 9) } : l)));
+  const termo = chaveBusca(busca.trim());
+  const visiveis = linhas.filter(l => {
+    const m = catalogo.find(x => x.id === l.material_id);
+    return m && (!termo || chaveBusca(nomePublico(m)).includes(termo));
+  });
+
+  return (
+    <div className="space-y-2">
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input className="pl-8" placeholder={`Buscar entre os ${linhas.length} itens do posto`} value={busca}
+          onChange={e => setBusca(e.target.value)} aria-label="Buscar item" />
+      </div>
+      <div className="rounded-md border divide-y">
+        {visiveis.map(l => {
+          const m = catalogo.find(x => x.id === l.material_id)!;
+          return (
+            <label key={l.material_id} className={`flex items-center gap-3 px-3 py-2 ${l.quantidade ? 'bg-primary/10' : ''}`}>
+              <span className="flex-1 min-w-0 text-sm leading-snug break-words">{nomePublico(m)}</span>
+              <span className="w-20 shrink-0 text-center">
+                <Input inputMode="decimal" placeholder="Qtd." className="h-9 text-center" aria-label={`Quantidade de ${nomePublico(m)}`}
+                  value={l.quantidade} onChange={e => mudar(l.material_id, e.target.value)} />
+                <span className="block text-[11px] text-muted-foreground mt-0.5 truncate">{m.unidade}</span>
+              </span>
+            </label>
+          );
+        })}
+        {visiveis.length === 0 && <p className="px-3 py-4 text-sm text-muted-foreground text-center">Nenhum item com "{busca}".</p>}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Converte as linhas; devolve a mensagem de erro em vez dos itens quando algo
+ * não confere. Linha sem quantidade não entra no pedido.
+ */
 function converter(linhas: Linha[], catalogo: MaterialPublico[]): { material_id: string; quantidade: number }[] | string {
-  const preenchidas = linhas.filter(l => l.material_id || l.quantidade);
-  if (preenchidas.length === 0) return 'Adicione pelo menos um item.';
+  const preenchidas = linhas.filter(l => l.quantidade.trim());
+  if (preenchidas.length === 0) return 'Informe a quantidade de pelo menos um item.';
+  if (preenchidas.length > 50) return 'No máximo 50 itens por pedido.';
   const itens: { material_id: string; quantidade: number }[] = [];
   for (const l of preenchidas) {
     if (!l.material_id) return 'Escolha o item de todas as linhas.';
@@ -140,6 +198,8 @@ const PedidoMaterialPublico = () => {
   };
 
   const catalogo = useMemo(() => catalogoDoPosto(dados?.materiais ?? [], dados?.postos.find(p => p.id === postoId)), [dados, postoId]);
+  const comLista = dados?.postos.find(p => p.id === postoId)?.itens != null && catalogo.length > 0;
+  const noPedido = linhas.filter(l => l.material_id && l.quantidade.trim()).length;
 
   const entrar = (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,7 +216,10 @@ const PedidoMaterialPublico = () => {
       const r = await identificar(s);
       setQuem(s);
       setDados(r);
-      setPostoId(r.posto_sugerido ?? (r.postos.length === 1 ? r.postos[0].id : ''));
+      const inicial = r.posto_sugerido ?? (r.postos.length === 1 ? r.postos[0].id : '');
+      const posto = r.postos.find(p => p.id === inicial);
+      setPostoId(inicial);
+      setLinhas(linhasDoPosto(posto, catalogoDoPosto(r.materiais, posto)));
       if (s.matricula) lembrar({ matricula: String(s.matricula) });
       if (r.pedidos.some(p => p.status === 'devolvida')) setAba('meus');
     });
@@ -171,8 +234,10 @@ const PedidoMaterialPublico = () => {
 
   const trocarPosto = (id: string) => {
     setPostoId(id);
-    // Itens que o posto novo não tem saem da lista.
-    const novo = catalogoDoPosto(dados?.materiais ?? [], dados?.postos.find(p => p.id === id));
+    const posto = dados?.postos.find(p => p.id === id);
+    const novo = catalogoDoPosto(dados?.materiais ?? [], posto);
+    if (posto?.itens != null) return setLinhas(ls => linhasDoPosto(posto, novo, ls));
+    // Sem lista: itens que o posto novo não tem saem da lista.
     setLinhas(ls => { const f = ls.filter(l => !l.material_id || novo.some(m => m.id === l.material_id)); return f.length ? f : [linhaVazia()]; });
   };
 
@@ -188,7 +253,7 @@ const PedidoMaterialPublico = () => {
       const r = await enviarPedido(quem, { telefone, postoId, itens, observacao, frequencia });
       lembrar({ telefone: tel });
       setEnviado({ codigo: r.codigo, recorrente: r.recorrente });
-      setLinhas([linhaVazia()]); setFrequencia('unica'); setObservacao('');
+      setLinhas(linhasDoPosto(dados?.postos.find(p => p.id === postoId), catalogo)); setFrequencia('unica'); setObservacao('');
       await recarregar();
     });
   };
@@ -320,7 +385,14 @@ const PedidoMaterialPublico = () => {
                         {postoId && (
                           <div>
                             <Label>Itens *</Label>
-                            <ListaItens linhas={linhas} setLinhas={setLinhas} catalogo={catalogo} />
+                            {comLista ? (
+                              <>
+                                <p className="text-xs text-muted-foreground mb-1">Preencha a quantidade só do que precisa. Item sem quantidade não entra no pedido.</p>
+                                <ListaDoPosto linhas={linhas} setLinhas={setLinhas} catalogo={catalogo} />
+                              </>
+                            ) : (
+                              <ListaItens linhas={linhas} setLinhas={setLinhas} catalogo={catalogo} />
+                            )}
                           </div>
                         )}
 
@@ -352,6 +424,11 @@ const PedidoMaterialPublico = () => {
                             placeholder="(61) 99999-9999" />
                         </div>
 
+                        {comLista && (
+                          <p className="text-sm text-center font-medium">
+                            {noPedido === 0 ? 'Nenhum item no pedido ainda' : `${noPedido} ${noPedido === 1 ? 'item' : 'itens'} no pedido`}
+                          </p>
+                        )}
                         <Button type="submit" size="lg" className="w-full gap-2" disabled={carregando || !postoId || catalogo.length === 0}>
                           {carregando ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingCart className="h-4 w-4" />}
                           {carregando ? 'Enviando...' : 'Enviar pedido'}
