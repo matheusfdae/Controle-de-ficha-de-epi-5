@@ -1,8 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -11,18 +9,18 @@ import { toast } from 'sonner';
 import EstadoSelect from '@/components/EstadoSelect';
 import { useAuth } from '@/contexts/AuthContext';
 import { listPostos } from '@/services/postosService';
-import { hojeBr, importarPlanilha, listMateriais } from '../lib/pedidosService';
+import { importarPlanilha, listMateriais } from '../lib/pedidosService';
 import { acharPosto, chaveNome, lerAba, type AbaPosto, type Celula, type PostoCadastrado } from '../lib/planilhaPostos';
 
 /**
  * Importa a planilha de material por posto (uma aba por posto): catálogo,
- * lista de cada posto (o encarregado passa a ver só ela) e teto mensal.
+ * e lista de cada posto (o encarregado passa a ver só ela).
  * Lê o arquivo no navegador, mostra como cada aba vai entrar e só grava ao
  * confirmar (função pedidos_importar_planilha, tudo de uma vez).
  */
 
 const NOVO = '__novo__';
-interface Linha { aba: AbaPosto; incluir: boolean; destino: string; uf: string; teto: string }
+interface Linha { aba: AbaPosto; incluir: boolean; destino: string; uf: string }
 
 const valorCelula = (v: unknown): Celula => {
   if (v && typeof v === 'object' && !(v instanceof Date)) {
@@ -43,7 +41,6 @@ export default function ImportarPlanilha({ podeEditar }: { podeEditar: boolean }
   const [postos, setPostos] = useState<PostoCadastrado[]>([]);
   // Chave do nome -> nome já cadastrado no catálogo (a planilha às vezes escreve o mesmo item de dois jeitos).
   const [catalogo, setCatalogo] = useState<Map<string, string>>(new Map());
-  const [desde, setDesde] = useState(hojeBr().slice(0, 7));
   const [lendo, setLendo] = useState(false);
   const [importando, setImportando] = useState(false);
   const [abertos, setAbertos] = useState<string | null>(null);
@@ -70,8 +67,7 @@ export default function ImportarPlanilha({ podeEditar }: { podeEditar: boolean }
       setCatalogo(new Map(m.filter(x => !x.item_pai_id).map(x => [chaveNome(x.nome), x.nome])));
       setLinhas(abas.map(a => {
         const achado = acharPosto(a, cad);
-        return { aba: a, incluir: true, destino: achado?.id ?? NOVO, uf: achado?.uf ?? a.uf,
-          teto: a.teto == null ? '' : String(a.teto).replace('.', ',') };
+        return { aba: a, incluir: true, destino: achado?.id ?? NOVO, uf: achado?.uf ?? a.uf };
       }));
       setNomeArquivo(f.name);
     } catch (e) { toast.error('Não foi possível ler a planilha: ' + (e as Error).message); }
@@ -86,7 +82,6 @@ export default function ImportarPlanilha({ podeEditar }: { podeEditar: boolean }
     return {
       postos: marcadas.length, criar: marcadas.filter(l => l.destino === NOVO).length,
       itens: marcadas.reduce((s, l) => s + l.aba.itens.length, 0), novos: novos.size,
-      tetos: marcadas.filter(l => l.teto.trim()).length, semTeto: marcadas.filter(l => !l.teto.trim()).length,
     };
   }, [marcadas, catalogo]);
   const destinosRepetidos = useMemo(() => {
@@ -100,8 +95,6 @@ export default function ImportarPlanilha({ podeEditar }: { podeEditar: boolean }
     if (!marcadas.length) return toast.error('Marque pelo menos uma aba.');
     if (destinosRepetidos.size) return toast.error('Duas abas estão ligadas ao mesmo posto. Ajuste antes de importar.');
     if (semAcesso.length) return toast.error(`Você não tem acesso ao estado de: ${semAcesso.map(l => l.aba.posto).join(', ')}. Marque o estado em Usuários.`);
-    const ruim = marcadas.find(l => l.teto.trim() && !(Number(l.teto.replace(/\./g, '').replace(',', '.')) >= 0));
-    if (ruim) return toast.error(`Teto inválido em ${ruim.aba.posto}.`);
     if (!confirm(`Importar ${resumo.postos} posto(s)? A lista de itens de cada um será substituída pela da planilha.`)) return;
     // Mesmo item com grafias diferentes vira um nome só: o do catálogo ou o primeiro que aparece.
     const nomes = new Map(catalogo);
@@ -111,11 +104,10 @@ export default function ImportarPlanilha({ podeEditar }: { podeEditar: boolean }
       const r = await importarPlanilha(marcadas.map(l => ({
         posto_id: l.destino === NOVO ? null : l.destino,
         criar: l.destino === NOVO ? { nome: l.aba.posto, uf: l.uf } : null,
-        teto: l.teto.trim() ? Number(l.teto.replace(/\./g, '').replace(',', '.')).toFixed(2) : null,
         itens: l.aba.itens.map(i => ({ nome: nomes.get(chaveNome(i.nome)) ?? i.nome, unidade: i.unidade })),
-      })), `${desde}-01`);
+      })));
       toast.success(`Importado: ${r.listas} lista(s), ${r.itens_nas_listas} itens nas listas, ${r.itens_criados} item(ns) novo(s) no catálogo, `
-        + `${r.postos_criados} posto(s) criado(s), ${r.tetos} teto(s).`);
+        + `${r.postos_criados} posto(s) criado(s).`);
       setLinhas([]); setNomeArquivo('');
     } catch (e) { toast.error((e as Error).message); }
     finally { setImportando(false); }
@@ -127,7 +119,7 @@ export default function ImportarPlanilha({ podeEditar }: { podeEditar: boolean }
         <CardTitle className="text-lg flex items-center gap-2"><FileSpreadsheet className="h-5 w-5 text-primary" /> Importar planilha de material por posto</CardTitle>
         <CardDescription>
           Planilha com uma aba por posto (POSTO:, CUSTO EM CONTRATO e a lista ORD/ITEM). Cada aba vira a lista do posto, que é o que o
-          encarregado vê no link; itens que não existem entram no catálogo; o custo em contrato vira o teto mensal. Nada é gravado antes de você confirmar.
+          encarregado vê no link; itens que não existem entram no catálogo. O custo em contrato da planilha não entra (o controle é por quantidade). Nada é gravado antes de você confirmar.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -142,13 +134,9 @@ export default function ImportarPlanilha({ podeEditar }: { podeEditar: boolean }
 
         {linhas.length > 0 && <>
           <div className="flex flex-wrap items-end gap-4">
-            <div>
-              <Label htmlFor="teto-desde">Tetos valem a partir de</Label>
-              <Input id="teto-desde" type="month" className="w-44" value={desde} onChange={e => e.target.value && setDesde(e.target.value)} />
-            </div>
             <p className="text-sm text-muted-foreground">
               <strong>{resumo.postos}</strong> posto(s), <strong>{resumo.criar}</strong> a criar · <strong>{resumo.itens}</strong> itens nas listas,
-              <strong> {resumo.novos}</strong> novo(s) no catálogo · <strong>{resumo.tetos}</strong> teto(s){resumo.semTeto > 0 && <>, {resumo.semTeto} sem teto (preencher depois em Teto por posto)</>}.
+              <strong> {resumo.novos}</strong> novo(s) no catálogo.
             </p>
           </div>
 
@@ -162,7 +150,6 @@ export default function ImportarPlanilha({ podeEditar }: { podeEditar: boolean }
                   <TableHead>Aba / posto na planilha</TableHead>
                   <TableHead className="min-w-56">Entra no posto</TableHead>
                   <TableHead>Estado</TableHead>
-                  <TableHead className="w-32">Teto mensal (R$)</TableHead>
                   <TableHead className="text-right">Itens</TableHead>
                   <TableHead>Avisos</TableHead>
                 </TableRow>
@@ -194,10 +181,6 @@ export default function ImportarPlanilha({ podeEditar }: { podeEditar: boolean }
                               opcoes={[...new Set([...estados, l.uf])]} />
                           : <span className="text-sm">{l.uf}</span>}
                         {ufBloqueada && <span className="block text-xs text-destructive">Sem acesso a {l.uf}</span>}
-                      </TableCell>
-                      <TableCell>
-                        <Input inputMode="decimal" className="h-9 text-right" placeholder="preencher depois" value={l.teto}
-                          aria-label={`Teto de ${l.aba.posto}`} onChange={e => mudar(i, { teto: e.target.value })} />
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         <button type="button" className="text-primary hover:underline" onClick={() => setAbertos(a => (a === l.aba.aba ? null : l.aba.aba))}>{l.aba.itens.length}</button>

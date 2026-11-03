@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAuth } from '@/contexts/AuthContext';
-import { ACAO_DA_ETAPA, formatarMoeda, minhasTarefas, type Tarefa } from '../lib/pedidosService';
+import { ACAO_DA_ETAPA, minhasTarefas, type Tarefa } from '../lib/pedidosService';
 
 /**
  * Sino de pedidos no topo do sistema: lista o que espera o usuário (pelo papel
@@ -66,7 +66,7 @@ export default function SinoPedidos() {
       ? `Novo pedido: ${primeiro.codigo}`
       : `${chegaram.length} pedidos novos esperando por você`;
     const texto = chegaram.length === 1
-      ? `${ACAO_DA_ETAPA[primeiro.status] ?? 'Ver'} · ${primeiro.posto} · ${formatarMoeda(primeiro.valor)}`
+      ? `${ACAO_DA_ETAPA[primeiro.status] ?? 'Ver'} · ${primeiro.posto} · ${primeiro.itens} item(ns)${primeiro.tem_epi ? ' · EPI' : ''}`
       : chegaram.slice(0, 3).map(t => `${t.codigo} (${ACAO_DA_ETAPA[t.status]?.toLowerCase() ?? 'ver'})`).join(', ');
     toast.info(titulo, {
       description: texto, duration: 15000,
@@ -133,8 +133,8 @@ export default function SinoPedidos() {
                   <span className="font-medium">{t.codigo}</span>
                   <span className="text-xs text-muted-foreground shrink-0">{quando(t.desde)}</span>
                 </span>
-                <span className="block text-xs text-muted-foreground truncate">{t.posto} · {formatarMoeda(t.valor)}</span>
-                <span className={`block text-xs font-medium ${t.excede_teto && t.status === 'aguardando_aprovacao' ? 'text-destructive' : 'text-primary'}`}>
+                <span className="block text-xs text-muted-foreground truncate">{t.posto} · {t.itens} item(ns){t.tem_epi ? ' · EPI' : ''}</span>
+                <span className="block text-xs font-medium text-primary">
                   {novas.has(chave(t)) && 'Novo · '}{ACAO_DA_ETAPA[t.status] ?? 'Ver'}
                 </span>
               </button>

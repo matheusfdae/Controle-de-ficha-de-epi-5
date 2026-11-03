@@ -10,36 +10,31 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AlertTriangle, Ban, Check, ClipboardList, Copy, HardHat, Loader2, Receipt, Repeat, Search, Undo2, X } from 'lucide-react';
+import { Ban, Check, ClipboardList, Copy, HardHat, Loader2, PackageCheck, Repeat, Search, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import BackButton from '@/components/BackButton';
 import PageHeader from '@/components/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { listPostos, type Posto } from '@/services/postosService';
 import {
-  ETAPAS, FILAS, RESPONSAVEIS, STATUS_PEDIDO, aprovarExcesso, cancelarPedido, conferirPedido, dataBr, formatarMoeda,
-  formatarNumero, hojeBr, inicioDoMes, listAprovadores, listGastos, listMateriais, listPedidos, listRecorrencias, listTetos, listUsuarios, nomeMaterial,
-  orcarPedido, precosVigentes, rotuloPapel, tetoNoMes, valorDoPedido, variacaoTabela,
-  type Aprovador, type Material, type Papel, type PedidoCompleto, type Recorrencia, type StatusPedido, type TetoPosto,
+  ETAPAS, FILAS, RESPONSAVEIS, STATUS_PEDIDO, atenderPedido, cancelarPedido, conferirPedido, dataBr, formatarNumero, hojeBr,
+  listAprovadores, listMateriais, listPedidos, listRecorrencias, listUsuarios, nomeMaterial, rotuloPapel,
+  type Aprovador, type Material, type Papel, type PedidoCompleto, type Recorrencia, type StatusPedido,
 } from '../lib/pedidosService';
-import RegistrarCompra from '../components/RegistrarCompra';
 import { ListaRepeticoes, RepetirPedido } from '../components/Repeticoes';
 import AnaliseEstoque from '../components/AnaliseEstoque';
 
 /**
- * Pedidos de material: filas por etapa (conferência, orçamento, aprovação do
- * excesso, faturamento) e a consulta de todos. No detalhe, cada papel vê só a
- * ação da etapa dele; o banco confere tudo de novo.
+ * Pedidos de material (só quantidade): filas por etapa (conferência do
+ * supervisor, atendimento de compras) e a consulta de todos. No detalhe, cada
+ * papel vê só a ação da etapa dele; o banco confere tudo de novo.
  */
 
 const COR_STATUS: Record<StatusPedido, string> = {
   enviada: 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100',
   devolvida: 'bg-orange-100 text-orange-900 dark:bg-orange-900/40 dark:text-orange-100',
-  em_orcamento: 'bg-sky-100 text-sky-900 dark:bg-sky-900/40 dark:text-sky-100',
-  aguardando_aprovacao: 'bg-red-100 text-red-900 dark:bg-red-900/40 dark:text-red-100',
-  a_faturar: 'bg-blue-100 text-blue-900 dark:bg-blue-900/40 dark:text-blue-100',
-  faturada: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100',
-  reprovada: 'bg-red-100 text-red-900 dark:bg-red-900/40 dark:text-red-100',
+  a_atender: 'bg-blue-100 text-blue-900 dark:bg-blue-900/40 dark:text-blue-100',
+  atendida: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100',
   cancelada: 'bg-muted text-muted-foreground',
 };
 
@@ -51,14 +46,11 @@ const diasAtras = (dias: number) => {
 const n = (v: string) => Number(v.replace(',', '.'));
 
 export default function Pedidos() {
-  const { user, can } = useAuth();
+  const { user } = useAuth();
   const [pedidos, setPedidos] = useState<PedidoCompleto[]>([]);
   const [postos, setPostos] = useState<Posto[]>([]);
   const [materiais, setMateriais] = useState<Material[]>([]);
-  const [tetos, setTetos] = useState<TetoPosto[]>([]);
-  const [gastosMes, setGastosMes] = useState<{ id: string; posto_id: string; valor_estimado: number; valor_orcado: number | null; valor_real: number | null }[]>([]);
   const [aprovadores, setAprovadores] = useState<Aprovador[]>([]);
-  const [tabela, setTabela] = useState<Map<string, number>>(new Map());
   const [carregando, setCarregando] = useState(true);
   const [aba, setAba] = useState('minhas');
   const [periodo, setPeriodo] = useState('90');
@@ -74,12 +66,8 @@ export default function Pedidos() {
   const carregar = useCallback(async () => {
     setCarregando(true);
     try {
-      const hoje = hojeBr();
-      const [p, po, m, t, g, a, tb] = await Promise.all([
-        listPedidos(diasAtras(Number(periodo))), listPostos(), listMateriais(), listTetos(),
-        listGastos(inicioDoMes(hoje), hoje), listAprovadores(), precosVigentes(),
-      ]);
-      setPedidos(p); setPostos(po); setMateriais(m); setTetos(t); setGastosMes(g); setAprovadores(a); setTabela(tb);
+      const [p, po, m, a] = await Promise.all([listPedidos(diasAtras(Number(periodo))), listPostos(), listMateriais(), listAprovadores()]);
+      setPedidos(p); setPostos(po); setMateriais(m); setAprovadores(a);
       const [rec, us] = await Promise.all([listRecorrencias(), listUsuarios().catch(() => [])]);
       setRecorrencias(rec); setUsuarios(us);
     } catch (e) {
@@ -119,12 +107,6 @@ export default function Pedidos() {
     : aba === 'todos' ? pedidos.filter(p => statusFiltro === 'todos' || p.status === statusFiltro)
       : pedidos.filter(p => p.status === aba));
 
-  const saldo = useCallback((p: PedidoCompleto) => {
-    const teto = tetoNoMes(tetos, p.posto_id, hojeBr());
-    const consumido = gastosMes.filter(g => g.posto_id === p.posto_id && g.id !== p.id).reduce((s, g) => s + valorDoPedido(g), 0);
-    return { teto, consumido };
-  }, [tetos, gastosMes]);
-
   const pedidoAberto = pedidos.find(p => p.id === aberto) ?? null;
   const linkPublico = `${window.location.origin}/pedido-material`;
 
@@ -133,7 +115,7 @@ export default function Pedidos() {
       <div className="max-w-7xl mx-auto space-y-6">
         <BackButton />
         <PageHeader title="Pedidos de Material" eyebrow="Pedidos"
-          description="Conferência do supervisor → orçamento de compras → aprovação do excesso de teto (comercial/gerência) → faturamento."
+          description="O encarregado pede → o supervisor confere (com o estoque e o consumo do posto) → compras atende."
           actions={
             <Button variant="outline" className="gap-2" onClick={() => {
               navigator.clipboard.writeText(linkPublico).then(() => toast.success('Link copiado: ' + linkPublico), () => toast.info(linkPublico));
@@ -193,7 +175,7 @@ export default function Pedidos() {
                   <TableHead>Data</TableHead>
                   <TableHead>Posto</TableHead>
                   <TableHead>Solicitante</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
+                  <TableHead>Itens</TableHead>
                   <TableHead>Situação</TableHead>
                 </TableRow>
               </TableHeader>
@@ -216,21 +198,15 @@ export default function Pedidos() {
                     <TableCell className="whitespace-nowrap">{dataBr(p.data_pedido)}</TableCell>
                     <TableCell>{nomePosto(p.posto_id)} <span className="text-xs text-muted-foreground">{p.uf}</span></TableCell>
                     <TableCell>{p.solicitante_nome}</TableCell>
-                    <TableCell className="text-right tabular-nums whitespace-nowrap">
-                      {formatarMoeda(valorDoPedido(p))}
-                      <span className="block text-[11px] text-muted-foreground">
-                        {p.valor_real != null ? 'nota' : p.valor_orcado != null ? 'orçado' : 'estimado'}
+                    <TableCell className="text-sm max-w-xs">
+                      <span className="line-clamp-2">
+                        {p.itens.map(i => `${formatarNumero(i.quantidade_atendida ?? i.quantidade)} ${nomeMaterial(materiais.find(m => m.id === i.material_id), materiais)}`).join(', ')}
                       </span>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         <Badge className={`${COR_STATUS[p.status]} border-0`}>{STATUS_PEDIDO[p.status]}</Badge>
-                        {p.excede_teto && !['faturada', 'cancelada', 'reprovada'].includes(p.status) && (
-                          <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3 w-3" /> Excede o teto</Badge>
-                        )}
                         {p.tem_epi && <Badge variant="outline" className="gap-1"><HardHat className="h-3 w-3" /> EPI</Badge>}
-                        {p.cobrar_cliente && <Badge variant="outline">Cobrar do cliente</Badge>}
-                        {p.sem_preco && p.status !== 'faturada' && <Badge variant="outline">Item fora da tabela</Badge>}
                         {minhaVez(p) && <Badge className="bg-primary text-primary-foreground">Sua vez</Badge>}
                       </div>
                     </TableCell>
@@ -245,12 +221,10 @@ export default function Pedidos() {
 
       {pedidoAberto && (
         <DetalhePedido key={pedidoAberto.id} pedido={pedidoAberto} posto={nomePosto(pedidoAberto.posto_id)}
-          materiais={materiais} tabela={tabela} saldo={saldo(pedidoAberto)}
-          minhaVez={minhaVez(pedidoAberto)}
-          podeCancelar={!['faturada', 'cancelada', 'reprovada'].includes(pedidoAberto.status) && temPapel(['compras', 'gerencia'], pedidoAberto)}
-          podeFaturar={['a_faturar', 'faturada'].includes(pedidoAberto.status) && (temPapel(['compras'], pedidoAberto) || can('pedidos_material', 'create'))}
+          materiais={materiais} minhaVez={minhaVez(pedidoAberto)}
+          podeCancelar={['enviada', 'devolvida', 'a_atender'].includes(pedidoAberto.status) && temPapel(['compras', 'gerencia'], pedidoAberto)}
           repeticao={recorrencias.find(r => r.origem_pedido_id === pedidoAberto.id || r.id === pedidoAberto.recorrencia_id)}
-          podeRepetir={!['cancelada', 'reprovada', 'devolvida'].includes(pedidoAberto.status) && temPapel(['supervisor', 'gerencia'], pedidoAberto)}
+          podeRepetir={!['cancelada', 'devolvida'].includes(pedidoAberto.status) && temPapel(['supervisor', 'gerencia'], pedidoAberto)}
           podeEncerrarRepeticao={temPapel(['supervisor', 'compras', 'gerencia'], pedidoAberto)}
           onRepeticao={carregar}
           onFechar={() => setAberto(null)} onAtualizado={async () => { setAberto(null); await carregar(); window.dispatchEvent(new Event('pedidos-atualizados')); }} />
@@ -259,40 +233,29 @@ export default function Pedidos() {
   );
 }
 
-function DetalhePedido({ pedido: p, posto, materiais, tabela, saldo, minhaVez, podeCancelar, podeFaturar, repeticao, podeRepetir,
+function DetalhePedido({ pedido: p, posto, materiais, minhaVez, podeCancelar, repeticao, podeRepetir,
   podeEncerrarRepeticao, onRepeticao, onFechar, onAtualizado }: {
-  pedido: PedidoCompleto; posto: string; materiais: Material[]; tabela: Map<string, number>;
-  saldo: { teto: number | null; consumido: number };
-  minhaVez: boolean; podeCancelar: boolean; podeFaturar: boolean;
+  pedido: PedidoCompleto; posto: string; materiais: Material[];
+  minhaVez: boolean; podeCancelar: boolean;
   repeticao: Recorrencia | undefined; podeRepetir: boolean; podeEncerrarRepeticao: boolean; onRepeticao: () => Promise<void>;
   onFechar: () => void; onAtualizado: () => Promise<void>;
 }) {
+  const conferindo = minhaVez && p.status === 'enviada';
+  const atendendo = minhaVez && p.status === 'a_atender';
+  // Na conferência, a coluna editável é a quantidade conferida; no atendimento, a entregue.
   const [quantidades, setQuantidades] = useState<Record<string, string>>(
     Object.fromEntries(p.itens.map(i => [i.id, String(i.quantidade).replace('.', ',')])));
-  const [precos, setPrecos] = useState<Record<string, string>>(
-    Object.fromEntries(p.itens.map(i => [i.id, i.preco_orcado != null ? String(i.preco_orcado).replace('.', ',')
-      : i.preco_ref != null ? String(i.preco_ref).replace('.', ',') : ''])));
   const [comentario, setComentario] = useState('');
   const [salvando, setSalvando] = useState(false);
-  const [faturando, setFaturando] = useState(false);
   const [cancelando, setCancelando] = useState(false);
   const mat = (id: string) => materiais.find(m => m.id === id);
+  const nome = (id: string) => nomeMaterial(mat(id), materiais);
 
-  const conferindo = minhaVez && p.status === 'enviada';
-  const orcando = minhaVez && p.status === 'em_orcamento';
-  const aprovando = minhaVez && p.status === 'aguardando_aprovacao';
-
-  const qtd = (id: string, original: number) => {
+  const digitada = (id: string, original: number) => {
     const v = n(quantidades[id] ?? '');
-    return conferindo && quantidades[id] !== '' && Number.isFinite(v) ? v : original;
+    return quantidades[id] !== '' && Number.isFinite(v) ? v : original;
   };
-  const preco = (i: PedidoCompleto['itens'][number]) => {
-    if (orcando) { const v = n(precos[i.id] ?? ''); return precos[i.id] !== '' && Number.isFinite(v) ? v : null; }
-    return i.preco_orcado ?? i.preco_ref;
-  };
-  const totalAgora = Math.round(p.itens.reduce((s, i) => s + qtd(i.id, i.quantidade) * (preco(i) ?? 0), 0) * 100) / 100;
-  const valorTeto = ['enviada', 'em_orcamento', 'devolvida'].includes(p.status) ? totalAgora : valorDoPedido(p);
-  const excede = !p.cobrar_cliente && saldo.teto != null && saldo.consumido + valorTeto > saldo.teto;
+  const mudados = p.itens.filter(i => digitada(i.id, i.quantidade) !== i.quantidade);
 
   const agir = async (fn: () => Promise<unknown>, ok: string) => {
     setSalvando(true);
@@ -301,36 +264,30 @@ function DetalhePedido({ pedido: p, posto, materiais, tabela, saldo, minhaVez, p
     finally { setSalvando(false); }
   };
 
+  const lerQuantidades = () => {
+    const lista: { item_id: string; quantidade: number }[] = [];
+    for (const i of p.itens) {
+      const q = digitada(i.id, i.quantidade);
+      if (!(q >= 0)) { toast.error(`Quantidade inválida em ${nome(i.material_id)}.`); return null; }
+      if (q !== i.quantidade) lista.push({ item_id: i.id, quantidade: q });
+    }
+    return lista;
+  };
+
   const conferir = (conferido: boolean) => {
     if (!conferido) {
       if (!comentario.trim()) return toast.error('Escreva o motivo da devolução.');
       return agir(() => conferirPedido(p.id, false, comentario), 'Pedido devolvido ao encarregado.');
     }
-    const ajustes: { item_id: string; quantidade: number }[] = [];
-    for (const i of p.itens) {
-      const q = qtd(i.id, i.quantidade);
-      if (!(q >= 0)) return toast.error(`Quantidade inválida em ${nomeMaterial(mat(i.material_id), materiais)}.`);
-      if (q !== i.quantidade) ajustes.push({ item_id: i.id, quantidade: q });
-    }
-    agir(() => conferirPedido(p.id, true, comentario, ajustes), 'Conferido. Segue para o orçamento de compras.');
+    const ajustes = lerQuantidades();
+    if (ajustes) agir(() => conferirPedido(p.id, true, comentario, ajustes), 'Conferido. Segue para compras atender.');
   };
 
-  const orcar = () => {
-    const lista: { item_id: string; preco: number }[] = [];
-    for (const i of p.itens) {
-      const v = preco(i);
-      if (v == null || !(v >= 0)) return toast.error(`Informe o preço orçado de ${nomeMaterial(mat(i.material_id), materiais)}.`);
-      lista.push({ item_id: i.id, preco: v });
-    }
-    agir(async () => {
-      const r = await orcarPedido(p.id, lista, comentario);
-      if (r.status === 'aguardando_aprovacao') toast.warning('O pedido excede o teto do posto: foi para a aprovação do comercial/gerência.');
-    }, 'Orçamento concluído.');
-  };
-
-  const aprovar = (sim: boolean) => {
-    if (!comentario.trim()) return toast.error(`Escreva a justificativa da ${sim ? 'aprovação' : 'reprovação'}.`);
-    agir(() => aprovarExcesso(p.id, sim, comentario), sim ? 'Excesso aprovado. Segue para faturamento.' : 'Pedido reprovado.');
+  const atender = () => {
+    const entregues = lerQuantidades();
+    if (!entregues) return;
+    if (entregues.length && !comentario.trim()) return toast.error('A entrega é diferente do conferido. Escreva o motivo no comentário.');
+    agir(() => atenderPedido(p.id, comentario, entregues), entregues.length ? 'Atendido com entrega parcial.' : 'Pedido atendido.');
   };
 
   const cancelar = () => {
@@ -339,7 +296,7 @@ function DetalhePedido({ pedido: p, posto, materiais, tabela, saldo, minhaVez, p
   };
 
   const etapaFeita = (s: StatusPedido) => p.eventos.some(e => e.para_status === s);
-  const pulouAprovacao = p.eventos.some(e => e.de_status === 'em_orcamento' && e.para_status === 'a_faturar');
+  const editando = conferindo || atendendo;
 
   return (
     <Dialog open onOpenChange={o => !o && onFechar()}>
@@ -349,7 +306,6 @@ function DetalhePedido({ pedido: p, posto, materiais, tabela, saldo, minhaVez, p
             <ClipboardList className="h-5 w-5 text-primary" /> {p.codigo}
             <Badge className={`${COR_STATUS[p.status]} border-0`}>{STATUS_PEDIDO[p.status]}</Badge>
             {p.tem_epi && <Badge variant="outline" className="gap-1"><HardHat className="h-3 w-3" /> Tem item de EPI</Badge>}
-            {p.cobrar_cliente && <Badge variant="outline">Cobrar do cliente</Badge>}
           </DialogTitle>
           <DialogDescription>
             {posto} ({p.uf}) · pedido em {dataBr(p.data_pedido)} por {p.solicitante_nome}
@@ -361,7 +317,7 @@ function DetalhePedido({ pedido: p, posto, materiais, tabela, saldo, minhaVez, p
 
         {/* Linha do tempo */}
         <ol className="flex flex-wrap gap-x-2 gap-y-1 text-xs">
-          {ETAPAS.filter(s => !(s === 'aguardando_aprovacao' && pulouAprovacao)).map((s, i) => {
+          {ETAPAS.map((s, i) => {
             const atual = p.status === s;
             const feita = etapaFeita(s) && !atual;
             return (
@@ -375,43 +331,25 @@ function DetalhePedido({ pedido: p, posto, materiais, tabela, saldo, minhaVez, p
           })}
         </ol>
 
-        {p.cobrar_cliente ? (
-          <p className="text-sm text-muted-foreground">
-            Posto sob demanda: este pedido é cobrado do cliente pelo custo (valor das notas) e não conta no teto do posto.
-            {p.cobrado_em && ` Cobrado em ${new Date(p.cobrado_em).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}${p.cobranca_ref ? ` (${p.cobranca_ref})` : ''}.`}
-          </p>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-4 text-sm">
-            <Info rotulo="Teto do mês" valor={saldo.teto == null ? 'Sem teto' : formatarMoeda(saldo.teto)} />
-            <Info rotulo="Consumido no mês (outros)" valor={formatarMoeda(saldo.consumido)} />
-            <Info rotulo={orcando ? 'Este pedido (orçado)' : 'Este pedido'} valor={formatarMoeda(valorTeto)} />
-            <Info rotulo="Saldo depois deste" valor={saldo.teto == null ? '—' : formatarMoeda(saldo.teto - saldo.consumido - valorTeto)}
-              destaque={excede ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400'} />
-          </div>
-        )}
-        {excede && !['faturada', 'cancelada', 'reprovada'].includes(p.status) && (
-          <p className="text-sm text-destructive flex items-center gap-1"><AlertTriangle className="h-4 w-4" />
-            Provável excesso de teto: depois do orçamento, o pedido vai para a aprovação do comercial/gerência.</p>
-        )}
-        {!['faturada', 'cancelada', 'reprovada'].includes(p.status) && <AnaliseEstoque pedidoId={p.id} materiais={materiais} />}
+        {['enviada', 'devolvida', 'a_atender'].includes(p.status) && <AnaliseEstoque pedidoId={p.id} materiais={materiais} />}
 
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Item</TableHead>
               <TableHead className="text-right">Pedido</TableHead>
-              <TableHead className="text-right w-28">{conferindo ? 'Conferido' : 'Qtd.'}</TableHead>
-              <TableHead className="text-right">Tabela</TableHead>
-              <TableHead className="text-right w-32">{orcando ? 'Orçado (R$)' : 'Orçado'}</TableHead>
-              <TableHead className="text-right">Subtotal</TableHead>
+              <TableHead className="text-right w-28">Conferido</TableHead>
+              <TableHead className="text-right w-28">Entregue</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {p.itens.map(i => {
               const m = mat(i.material_id);
-              const ref = tabela.get(i.material_id) ?? i.preco_ref;
-              const orc = orcando ? preco(i) : i.preco_orcado;
-              const varia = variacaoTabela(orc, ref);
+              const campo = (
+                <Input className="h-8 text-right" inputMode="decimal" aria-label={`${conferindo ? 'Quantidade conferida' : 'Quantidade entregue'} de ${nome(i.material_id)}`}
+                  value={quantidades[i.id] ?? ''} onChange={e => setQuantidades(q => ({ ...q, [i.id]: e.target.value.replace(/[^\d.,]/g, '') }))} />
+              );
+              const entregue = i.quantidade_atendida;
               return (
                 <TableRow key={i.id}>
                   <TableCell>
@@ -419,28 +357,18 @@ function DetalhePedido({ pedido: p, posto, materiais, tabela, saldo, minhaVez, p
                     {m?.is_epi && <HardHat className="inline h-3.5 w-3.5 ml-1 text-amber-600" aria-label="EPI" />}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{formatarNumero(i.quantidade_pedida)}</TableCell>
-                  <TableCell className="text-right">
-                    {conferindo ? (
-                      <Input className="h-8 text-right" inputMode="decimal" aria-label="Quantidade conferida"
-                        value={quantidades[i.id] ?? ''} onChange={e => setQuantidades(q => ({ ...q, [i.id]: e.target.value.replace(/[^\d.,]/g, '') }))} />
-                    ) : formatarNumero(i.quantidade)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{ref == null ? <span className="text-xs text-amber-700">fora da tabela</span> : formatarMoeda(ref)}</TableCell>
-                  <TableCell className="text-right">
-                    {orcando ? (
-                      <Input className="h-8 text-right" inputMode="decimal" aria-label="Preço orçado"
-                        value={precos[i.id] ?? ''} onChange={e => setPrecos(x => ({ ...x, [i.id]: e.target.value.replace(/[^\d.,]/g, '') }))} />
-                    ) : <span className="tabular-nums">{formatarMoeda(i.preco_orcado)}</span>}
-                    {varia != null && varia !== 0 && (
-                      <span className={`block text-[11px] ${varia > 0 ? 'text-destructive' : 'text-emerald-600'}`}>{varia > 0 ? '+' : ''}{formatarNumero(varia)}% x tabela</span>
+                  <TableCell className="text-right tabular-nums">{conferindo ? campo : p.status === 'enviada' || p.status === 'devolvida' ? '—' : formatarNumero(i.quantidade)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {atendendo ? campo : entregue == null ? '—' : (
+                      <span className={entregue !== i.quantidade ? 'text-amber-700 dark:text-amber-400 font-medium' : ''}>{formatarNumero(entregue)}</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{formatarMoeda(qtd(i.id, i.quantidade) * (preco(i) ?? 0))}</TableCell>
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
+        {atendendo && <p className="text-xs text-muted-foreground">A coluna "Entregue" vem com o conferido. Se for entregar menos, corrija e explique no comentário.</p>}
         {p.observacao && <p className="text-sm"><span className="text-muted-foreground">Observação do encarregado:</span> {p.observacao}</p>}
 
         <RepetirPedido pedidoId={p.id} repeticao={repeticao} podeRepetir={podeRepetir} podeEncerrar={podeEncerrarRepeticao} onMudou={onRepeticao} />
@@ -456,14 +384,14 @@ function DetalhePedido({ pedido: p, posto, materiais, tabela, saldo, minhaVez, p
                     <><strong>{e.comentario}</strong>{e.usuario_nome && ` — ${e.usuario_nome}`}</>
                   ) : (
                     <>
-                      <strong>{STATUS_PEDIDO[e.para_status]}</strong>
+                      <strong>{STATUS_PEDIDO[e.para_status] ?? e.para_status}</strong>
                       {e.usuario_nome && ` — ${e.usuario_nome}`}{e.papel && ` (${rotuloPapel(e.papel)})`}
                       {e.comentario && <span className="block text-muted-foreground">“{e.comentario}”</span>}
                     </>
                   )}
                   {e.payload?.ajustes?.length ? (
                     <span className="block text-muted-foreground text-xs">
-                      Ajustes: {e.payload.ajustes.map(a => `${a.item}: ${formatarNumero(Number(a.de))} → ${formatarNumero(Number(a.para))}`).join('; ')}
+                      {e.para_status === 'atendida' ? 'Entregue diferente do conferido' : 'Ajustes'}: {e.payload.ajustes.map(a => `${a.item}: ${formatarNumero(Number(a.de))} → ${formatarNumero(Number(a.para))}`).join('; ')}
                     </span>
                   ) : null}
                 </span>
@@ -472,23 +400,10 @@ function DetalhePedido({ pedido: p, posto, materiais, tabela, saldo, minhaVez, p
           </ol>
         </div>
 
-        {p.compras.length > 0 && (
-          <div className="space-y-1 text-sm">
-            <p className="font-semibold">Notas</p>
-            {p.compras.map(c => (
-              <div key={c.id} className="rounded-md border p-2">
-                <p>{dataBr(c.data_compra)} · {c.fornecedor_nome}{c.numero_nf && ` · NF ${c.numero_nf}`} ·{' '}
-                  <strong>{formatarMoeda(c.itens.reduce((s, i) => s + i.quantidade * i.valor_unitario, 0))}</strong></p>
-                <p className="text-muted-foreground">{c.itens.map(i => `${formatarNumero(i.quantidade)} ${nomeMaterial(mat(i.material_id), materiais)} a ${formatarMoeda(i.valor_unitario)}`).join('; ')}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {(conferindo || orcando || aprovando || podeCancelar) && (
+        {(editando || podeCancelar) && (
           <div className="space-y-2">
             <Label htmlFor="coment">
-              {aprovando ? 'Justificativa (obrigatória)' : conferindo ? 'Comentário (obrigatório para devolver)' : 'Comentário'}
+              {conferindo ? 'Comentário (obrigatório para devolver)' : atendendo ? `Comentário${mudados.length ? ' (obrigatório: entrega diferente do conferido)' : ''}` : 'Comentário'}
               {podeCancelar && ' — também é o motivo, se for cancelar'}
             </Label>
             <Textarea id="coment" rows={2} maxLength={1000} value={comentario} onChange={e => setComentario(e.target.value)} />
@@ -504,37 +419,16 @@ function DetalhePedido({ pedido: p, posto, materiais, tabela, saldo, minhaVez, p
           {conferindo && <>
             <Button variant="outline" className="gap-2" disabled={salvando} onClick={() => conferir(false)}><Undo2 className="h-4 w-4" /> Devolver ao encarregado</Button>
             <Button className="gap-2" disabled={salvando} onClick={() => conferir(true)}>
-              {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Conferido — mandar para orçamento
+              {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Conferido — mandar para compras
             </Button>
           </>}
-          {orcando && (
-            <Button className="gap-2" disabled={salvando} onClick={orcar}>
-              {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Concluir orçamento
+          {atendendo && (
+            <Button className="gap-2" disabled={salvando} onClick={atender}>
+              {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <PackageCheck className="h-4 w-4" />} {mudados.length ? 'Atender com entrega parcial' : 'Pedido atendido'}
             </Button>
-          )}
-          {aprovando && <>
-            <Button variant="destructive" className="gap-2" disabled={salvando} onClick={() => aprovar(false)}><X className="h-4 w-4" /> Reprovar</Button>
-            <Button className="gap-2" disabled={salvando} onClick={() => aprovar(true)}><Check className="h-4 w-4" /> Aprovar excesso</Button>
-          </>}
-          {podeFaturar && p.status === 'a_faturar' && (
-            <Button className="gap-2" onClick={() => setFaturando(true)}><Receipt className="h-4 w-4" /> Faturar (registrar nota)</Button>
           )}
         </DialogFooter>
-
-        {faturando && (
-          <RegistrarCompra pedido={p} materiais={materiais} onFechar={() => setFaturando(false)}
-            onSalvo={async () => { setFaturando(false); await onAtualizado(); }} />
-        )}
       </DialogContent>
     </Dialog>
-  );
-}
-
-function Info({ rotulo, valor, destaque }: { rotulo: string; valor: string; destaque?: string }) {
-  return (
-    <div className="rounded-md border p-2">
-      <p className="text-xs text-muted-foreground">{rotulo}</p>
-      <p className={`font-semibold tabular-nums ${destaque ?? ''}`}>{valor}</p>
-    </div>
   );
 }

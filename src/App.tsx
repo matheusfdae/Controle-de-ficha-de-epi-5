@@ -50,9 +50,6 @@ const CrachasConfiguracoes = lazy(() => import('./modules/crachas/pages/Configur
 
 const PedidoMaterialPublico = lazy(() => import('./modules/pedidos/pages/PedidoMaterialPublico'));
 const Pedidos             = lazy(() => import('./modules/pedidos/pages/Pedidos'));
-const PedidosPainel       = lazy(() => import('./modules/pedidos/pages/PainelGastos'));
-const PedidosPrecos       = lazy(() => import('./modules/pedidos/pages/RelatorioPrecos'));
-const PedidosCobranca     = lazy(() => import('./modules/pedidos/pages/CobrancaCliente'));
 const PedidosGerencial    = lazy(() => import('./modules/pedidos/pages/PainelGerencial'));
 const PedidosEstoque      = lazy(() => import('./modules/pedidos/pages/EstoquePosto'));
 const PedidosDoPosto      = lazy(() => import('./modules/pedidos/pages/PedidosDoPosto'));
@@ -165,9 +162,6 @@ function AppRoutes() {
           <Route path="/pedidos"               element={<Pedidos />} />
           <Route path="/pedidos/estoque"       element={<PedidosEstoque />} />
           <Route path="/pedidos/posto/:postoId" element={<PedidosDoPosto />} />
-          <Route path="/pedidos/painel"        element={<RequireModule module="pedidos_material"><PedidosPainel /></RequireModule>} />
-          <Route path="/pedidos/precos"        element={<RequireModule module="pedidos_material"><PedidosPrecos /></RequireModule>} />
-          <Route path="/pedidos/cobranca"      element={<RequireModule module="pedidos_material"><PedidosCobranca /></RequireModule>} />
           <Route path="/pedidos/gerencial"     element={<RequireModule module="pedidos_material"><PedidosGerencial /></RequireModule>} />
           <Route path="/pedidos/configuracoes" element={<RequireModule module="pedidos_material"><PedidosConfig /></RequireModule>} />
         </Route>

@@ -1,69 +1,81 @@
 import { describe, expect, it } from 'vitest';
-import { gastoMensal, mesesAte, porEtapa, porPosto, situacao, tempoAteFaturar, tempoPorEtapa } from '@/modules/pedidos/lib/gerencial';
-import type { PedidoCompleto } from '@/modules/pedidos/lib/pedidosService';
+import { entregaParcial, indicadores, mesesAte, pedidosPorMes, porEtapa, porPosto, tempoPorEtapa, topItens } from '@/modules/pedidos/lib/gerencial';
+import type { Material, PedidoCompleto } from '@/modules/pedidos/lib/pedidosService';
 
+type Evento = PedidoCompleto['eventos'][number];
+type Item = PedidoCompleto['itens'][number];
+const ev = (para: string, em: string, de: string | null = null) =>
+  ({ id: em + para, pedido_id: 'p', de_status: de, para_status: para, papel: null, comentario: null, payload: null, usuario_nome: null, created_at: em }) as Evento;
+const item = (material_id: string, quantidade: number, atendida: number | null = null): Item =>
+  ({ id: material_id + quantidade, pedido_id: 'p', material_id, quantidade_pedida: quantidade, quantidade, quantidade_atendida: atendida });
 const pedido = (o: Partial<PedidoCompleto>): PedidoCompleto => ({
   id: 'p', codigo: 'SOL-2026-000001', ano: 2026, numero: 1, posto_id: 'a', uf: 'DF', recorrencia_id: null, data_pedido: '2026-10-01',
-  status: 'faturada', valor_estimado: 100, valor_orcado: null, valor_real: null, excede_teto: false, sem_preco: false, tem_epi: false,
-  data_aprovacao: '2026-10-02', faturada_em: null, cobrar_cliente: false, cobrado_em: null, cobranca_ref: null, observacao: null,
-  solicitante_nome: 'X', solicitante_matricula: null, solicitante_cargo: null, solicitante_telefone: null, created_at: '2026-10-01T10:00:00Z',
-  itens: [], eventos: [], compras: [], ...o,
+  status: 'enviada', tem_epi: false, conferida_em: null, atendida_em: null, observacao: null, solicitante_nome: 'X', solicitante_matricula: null,
+  solicitante_cargo: null, solicitante_telefone: null, created_at: '2026-10-01T10:00:00Z', itens: [], eventos: [], ...o,
 });
 const postos = [{ id: 'a', nome: 'A', uf: 'DF' }, { id: 'b', nome: 'B', uf: 'DF' }, { id: 'c', nome: 'C', uf: 'GO' }];
-const tetos = [{ posto_id: 'a', vigente_desde: '2026-01-01', valor: 1000 }, { posto_id: 'b', vigente_desde: '2026-01-01', valor: 100 }];
+const materiais: Material[] = [
+  { id: 'vas', nome: 'Vassoura', item_pai_id: null, unidade: 'un', categoria: null, is_epi: false, ativo: true },
+  { id: 'luva', nome: 'Luva', item_pai_id: null, unidade: 'par', categoria: null, is_epi: true, ativo: true },
+];
 
-describe('situação do teto', () => {
-  it('faixas', () => {
-    expect(situacao(700, 1000)).toBe('ok');
-    expect(situacao(701, 1000)).toBe('atencao');
-    expect(situacao(1000, 1000)).toBe('atencao');
-    expect(situacao(1001, 1000)).toBe('acima');
-    expect(situacao(5, null)).toBe('sem_teto');
-  });
+const atendido = pedido({
+  id: '1', posto_id: 'a', status: 'atendida', atendida_em: '2026-10-05T10:00:00Z', tem_epi: true,
+  itens: [item('vas', 10, 8), item('luva', 20, 20)],
+  eventos: [ev('enviada', '2026-10-01T10:00:00Z'), ev('a_atender', '2026-10-02T10:00:00Z', 'enviada'),
+    ev('a_atender', '2026-10-02T12:00:00Z', 'a_atender'), ev('atendida', '2026-10-05T10:00:00Z', 'a_atender')],
 });
+const pedidos = [
+  atendido,
+  pedido({ id: '2', posto_id: 'a', status: 'a_atender', itens: [item('vas', 2)], eventos: [ev('enviada', '2026-10-03T10:00:00Z'), ev('devolvida', '2026-10-03T11:00:00Z', 'enviada')] }),
+  pedido({ id: '3', posto_id: 'b', status: 'enviada', data_pedido: '2026-10-20', itens: [item('luva', 5)] }),
+  pedido({ id: '4', posto_id: 'b', status: 'cancelada', itens: [item('vas', 99)] }),
+  pedido({ id: '5', posto_id: 'a', status: 'atendida', data_pedido: '2026-09-15', atendida_em: '2026-09-16T10:00:00Z', itens: [item('vas', 1, 1)] }),
+];
 
-describe('porPosto', () => {
-  const pedidos = [
-    pedido({ id: '1', posto_id: 'a', valor_real: 800 }),
-    pedido({ id: '2', posto_id: 'b', valor_orcado: 150, status: 'a_faturar' }),
-    pedido({ id: '3', posto_id: 'b', valor_real: 999, cobrar_cliente: true }),
-    pedido({ id: '4', posto_id: 'a', valor_real: 500, data_aprovacao: '2026-09-30' }),
-    pedido({ id: '5', posto_id: 'a', valor_estimado: 300, status: 'em_orcamento', data_aprovacao: null }),
-  ];
-  it('gasto do mês, fora sob demanda e outros meses; ordena por uso', () => {
-    const l = porPosto(pedidos, postos, tetos, '2026-10');
-    expect(l.map(x => [x.id, x.gasto, x.situacao, x.uso])).toEqual([['b', 150, 'acima', 150], ['a', 800, 'atencao', 80]]);
+describe('painel gerencial', () => {
+  it('entrega parcial = entregou diferente do conferido', () => {
+    expect(entregaParcial(atendido)).toBe(true);
+    expect(entregaParcial(pedidos[4])).toBe(false);
+    expect(entregaParcial(pedidos[1])).toBe(false);
   });
-  it('gasto mensal com teto somado', () => {
-    expect(gastoMensal(pedidos, postos, tetos, ['2026-09', '2026-10'])).toEqual([
-      { mes: '2026-09', rotulo: 'set/26', gasto: 500, teto: 1100 }, { mes: '2026-10', rotulo: 'out/26', gasto: 950, teto: 1100 },
+
+  it('por posto: pedidos do mês sem cancelados, ordenado do que mais pediu', () => {
+    const l = porPosto(pedidos, postos, '2026-10');
+    expect(l.map(x => [x.id, x.pedidos, x.linhas, x.atendidos, x.parciais, x.devolvidos, x.emAndamento])).toEqual([
+      ['a', 2, 3, 1, 1, 1, 1], ['b', 1, 1, 0, 0, 0, 1],
+    ]);
+    expect(l[0].diasAtendimento).toBe(4);
+  });
+
+  it('indicadores do mês', () => {
+    expect(indicadores(pedidos, '2026-10', '2026-09')).toEqual({
+      pedidos: 3, pedidosAnterior: 1, emAndamento: 2, atendidos: 1, parciais: 1, devolvidos: 1, comEpi: 1, diasAtendimento: 4,
+    });
+  });
+
+  it('feitos e atendidos por mês', () => {
+    expect(pedidosPorMes(pedidos, ['2026-09', '2026-10'])).toEqual([
+      { mes: '2026-09', rotulo: 'set/26', pedidos: 1, atendidos: 1 }, { mes: '2026-10', rotulo: 'out/26', pedidos: 3, atendidos: 1 },
     ]);
   });
-  it('etapas', () => {
-    expect(porEtapa(pedidos).find(e => e.status === 'em_orcamento')?.pedidos).toBe(1);
-  });
-});
 
-it('meses até o escolhido, virando o ano', () => {
-  expect(mesesAte('2027-02', 4)).toEqual(['2026-11', '2026-12', '2027-01', '2027-02']);
-});
+  it('etapas abertas agora', () => {
+    expect(porEtapa(pedidos).map(e => [e.status, e.pedidos])).toEqual([['enviada', 1], ['devolvida', 0], ['a_atender', 1]]);
+  });
 
-describe('tempos', () => {
-  const ev = (para: string, em: string, de: string | null = null) =>
-    ({ id: em, pedido_id: 'p', de_status: de, para_status: para, papel: null, comentario: null, payload: null, usuario_nome: null, created_at: em }) as PedidoCompleto['eventos'][number];
-  const p = pedido({
-    status: 'faturada', faturada_em: '2026-10-05T10:00:00Z',
-    eventos: [
-      ev('enviada', '2026-10-01T10:00:00Z'), ev('em_orcamento', '2026-10-02T10:00:00Z', 'enviada'),
-      ev('em_orcamento', '2026-10-02T12:00:00Z', 'em_orcamento'), // anotação: não conta
-      ev('a_faturar', '2026-10-03T22:00:00Z', 'em_orcamento'), ev('faturada', '2026-10-05T10:00:00Z', 'a_faturar'),
-    ],
+  it('itens mais pedidos: nº de pedidos e, no empate, a quantidade entregue (ou conferida)', () => {
+    expect(topItens(pedidos, materiais, '2026-10')).toEqual([
+      { id: 'luva', nome: 'Luva', unidade: 'par', pedidos: 2, quantidade: 25 },
+      { id: 'vas', nome: 'Vassoura', unidade: 'un', pedidos: 2, quantidade: 10 },
+    ]);
   });
-  it('tempo médio por etapa ignora anotações', () => {
-    expect(tempoPorEtapa([p]).map(t => [t.status, t.dias])).toEqual([['enviada', 1], ['em_orcamento', 1.5], ['aguardando_aprovacao', null], ['a_faturar', 1.5]]);
+
+  it('tempo por etapa ignora anotações', () => {
+    expect(tempoPorEtapa([atendido]).map(t => [t.status, t.dias])).toEqual([['enviada', 1], ['a_atender', 3]]);
   });
-  it('do envio ao faturamento', () => {
-    expect(tempoAteFaturar([p], '2026-10')).toBe(4);
-    expect(tempoAteFaturar([p], '2026-09')).toBeNull();
+
+  it('meses até o escolhido, virando o ano', () => {
+    expect(mesesAte('2027-02', 4)).toEqual(['2026-11', '2026-12', '2027-01', '2027-02']);
   });
 });

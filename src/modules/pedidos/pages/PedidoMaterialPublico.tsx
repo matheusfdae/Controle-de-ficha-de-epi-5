@@ -34,17 +34,13 @@ const lembrar = (dados: { matricula?: string; telefone?: string }) => {
 const COR_STATUS: Record<string, string> = {
   enviada: 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100',
   devolvida: 'bg-orange-100 text-orange-900 dark:bg-orange-900/40 dark:text-orange-100',
-  em_orcamento: 'bg-sky-100 text-sky-900 dark:bg-sky-900/40 dark:text-sky-100',
-  aguardando_aprovacao: 'bg-sky-100 text-sky-900 dark:bg-sky-900/40 dark:text-sky-100',
-  a_faturar: 'bg-blue-100 text-blue-900 dark:bg-blue-900/40 dark:text-blue-100',
-  faturada: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100',
-  reprovada: 'bg-red-100 text-red-900 dark:bg-red-900/40 dark:text-red-100',
+  a_atender: 'bg-blue-100 text-blue-900 dark:bg-blue-900/40 dark:text-blue-100',
+  atendida: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100',
   cancelada: 'bg-muted text-muted-foreground',
 };
-// O encarregado não precisa saber de teto: aprovação do excesso aparece como "em análise".
+// Nomes das etapas do ponto de vista do encarregado.
 const STATUS_ENCARREGADO: Record<string, string> = {
-  ...STATUS_PEDIDO, enviada: 'Com o supervisor', em_orcamento: 'Em análise (compras)', aguardando_aprovacao: 'Em análise (compras)',
-  a_faturar: 'Aprovado — em compra', faturada: 'Comprado', devolvida: 'Devolvido para você corrigir',
+  ...STATUS_PEDIDO, enviada: 'Com o supervisor', a_atender: 'Conferido — com compras', atendida: 'Atendido', devolvida: 'Devolvido para você corrigir',
 };
 
 interface Linha { material_id: string; quantidade: string }
@@ -416,7 +412,7 @@ function CartaoPedido({ p, carregando, catalogo, onCancelar, onReenviar }: {
   const [editando, setEditando] = useState(false);
   const [linhas, setLinhas] = useState<Linha[]>([]);
   const [obs, setObs] = useState('');
-  const motivo = [...(p.historico ?? [])].reverse().find(h => h.comentario && ['devolvida', 'reprovada', 'cancelada'].includes(h.status));
+  const motivo = [...(p.historico ?? [])].reverse().find(h => h.comentario && ['devolvida', 'cancelada', 'atendida'].includes(h.status));
 
   const corrigir = () => {
     setLinhas((p.itens ?? []).map(i => ({ material_id: i.material_id, quantidade: String(i.quantidade).replace('.', ',') })));
@@ -440,13 +436,16 @@ function CartaoPedido({ p, carregando, catalogo, onCancelar, onReenviar }: {
               <li key={i.material_id}>
                 {formatarNumero(i.quantidade)} {i.unidade} · {i.nome}
                 {i.quantidade !== i.quantidade_pedida && <span className="text-xs"> (pedido: {formatarNumero(i.quantidade_pedida)})</span>}
+                {i.quantidade_atendida != null && i.quantidade_atendida !== i.quantidade && (
+                  <span className="text-xs text-amber-700 dark:text-amber-400"> · entregue: {formatarNumero(i.quantidade_atendida)}</span>
+                )}
               </li>
             ))}
           </ul>
         )}
         {motivo?.comentario && (
           <p className={`text-xs ${p.status === 'devolvida' ? 'text-orange-700 dark:text-orange-400' : 'text-destructive'}`}>
-            {p.status === 'devolvida' ? 'O supervisor pediu: ' : 'Motivo: '}{motivo.comentario}
+            {p.status === 'devolvida' ? 'O supervisor pediu: ' : p.status === 'atendida' ? 'Compras informou: ' : 'Motivo: '}{motivo.comentario}
           </p>
         )}
         {editando ? (

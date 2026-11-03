@@ -21,8 +21,8 @@ async function avisar(admin: any) {
   await admin.rpc('gerar_pedidos_recorrentes');
 
   const { data: brutos, error } = await admin.from('pedidos_material')
-    .select('id, codigo, posto_id, uf, status, notificado_status, epi_avisado, tem_epi, data_pedido, solicitante_nome, valor_estimado, valor_orcado, valor_real, excede_teto, sem_preco, recorrencia_id')
-    .or('status.in.(enviada,em_orcamento,aguardando_aprovacao,a_faturar),and(tem_epi.eq.true,epi_avisado.eq.false)')
+    .select('id, codigo, posto_id, uf, status, notificado_status, epi_avisado, tem_epi, data_pedido, solicitante_nome, recorrencia_id')
+    .or('status.in.(enviada,a_atender),and(tem_epi.eq.true,epi_avisado.eq.false)')
     .order('ano').order('numero').limit(1000);
   if (error) throw new Error(error.message);
   const etapa = (brutos ?? []).filter((p: any) => RESPONSAVEIS[p.status] && p.notificado_status !== p.status);
@@ -52,8 +52,7 @@ async function avisar(admin: any) {
     id: p.id, codigo: p.codigo, posto_id: p.posto_id, uf: p.uf, status: p.status,
     posto: (postos ?? []).find((x: any) => x.id === p.posto_id)?.nome ?? '—',
     data_pedido: p.data_pedido, solicitante_nome: p.solicitante_nome,
-    valor: Number(p.valor_real ?? p.valor_orcado ?? p.valor_estimado),
-    excede_teto: p.excede_teto, sem_preco: p.sem_preco, tem_epi: p.tem_epi, recorrente: !!p.recorrencia_id,
+    tem_epi: p.tem_epi, recorrente: !!p.recorrencia_id,
     itens: (itens ?? []).filter((i: any) => i.pedido_id === p.id)
       .map((i: any) => `${qtd(i.quantidade)} ${i.materiais?.unidade ?? ''} ${nomeItem(i.materiais)}`.replace(/\s+/g, ' ').trim()).join('; '),
   });
