@@ -13,6 +13,7 @@ PSQL=(docker exec -i supabase-db psql -U postgres -d postgres -X -q -v ON_ERROR_
 FUNCAO_URL="http://localhost:8000/functions/v1/enviar-convocacao-uniforme"
 FUNCAO_ESTOQUE="http://localhost:8000/functions/v1/enviar-relatorio-estoque"
 FUNCAO_PENDENTES="http://localhost:8000/functions/v1/enviar-relatorio-pendentes"
+FUNCAO_PEDIDOS="http://localhost:8000/functions/v1/avisar-pedidos-material"
 
 # Segredo do agendador: gerado aqui, guardado no banco e num arquivo só deste usuário.
 CRON_SECRET="$(openssl rand -hex 32)"
@@ -30,7 +31,9 @@ LINHA_ESTOQUE="0 $HORA * * * curl -s -m 120 -X POST $FUNCAO_ESTOQUE -H 'Content-
 LINHA_PENDENTES="0 $HORA * * * curl -s -m 120 -X POST $FUNCAO_PENDENTES -H 'Content-Type: application/json' -H \"x-cron-secret: \$(cat \$HOME/.email-cron-secret)\" -d '{\"modo\":\"automatico\"}' >> \$HOME/relatorio-pendentes.log 2>&1; echo >> \$HOME/relatorio-pendentes.log # relatorio-pendentes"
 # Pedido de reposição: a cada 15 min (só envia se algum item chegou ao mínimo); o log só guarda envios e falhas.
 LINHA_REPOSICAO="*/15 * * * * r=\$(curl -s -m 120 -X POST $FUNCAO_ESTOQUE -H 'Content-Type: application/json' -H \"x-cron-secret: \$(cat \$HOME/.email-cron-secret)\" -d '{\"modo\":\"reposicao\"}' 2>&1); case \"\$r\" in *'\"enviado\":false'*) ;; *) echo \"\$(date '+\%F \%T') \$r\" >> \$HOME/reposicao-estoque.log;; esac # reposicao-estoque"
-( crontab -l 2>/dev/null | grep -v -e '# convocacao-uniforme' -e '# relatorio-estoque' -e '# reposicao-estoque' -e '# relatorio-pendentes' || true; echo "$LINHA"; echo "$LINHA_ESTOQUE"; echo "$LINHA_PENDENTES"; echo "$LINHA_REPOSICAO" ) | crontab -
-echo ">>> Agendamento: todo dia às ${HORA}h desta VM (= 7h de Brasília) + pedido de reposição a cada 15 min."
-echo "    Logs em ~/convocacao-uniforme.log, ~/relatorio-estoque.log, ~/relatorio-pendentes.log e ~/reposicao-estoque.log"
+# Aviso aos aprovadores de pedidos de material: a cada 5 min (só envia se algum pedido chegou a um nível novo).
+LINHA_PEDIDOS="*/5 * * * * r=\$(curl -s -m 120 -X POST $FUNCAO_PEDIDOS -H 'Content-Type: application/json' -H \"x-cron-secret: \$(cat \$HOME/.email-cron-secret)\" -d '{\"modo\":\"automatico\"}' 2>&1); case \"\$r\" in *'\"enviado\":false'*) ;; *) echo \"\$(date '+\%F \%T') \$r\" >> \$HOME/avisos-pedidos.log;; esac # avisos-pedidos"
+( crontab -l 2>/dev/null | grep -v -e '# convocacao-uniforme' -e '# relatorio-estoque' -e '# reposicao-estoque' -e '# relatorio-pendentes' -e '# avisos-pedidos' || true; echo "$LINHA"; echo "$LINHA_ESTOQUE"; echo "$LINHA_PENDENTES"; echo "$LINHA_REPOSICAO"; echo "$LINHA_PEDIDOS" ) | crontab -
+echo ">>> Agendamento: todo dia às ${HORA}h desta VM (= 7h de Brasília) + pedido de reposição a cada 15 min + aviso de pedidos de material a cada 5 min."
+echo "    Logs em ~/convocacao-uniforme.log, ~/relatorio-estoque.log, ~/relatorio-pendentes.log, ~/reposicao-estoque.log e ~/avisos-pedidos.log"
 echo "    Na tela: Configurações > E-mail > conecte a conta e, em cada cartão (convocação, estoque e fichas pendentes), escolha o dia, os destinatários e ligue o envio automático."

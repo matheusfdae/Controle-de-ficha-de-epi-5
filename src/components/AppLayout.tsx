@@ -5,6 +5,7 @@ import { Separator } from '@/components/ui/separator';
 import InstallAppButton from '@/components/InstallAppButton';
 import ThemeToggle from '@/components/ThemeToggle';
 import ChatAjuda from '@/components/ChatAjuda';
+import SinoPedidos from '@/modules/pedidos/components/SinoPedidos';
 
 const titles: Record<string, string> = {
   '/': 'Dashboard',
@@ -35,6 +36,7 @@ export default function AppLayout() {
             <Separator orientation="vertical" className="h-5 mx-1" />
             <h1 className="text-sm font-semibold text-foreground truncate">{title}</h1>
             <div className="ml-auto flex items-center gap-1">
+              <SinoPedidos />
               <ThemeToggle />
               <InstallAppButton />
             </div>

@@ -11,7 +11,8 @@ export type ModuleId =
   | 'configuracoes'
   | 'assinar_tablet'
   | 'colaboradores'
-  | 'crachas';
+  | 'crachas'
+  | 'pedidos_material';
 
 export type ActionId = 'view' | 'create' | 'edit' | 'delete';
 
@@ -34,6 +35,8 @@ export const MODULES: ModuleDef[] = [
   { id: 'colaboradores',    label: 'Colaboradores Senior', actions: ['view', 'edit'] },
   { id: 'integracao',       label: 'Integração',        actions: ['view', 'create', 'edit', 'delete'] },
   { id: 'crachas',          label: 'Crachás',           actions: ['view', 'create', 'edit', 'delete'] },
+  // view = pedidos, painel e relatório; create = registrar compra; edit = materiais, tetos, alçada e aprovadores.
+  { id: 'pedidos_material', label: 'Pedidos de Material', actions: ['view', 'create', 'edit'] },
   { id: 'funcoes',          label: 'Funções',           actions: ['view', 'create', 'edit', 'delete'] },
   { id: 'configuracoes',    label: 'Configurações',     actions: ['view', 'edit'] },
 ];
