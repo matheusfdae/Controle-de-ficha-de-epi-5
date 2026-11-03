@@ -46,11 +46,11 @@ describe('lerAba', () => {
     expect(lerAba('MENU', grade)).toBeNull();
     expect(lerAba('X', [['nada']])!.avisos[0]).toMatch(/Cabeçalho/);
   });
-  it('sem custo em contrato = teto vazio com aviso', () => {
+  it('sem custo em contrato = teto vazio, sem aviso (controle é só de quantidade)', () => {
     const g = grade.map(l => l.map(v => (typeof v === 'string' && v.startsWith('CUSTO') ? null : v)));
     const b = lerAba('BASE', g)!;
     expect(b.teto).toBeNull();
-    expect(b.avisos[0]).toMatch(/CUSTO EM CONTRATO/);
+    expect(b.avisos.some(a => /CUSTO EM CONTRATO/.test(a))).toBe(false);
   });
 });
 

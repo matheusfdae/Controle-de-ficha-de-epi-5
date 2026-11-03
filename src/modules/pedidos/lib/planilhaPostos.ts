@@ -71,7 +71,6 @@ export function lerAba(nomeAba: string, grade: Celula[][]): AbaPosto | null {
   posto = posto || aba;
   const base: AbaPosto = { aba, posto, uf: ufSugerida(aba, posto), teto, itens: [], avisos };
   if (colItem < 0 || linMes < 0) { avisos.push('Cabeçalho (ITEM e meses) não encontrado: aba ignorada.'); return base; }
-  if (teto == null) avisos.push('Sem "CUSTO EM CONTRATO": teto fica para preencher na tela.');
 
   const vistos = new Set<string>();
   let secao: string | null = null;
