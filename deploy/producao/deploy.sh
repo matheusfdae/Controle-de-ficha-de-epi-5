@@ -59,10 +59,11 @@ MIGRACOES=(
   "20261030120000_pedidos_material.sql|SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='pedidos_material' AND column_name='conferida_em')"
   "20261031120000_estoque_posto.sql|SELECT to_regclass('public.estoque_plantoes') IS NOT NULL"
   "20261031130000_importar_planilha_postos.sql|SELECT to_regprocedure('public.pedidos_importar_planilha(jsonb)') IS NOT NULL"
-  "20261104140000_pedidos_preco_anterior.sql|SELECT to_regprocedure('public.pedido_precos_anteriores(uuid)') IS NOT NULL"
-  "20261104130000_estoque_lancar_dia.sql|SELECT to_regprocedure('public.estoque_lancar_dia(uuid,date,text,jsonb,text,boolean,text)') IS NOT NULL"
   "20261104120000_pedidos_teto_precos.sql|SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='postos' AND column_name='teto_material')"
+  "20261104130000_estoque_lancar_dia.sql|SELECT to_regprocedure('public.estoque_lancar_dia(uuid,date,text,jsonb,text,boolean,text)') IS NOT NULL"
+  "20261104140000_pedidos_preco_anterior.sql|SELECT to_regprocedure('public.pedido_precos_anteriores(uuid)') IS NOT NULL"
 )
+# A ordem acima é a ordem em que as pendentes são aplicadas: sempre da mais antiga para a mais nova.
 PENDENTES=()
 echo ">>> Migrations:"
 for m in "${MIGRACOES[@]}"; do
