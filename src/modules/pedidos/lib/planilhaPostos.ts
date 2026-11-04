@@ -12,6 +12,18 @@
  */
 
 export type Celula = string | number | boolean | Date | null | undefined;
+
+/** Valor de uma célula do ExcelJS (fórmula, texto rico, link) como valor simples. */
+export const valorCelula = (v: unknown): Celula => {
+  if (v && typeof v === 'object' && !(v instanceof Date)) {
+    const o = v as { result?: unknown; richText?: { text: string }[]; text?: string };
+    if ('result' in o) return valorCelula(o.result);
+    if (o.richText) return o.richText.map(t => t.text).join('');
+    if (typeof o.text === 'string') return o.text;
+    return null;
+  }
+  return v as Celula;
+};
 export interface ItemPlanilha { nome: string; unidade: string | null; linha: number; secao: string | null }
 export interface AbaPosto {
   aba: string; posto: string; uf: string; teto: number | null; itens: ItemPlanilha[]; avisos: string[];

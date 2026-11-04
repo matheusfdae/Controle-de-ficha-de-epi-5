@@ -6,18 +6,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowDownRight, ArrowUpRight, CheckCircle2, ClipboardList, Clock, HardHat, Loader2, PackageMinus, Undo2 } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, CheckCircle2, ClipboardList, Clock, FileDown, HardHat, Loader2, PackageMinus, Undo2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import BackButton from '@/components/BackButton';
 import PageHeader from '@/components/PageHeader';
 import { listPostos, type Posto } from '@/services/postosService';
-import { formatarNumero, hojeBr, listMateriais, listPedidos, type Material, type PedidoCompleto } from '../lib/pedidosService';
-import { indicadores, mesesAte, pedidosPorMes, porEtapa, porPosto, rotuloMes, tempoPorEtapa, topItens } from '../lib/gerencial';
+import { formatarNumero, hojeBr, listMateriais, listPedidos, reais, type Material, type PedidoCompleto } from '../lib/pedidosService';
+import { gastoTeto, indicadores, mesesAte, pedidosPorMes, porEtapa, porPosto, rotuloMes, tempoPorEtapa, topItens } from '../lib/gerencial';
 import BarrasPostos3D from '../components/BarrasPostos3D';
+import { pdfPedidosDoMes, pdfPedidosDoPosto, pdfTetoPorPosto } from '../lib/relatoriosPdf';
 
 /**
- * Painel Gerencial dos pedidos de material (só quantidade): indicadores do
- * mês, pedidos por posto em barras 3D e gráficos de andamento, itens mais
+ * Painel Gerencial dos pedidos de material: indicadores do mês, gasto de cada
+ * posto contra o teto, pedidos por posto em barras 3D e gráficos de andamento, itens mais
  * pedidos e tempos de conferência e atendimento.
  */
 
@@ -97,6 +100,20 @@ export default function PainelGerencial() {
   const etapas = useMemo(() => porEtapa(pedidosUf), [pedidosUf]);
   const itens = useMemo(() => topItens(pedidosUf, materiais, mes), [pedidosUf, materiais, mes]);
   const tempos = useMemo(() => tempoPorEtapa(pedidosUf), [pedidosUf]);
+  const tetos = useMemo(() => gastoTeto(pedidosUf, postosUf, mes), [pedidosUf, postosUf, mes]);
+  const gastoTotal = tetos.reduce((s, l) => s + l.gasto, 0);
+  const acima = tetos.filter(l => l.passou).length;
+  const mesAtual = mes === hojeBr().slice(0, 7);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
+  const pdf = async (fn: () => Promise<unknown>) => {
+    setGerandoPdf(true);
+    try { await fn(); } catch (e) { toast.error('Não foi possível gerar o PDF: ' + (e as Error).message); } finally { setGerandoPdf(false); }
+  };
+  const doMesUf = () => pedidosUf.filter(p => p.data_pedido.slice(0, 7) === mes);
+  const pdfPosto = (id: string) => {
+    const po = postos.find(x => x.id === id);
+    if (po) pdf(() => pdfPedidosDoPosto(po, doMesUf().filter(p => p.posto_id === id), materiais, mes));
+  };
 
   const delta = k.pedidosAnterior ? Math.round(((k.pedidos - k.pedidosAnterior) / k.pedidosAnterior) * 1000) / 10 : null;
   const DeltaIcone = delta != null && delta > 0 ? ArrowUpRight : ArrowDownRight;
@@ -107,7 +124,7 @@ export default function PainelGerencial() {
       <div className="max-w-7xl mx-auto space-y-6">
         <BackButton />
         <PageHeader title="Painel Gerencial" eyebrow="Pedidos"
-          description="Quantos pedidos cada posto fez, o andamento, os itens mais pedidos e o tempo de conferência e de atendimento." />
+          description="Gasto de cada posto contra o teto, quantos pedidos cada posto fez, o andamento, os itens mais pedidos e o tempo de conferência e de atendimento." />
 
         <div className="flex flex-wrap items-end gap-3">
           <div>
@@ -125,6 +142,20 @@ export default function PainelGerencial() {
             </Select>
           </div>
           {carregando && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mb-2" />}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2 ml-auto" disabled={carregando || gerandoPdf}>
+                {gerandoPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />} Relatórios em PDF
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72">
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{rotuloMes(mes)} · {uf === 'todos' ? 'todos os estados' : uf}</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => pdf(() => pdfTetoPorPosto(tetos, mes, uf))}>Teto x gasto por posto</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => pdf(() => pdfPedidosDoMes(doMesUf(), postos, materiais, mes, uf))}>Pedidos do mês (todos)</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Pedidos de um posto no mês: use o ícone de PDF na linha do posto, no quadro de teto.</DropdownMenuLabel>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -139,6 +170,67 @@ export default function PainelGerencial() {
           <Indicador titulo="Devolvidos ao encarregado" valor={`${k.devolvidos}`} icone={Undo2} detalhe="pedidos do mês que voltaram para correção" />
           <Indicador titulo="Pedidos com EPI" valor={`${k.comEpi}`} icone={HardHat} detalhe="no mês" />
         </div>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Teto de gasto por posto — {rotuloMes(mes)}</CardTitle>
+            <CardDescription>
+              Gasto = soma do valor dos pedidos feitos no mês{mesAtual ? ` até hoje (${hojeBr().split('-').reverse().join('/')})` : ''}, sem os cancelados.
+              O teto de cada posto fica em Configurações de Pedidos → Itens por posto. Clique num posto para ver os pedidos dele.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+              <span>Gasto no mês: <strong className="tabular-nums">{reais(gastoTotal)}</strong></span>
+              <span>Postos com teto: <strong>{tetos.filter(l => l.teto != null).length}</strong></span>
+              <span className={acima ? 'text-destructive font-semibold' : ''}>Acima do teto: <strong>{acima}</strong></span>
+            </div>
+            {tetos.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">Nenhum posto com teto ou com gasto neste mês.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader><TableRow>
+                    <TableHead>Posto</TableHead><TableHead className="text-right">Teto mensal</TableHead><TableHead className="text-right">Gasto no mês</TableHead>
+                    <TableHead className="min-w-48">Uso do teto</TableHead><TableHead className="text-right">Sobra / passou</TableHead><TableHead className="text-right">Pedidos</TableHead>
+                    <TableHead className="w-10"><span className="sr-only">PDF</span></TableHead>
+                  </TableRow></TableHeader>
+                  <TableBody>
+                    {tetos.map(l => (
+                      <TableRow key={l.id} className="cursor-pointer" onClick={() => abrirPosto(l.id)}>
+                        <TableCell className="font-medium">{l.nome} <span className="text-xs text-muted-foreground">{l.uf}</span>
+                          {l.semPreco > 0 && <span className="block text-[11px] text-amber-600">{l.semPreco} pedido(s) com item sem preço</span>}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums whitespace-nowrap">{l.teto == null ? <span className="text-muted-foreground text-xs">sem teto</span> : reais(l.teto)}</TableCell>
+                        <TableCell className={`text-right tabular-nums whitespace-nowrap ${l.passou ? 'text-destructive font-semibold' : ''}`}>{reais(l.gasto)}</TableCell>
+                        <TableCell>
+                          {l.pct == null ? <span className="text-xs text-muted-foreground">—</span> : (
+                            <div className="flex items-center gap-2">
+                              <div className="h-2 flex-1 rounded-full bg-muted overflow-hidden">
+                                <div className={`h-full ${l.passou ? 'bg-destructive' : l.pct >= 80 ? 'bg-amber-500' : 'bg-primary'}`} style={{ width: `${Math.min(100, l.pct)}%` }} />
+                              </div>
+                              <span className={`w-14 text-right text-xs tabular-nums ${l.passou ? 'text-destructive font-semibold' : ''}`}>{l.pct.toLocaleString('pt-BR')}%</span>
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className={`text-right tabular-nums whitespace-nowrap text-sm ${l.passou ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
+                          {l.teto == null ? '—' : l.passou ? `passou ${reais(l.gasto - l.teto)}` : `sobra ${reais(l.teto - l.gasto)}`}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{l.pedidos}</TableCell>
+                        <TableCell className="p-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" disabled={gerandoPdf} title="PDF dos pedidos do posto no mês"
+                            aria-label={`PDF dos pedidos de ${l.nome} no mês`} onClick={e => { e.stopPropagation(); pdfPosto(l.id); }}>
+                            <FileDown className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader className="pb-2">

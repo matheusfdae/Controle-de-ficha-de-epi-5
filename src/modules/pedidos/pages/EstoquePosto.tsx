@@ -9,7 +9,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AlertTriangle, Camera, CheckCircle2, ClipboardCheck, Loader2, Lock, PackageOpen, Plus, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Camera, CalendarCheck, CheckCircle2, ClipboardCheck, Loader2, Lock, PackageOpen, Plus, Trash2, X } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ConsumoPosto from '../components/ConsumoPosto';
 import { toast } from 'sonner';
 import BackButton from '@/components/BackButton';
 import PageHeader from '@/components/PageHeader';
@@ -17,17 +19,18 @@ import SignaturePad from '@/components/SignaturePad';
 import { useAuth } from '@/contexts/AuthContext';
 import { listPostos, type Posto } from '@/services/postosService';
 import { getMinhaAssinatura } from '@/services/assinaturaUsuarioService';
-import { formatarNumero, listAprovadores, listMateriais, materiaisPediveis, nomeMaterial, type Aprovador, type Material } from '../lib/pedidosService';
+import { formatarNumero, hojeBr, listAprovadores, listItensPorPosto, listMateriais, materiaisPediveis, nomeMaterial, type Aprovador, type Material } from '../lib/pedidosService';
 import {
-  abrirPlantao, cancelarPlantao, comprimirFoto, esperado, fecharPlantao, fotosDoPlantao, plantoesDoPosto, saldoDoPosto,
+  abrirPlantao, cancelarPlantao, comprimirFoto, esperado, fecharPlantao, fotosDoPlantao, lancarDia, plantoesDoPosto, saldoDoPosto,
   type ItemPlantao, type Plantao, type SaldoPosto,
 } from '../lib/estoqueService';
 
 /**
- * Estoque do posto por plantão. O supervisor abre o plantão com a foto do
- * depósito e a contagem; no fim, foto, o que foi usado/recebido e a contagem
- * final, rubrica e declaração. O banco confere tudo e só então atualiza o
- * estoque do posto.
+ * Estoque do posto. Dois jeitos de lançar: o dia inteiro de uma vez (quanto
+ * havia no início, quanto chegou e quanto foi usado de cada item) ou por
+ * plantão (abre com foto e contagem; no fim, foto, usado/recebido e contagem
+ * final). Sempre com rubrica e declaração; o banco confere tudo e só então
+ * atualiza o estoque do posto. Embaixo, o consumo diário, quinzenal e mensal.
  */
 
 const DECLARACAO = 'Declaro que estou ciente e concordo que as quantidades lançadas são as que existem no depósito de material do posto.';
@@ -87,14 +90,17 @@ export default function EstoquePosto() {
   const [plantoes, setPlantoes] = useState<(Plantao & { itens: ItemPlantao[] })[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [detalhe, setDetalhe] = useState<(Plantao & { itens: ItemPlantao[] }) | null>(null);
+  const [listas, setListas] = useState<{ posto_id: string; material_id: string }[]>([]);
+  const [modo, setModo] = useState<'dia' | 'plantao'>('dia');
+  const [versao, setVersao] = useState(0);
 
   const souAdmin = user?.role === 'admin';
   const meusPostos = useMemo(() => postos.filter(p => souAdmin || aprovadores.some(a => a.user_id === user?.id
     && ['supervisor', 'gerencia'].includes(a.nivel) && a.uf === p.uf && (a.postos.length === 0 || a.postos.includes(p.id)))), [postos, aprovadores, souAdmin, user?.id]);
 
   useEffect(() => {
-    Promise.all([listPostos(), listAprovadores(), listMateriais()])
-      .then(([po, a, m]) => { setPostos(po); setAprovadores(a); setMateriais(m); })
+    Promise.all([listPostos(), listAprovadores(), listMateriais(), listItensPorPosto()])
+      .then(([po, a, m, l]) => { setPostos(po); setAprovadores(a); setMateriais(m); setListas(l); })
       .catch(e => toast.error('Erro ao carregar: ' + (e as Error).message))
       .finally(() => setCarregando(false));
   }, []);
@@ -105,7 +111,7 @@ export default function EstoquePosto() {
     setCarregando(true);
     try {
       const [s, p] = await Promise.all([saldoDoPosto(postoId), plantoesDoPosto(postoId)]);
-      setSaldo(s); setPlantoes(p);
+      setSaldo(s); setPlantoes(p); setVersao(v => v + 1);
     } catch (e) { toast.error('Erro ao carregar o estoque: ' + (e as Error).message); }
     finally { setCarregando(false); }
   }, [postoId]);
@@ -121,7 +127,7 @@ export default function EstoquePosto() {
       <div className="max-w-5xl mx-auto space-y-6">
         <BackButton />
         <PageHeader title="Estoque do Posto" eyebrow="Pedidos"
-          description="Controle por plantão: no início, foto e contagem do depósito; no fim, foto, o que foi usado e a contagem final, com a rubrica do supervisor." />
+          description="Lance o dia (quanto havia, quanto chegou e quanto foi usado) ou por plantão, com foto e rubrica. Embaixo, o consumo por dia, quinzena e mês." />
 
         <div className="max-w-sm">
           <Label>Posto</Label>
@@ -135,7 +141,22 @@ export default function EstoquePosto() {
 
         {postoId && !carregando && (aberto
           ? <FecharPlantao key={aberto.id} plantao={aberto} materiais={materiais} nome={nome} userId={user?.id ?? ''} onPronto={carregarPosto} />
-          : <AbrirPlantao key={postoId} postoId={postoId} saldo={saldo} materiais={materiais} nome={nome} onPronto={carregarPosto} />)}
+          : <>
+            <Tabs value={modo} onValueChange={v => setModo(v as 'dia' | 'plantao')}>
+              <TabsList>
+                <TabsTrigger value="dia" className="gap-1"><CalendarCheck className="h-4 w-4" /> Lançar o dia</TabsTrigger>
+                <TabsTrigger value="plantao" className="gap-1"><PackageOpen className="h-4 w-4" /> Por plantão</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {modo === 'dia'
+              ? <LancarDia key={postoId} postoId={postoId} saldo={saldo} listaPosto={listas.filter(l => l.posto_id === postoId).map(l => l.material_id)}
+                  materiais={materiais} nome={nome} userId={user?.id ?? ''} onPronto={carregarPosto} />
+              : <AbrirPlantao key={postoId} postoId={postoId} saldo={saldo} materiais={materiais} nome={nome} onPronto={carregarPosto} />}
+          </>)}
+
+        {postoId && (
+          <ConsumoPosto key={postoId} posto={postos.find(p => p.id === postoId)!} materiais={materiais} versao={versao} />
+        )}
 
         {postoId && !carregando && (
           <div className="grid gap-4 lg:grid-cols-2">
@@ -193,6 +214,135 @@ export default function EstoquePosto() {
 
       {detalhe && <DetalhePlantao plantao={detalhe} nome={nome} unidade={id => mat(id)?.unidade ?? ''} onFechar={() => setDetalhe(null)} />}
     </div>
+  );
+}
+
+/** O dia de uma vez: para cada item, quanto havia no início, quanto chegou e quanto foi usado. */
+function LancarDia({ postoId, saldo, listaPosto, materiais, nome, userId, onPronto }: {
+  postoId: string; saldo: SaldoPosto[]; listaPosto: string[]; materiais: Material[]; nome: (id: string) => string; userId: string;
+  onPronto: () => Promise<void>;
+}) {
+  // Início = estoque do último lançamento; itens da lista do posto que ainda não têm estoque entram com 0.
+  const [linhas, setLinhas] = useState(() => {
+    const ids = [...new Set([...saldo.map(s => s.material_id), ...listaPosto])];
+    return ids.sort((a, b) => nome(a).localeCompare(nome(b))).map(id => {
+      const s = saldo.find(x => x.material_id === id);
+      return { material_id: id, inicio: s ? txt(s.quantidade) : '', recebida: '', usada: '' };
+    });
+  });
+  const [data, setData] = useState(hojeBr());
+  const [foto, setFoto] = useState('');
+  const [obs, setObs] = useState('');
+  const [salva, setSalva] = useState('');
+  const [assinatura, setAssinatura] = useState('');
+  const [desenhar, setDesenhar] = useState(false);
+  const [ciente, setCiente] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  useEffect(() => { if (userId) getMinhaAssinatura(userId).then(a => { setSalva(a); if (!a) setDesenhar(true); }).catch(() => setDesenhar(true)); }, [userId]);
+
+  const opcoes = materiaisPediveis(materiais).filter(m => !linhas.some(l => l.material_id === m.id));
+  const mudar = (i: number, campo: 'inicio' | 'recebida' | 'usada', v: string) =>
+    setLinhas(ls => ls.map((l, j) => (j === i ? { ...l, [campo]: v.replace(/[^\d.,]/g, '').slice(0, 9) } : l)));
+  const ficou = (l: typeof linhas[number]) => Math.round((num(l.inicio) + num(l.recebida) - num(l.usada)) * 100) / 100;
+  const usadoTotal = linhas.filter(l => num(l.usada) > 0).length;
+  const rubrica = desenhar ? assinatura : salva;
+  const minData = new Date(Date.now() - 60 * 864e5).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+
+  const salvar = async () => {
+    if (!foto) return toast.error('Fotografe o depósito.');
+    if (!linhas.length) return toast.error('Adicione os itens do depósito.');
+    for (const l of linhas) {
+      if (![l.inicio, l.recebida, l.usada].every(v => num(v) >= 0)) return toast.error(`Confira os números de ${nome(l.material_id)}.`);
+      if (ficou(l) < 0) return toast.error(`Em ${nome(l.material_id)}, o usado é maior que o que havia no início mais o recebido.`);
+    }
+    if (!rubrica) return toast.error('Faça a sua rubrica.');
+    if (!ciente) return toast.error('Marque a declaração de que as quantidades são as do depósito.');
+    setSalvando(true);
+    try {
+      await lancarDia(postoId, data, foto, linhas.map(l => ({ material_id: l.material_id, inicio: num(l.inicio), recebida: num(l.recebida), usada: num(l.usada) })), rubrica, ciente, obs);
+      toast.success(`Lançamento de ${data.split('-').reverse().join('/')} salvo. Estoque atualizado.`);
+      await onPronto();
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setSalvando(false); }
+  };
+
+  return (
+    <Card className="border-primary/30">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2"><CalendarCheck className="h-5 w-5 text-primary" /> Lançamento do dia</CardTitle>
+        <CardDescription>Para cada item: quanto havia no início, quanto chegou e quanto foi usado. "Ficou" é calculado e vira o estoque do posto.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap gap-4 items-end">
+          <div>
+            <Label htmlFor="dia-lanc">Dia</Label>
+            <Input id="dia-lanc" type="date" className="w-44" value={data} min={minData} max={hojeBr()} onChange={e => e.target.value && setData(e.target.value)} />
+          </div>
+          <p className="text-xs text-muted-foreground pb-2">Dá para lançar um dia que passou (até 60 dias). O estoque do posto fica com o lançamento mais recente.</p>
+        </div>
+        <CampoFoto foto={foto} onFoto={setFoto} rotulo="Foto do depósito" />
+
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Item</TableHead>
+                <TableHead className="text-right w-28">Iniciou com</TableHead>
+                <TableHead className="text-right w-24">Recebeu</TableHead>
+                <TableHead className="text-right w-24">Usou</TableHead>
+                <TableHead className="text-right w-24">Ficou</TableHead>
+                <TableHead className="w-10" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {linhas.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">Adicione os itens do depósito.</TableCell></TableRow>}
+              {linhas.map((l, i) => {
+                const f = ficou(l);
+                return (
+                  <TableRow key={l.material_id} className={num(l.usada) > 0 ? 'bg-primary/5' : undefined}>
+                    <TableCell className="text-sm">{nome(l.material_id)} <span className="text-xs text-muted-foreground">{materiais.find(m => m.id === l.material_id)?.unidade}</span></TableCell>
+                    <TableCell><Input inputMode="decimal" className="text-right h-9" placeholder="0" aria-label={`Início de ${nome(l.material_id)}`} value={l.inicio} onChange={e => mudar(i, 'inicio', e.target.value)} /></TableCell>
+                    <TableCell><Input inputMode="decimal" className="text-right h-9" placeholder="0" aria-label={`Recebido de ${nome(l.material_id)}`} value={l.recebida} onChange={e => mudar(i, 'recebida', e.target.value)} /></TableCell>
+                    <TableCell><Input inputMode="decimal" className="text-right h-9" placeholder="0" aria-label={`Usado de ${nome(l.material_id)}`} value={l.usada} onChange={e => mudar(i, 'usada', e.target.value)} /></TableCell>
+                    <TableCell className={`text-right tabular-nums font-semibold ${f < 0 ? 'text-destructive' : ''}`}>{formatarNumero(f)}</TableCell>
+                    <TableCell className="p-1">
+                      <Button type="button" size="icon" variant="ghost" aria-label={`Tirar ${nome(l.material_id)}`} onClick={() => setLinhas(ls => ls.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+        <AdicionarItem opcoes={opcoes} materiais={materiais} onAdicionar={id => setLinhas(ls => [...ls, { material_id: id, inicio: '', recebida: '', usada: '' }])} />
+        <p className="text-xs text-muted-foreground">{usadoTotal} item(ns) com uso lançado. Item sem uso no dia: deixe "Usou" em branco.</p>
+
+        <div>
+          <Label htmlFor="obs-dia">Observação (opcional)</Label>
+          <Textarea id="obs-dia" rows={2} maxLength={1000} value={obs} onChange={e => setObs(e.target.value)} placeholder="Ex.: limpeza pesada depois do evento" />
+        </div>
+
+        <div className="rounded-lg border p-3 space-y-3">
+          <p className="text-sm font-medium flex items-center gap-2"><Lock className="h-4 w-4" /> Rubrica do supervisor</p>
+          {!desenhar && salva ? (
+            <div className="flex items-end gap-3 flex-wrap">
+              <img src={salva} alt="Sua rubrica" className="h-16 bg-white rounded border px-2" />
+              <Button type="button" variant="ghost" size="sm" onClick={() => setDesenhar(true)}>Assinar de novo</Button>
+            </div>
+          ) : (
+            <SignaturePad label="Assine com o dedo" onSave={setAssinatura} grande />
+          )}
+          <label className="flex items-start gap-2 text-sm cursor-pointer">
+            <Checkbox checked={ciente} onCheckedChange={v => setCiente(v === true)} className="mt-0.5" aria-label="Declaração de conferência" />
+            <span>{DECLARACAO}</span>
+          </label>
+        </div>
+
+        <Button size="lg" className="w-full sm:w-auto gap-2" disabled={salvando} onClick={salvar}>
+          {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarCheck className="h-4 w-4" />} Salvar lançamento do dia
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 

@@ -9,8 +9,8 @@ import { toast } from 'sonner';
 import EstadoSelect from '@/components/EstadoSelect';
 import { useAuth } from '@/contexts/AuthContext';
 import { listPostos } from '@/services/postosService';
-import { importarPlanilha, listMateriais } from '../lib/pedidosService';
-import { acharPosto, chaveNome, lerAba, type AbaPosto, type Celula, type PostoCadastrado } from '../lib/planilhaPostos';
+import { importarPlanilha, listMateriais, reais } from '../lib/pedidosService';
+import { acharPosto, chaveNome, lerAba, valorCelula, type AbaPosto, type Celula, type PostoCadastrado } from '../lib/planilhaPostos';
 
 /**
  * Importa a planilha de material por posto (uma aba por posto): catálogo,
@@ -22,16 +22,6 @@ import { acharPosto, chaveNome, lerAba, type AbaPosto, type Celula, type PostoCa
 const NOVO = '__novo__';
 interface Linha { aba: AbaPosto; incluir: boolean; destino: string; uf: string }
 
-const valorCelula = (v: unknown): Celula => {
-  if (v && typeof v === 'object' && !(v instanceof Date)) {
-    const o = v as { result?: unknown; richText?: { text: string }[]; text?: string };
-    if ('result' in o) return valorCelula(o.result);
-    if (o.richText) return o.richText.map(t => t.text).join('');
-    if (typeof o.text === 'string') return o.text;
-    return null;
-  }
-  return v as Celula;
-};
 
 export default function ImportarPlanilha({ podeEditar }: { podeEditar: boolean }) {
   const { estados } = useAuth();
@@ -104,10 +94,11 @@ export default function ImportarPlanilha({ podeEditar }: { podeEditar: boolean }
       const r = await importarPlanilha(marcadas.map(l => ({
         posto_id: l.destino === NOVO ? null : l.destino,
         criar: l.destino === NOVO ? { nome: l.aba.posto, uf: l.uf } : null,
+        teto: l.aba.teto == null ? null : l.aba.teto.toFixed(2),
         itens: l.aba.itens.map(i => ({ nome: nomes.get(chaveNome(i.nome)) ?? i.nome, unidade: i.unidade })),
       })));
       toast.success(`Importado: ${r.listas} lista(s), ${r.itens_nas_listas} itens nas listas, ${r.itens_criados} item(ns) novo(s) no catálogo, `
-        + `${r.postos_criados} posto(s) criado(s).`);
+        + `${r.postos_criados} posto(s) criado(s), ${r.tetos} teto(s) gravado(s).`);
       setLinhas([]); setNomeArquivo('');
     } catch (e) { toast.error((e as Error).message); }
     finally { setImportando(false); }
@@ -119,7 +110,7 @@ export default function ImportarPlanilha({ podeEditar }: { podeEditar: boolean }
         <CardTitle className="text-lg flex items-center gap-2"><FileSpreadsheet className="h-5 w-5 text-primary" /> Importar planilha de material por posto</CardTitle>
         <CardDescription>
           Planilha com uma aba por posto (POSTO:, CUSTO EM CONTRATO e a lista ORD/ITEM). Cada aba vira a lista do posto, que é o que o
-          encarregado vê no link; itens que não existem entram no catálogo. O custo em contrato da planilha não entra (o controle é por quantidade). Nada é gravado antes de você confirmar.
+          encarregado vê no link; itens que não existem entram no catálogo. O custo em contrato de cada aba vira o teto mensal do posto (aba sem custo mantém o teto que já está). Nada é gravado antes de você confirmar.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -150,6 +141,7 @@ export default function ImportarPlanilha({ podeEditar }: { podeEditar: boolean }
                   <TableHead>Aba / posto na planilha</TableHead>
                   <TableHead className="min-w-56">Entra no posto</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead className="text-right">Teto mensal</TableHead>
                   <TableHead className="text-right">Itens</TableHead>
                   <TableHead>Avisos</TableHead>
                 </TableRow>
@@ -181,6 +173,9 @@ export default function ImportarPlanilha({ podeEditar }: { podeEditar: boolean }
                               opcoes={[...new Set([...estados, l.uf])]} />
                           : <span className="text-sm">{l.uf}</span>}
                         {ufBloqueada && <span className="block text-xs text-destructive">Sem acesso a {l.uf}</span>}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-sm whitespace-nowrap">
+                        {l.aba.teto == null ? <span className="text-muted-foreground">—</span> : reais(l.aba.teto)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         <button type="button" className="text-primary hover:underline" onClick={() => setAbertos(a => (a === l.aba.aba ? null : l.aba.aba))}>{l.aba.itens.length}</button>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { entregaParcial, indicadores, mesesAte, pedidosPorMes, porEtapa, porPosto, tempoPorEtapa, topItens } from '@/modules/pedidos/lib/gerencial';
+import { entregaParcial, gastoTeto, indicadores, mesesAte, pedidosPorMes, porEtapa, porPosto, tempoPorEtapa, topItens } from '@/modules/pedidos/lib/gerencial';
 import type { Material, PedidoCompleto } from '@/modules/pedidos/lib/pedidosService';
 
 type Evento = PedidoCompleto['eventos'][number];
@@ -7,16 +7,16 @@ type Item = PedidoCompleto['itens'][number];
 const ev = (para: string, em: string, de: string | null = null) =>
   ({ id: em + para, pedido_id: 'p', de_status: de, para_status: para, papel: null, comentario: null, payload: null, usuario_nome: null, created_at: em }) as Evento;
 const item = (material_id: string, quantidade: number, atendida: number | null = null): Item =>
-  ({ id: material_id + quantidade, pedido_id: 'p', material_id, quantidade_pedida: quantidade, quantidade, quantidade_atendida: atendida });
+  ({ id: material_id + quantidade, pedido_id: 'p', material_id, quantidade_pedida: quantidade, quantidade, quantidade_atendida: atendida, preco_unit: null });
 const pedido = (o: Partial<PedidoCompleto>): PedidoCompleto => ({
   id: 'p', codigo: 'SOL-2026-000001', ano: 2026, numero: 1, posto_id: 'a', uf: 'DF', recorrencia_id: null, data_pedido: '2026-10-01',
   status: 'enviada', tem_epi: false, conferida_em: null, atendida_em: null, observacao: null, solicitante_nome: 'X', solicitante_matricula: null,
-  solicitante_cargo: null, solicitante_telefone: null, created_at: '2026-10-01T10:00:00Z', itens: [], eventos: [], ...o,
+  solicitante_cargo: null, solicitante_telefone: null, created_at: '2026-10-01T10:00:00Z', valor_total: 0, sem_preco: false, itens: [], eventos: [], ...o,
 });
 const postos = [{ id: 'a', nome: 'A', uf: 'DF' }, { id: 'b', nome: 'B', uf: 'DF' }, { id: 'c', nome: 'C', uf: 'GO' }];
 const materiais: Material[] = [
-  { id: 'vas', nome: 'Vassoura', item_pai_id: null, unidade: 'un', categoria: null, is_epi: false, ativo: true },
-  { id: 'luva', nome: 'Luva', item_pai_id: null, unidade: 'par', categoria: null, is_epi: true, ativo: true },
+  { id: 'vas', nome: 'Vassoura', item_pai_id: null, unidade: 'un', categoria: null, is_epi: false, ativo: true, preco: null },
+  { id: 'luva', nome: 'Luva', item_pai_id: null, unidade: 'par', categoria: null, is_epi: true, ativo: true, preco: null },
 ];
 
 const atendido = pedido({
@@ -77,5 +77,20 @@ describe('painel gerencial', () => {
 
   it('meses até o escolhido, virando o ano', () => {
     expect(mesesAte('2027-02', 4)).toEqual(['2026-11', '2026-12', '2027-01', '2027-02']);
+  });
+});
+
+describe('gastoTeto', () => {
+  it('soma o valor do mês (sem cancelados), compara com o teto e põe quem passou primeiro', () => {
+    const ps = [
+      pedido({ id: '1', posto_id: 'a', valor_total: 300 }), pedido({ id: '2', posto_id: 'a', valor_total: 250, sem_preco: true }),
+      pedido({ id: '3', posto_id: 'a', valor_total: 999, status: 'cancelada' }), pedido({ id: '4', posto_id: 'b', valor_total: 80 }),
+      pedido({ id: '5', posto_id: 'b', valor_total: 500, data_pedido: '2026-09-30' }),
+    ];
+    const l = gastoTeto(ps, [
+      { id: 'a', nome: 'A', uf: 'DF', teto_material: 500 }, { id: 'b', nome: 'B', uf: 'DF', teto_material: 100 },
+      { id: 'c', nome: 'C', uf: 'GO', teto_material: null },
+    ], '2026-10');
+    expect(l.map(x => [x.id, x.gasto, x.pct, x.passou, x.semPreco])).toEqual([['a', 550, 110, true, 1], ['b', 80, 80, false, 0]]);
   });
 });

@@ -10,15 +10,16 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Ban, Check, ClipboardList, Copy, HardHat, Loader2, PackageCheck, Repeat, Search, Trash2, Undo2 } from 'lucide-react';
+import { Ban, Check, ClipboardList, Copy, HardHat, Loader2, PackageCheck, Repeat, Search, Trash2, TrendingDown, TrendingUp, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import BackButton from '@/components/BackButton';
 import PageHeader from '@/components/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { listPostos, type Posto } from '@/services/postosService';
 import {
-  ETAPAS, FILAS, RESPONSAVEIS, STATUS_PEDIDO, atenderPedido, cancelarPedido, conferirPedido, dataBr, formatarNumero, hojeBr,
-  listAprovadores, listMateriais, listPedidos, listRecorrencias, listUsuarios, nomeMaterial, rotuloPapel,
+  ETAPAS, FILAS, RESPONSAVEIS, STATUS_PEDIDO, atenderPedido, cancelarPedido, conferirPedido, dataBr, formatarNumero, gastoDoMesNoBanco, hojeBr,
+  listAprovadores, listMateriais, listPedidos, listRecorrencias, listUsuarios, nomeMaterial, precosAnteriores, reais, rotuloPapel, variacaoPreco,
+  type PrecoAnterior,
   type Aprovador, type Material, type Papel, type PedidoCompleto, type Recorrencia, type StatusPedido,
 } from '../lib/pedidosService';
 import { ListaRepeticoes, RepetirPedido } from '../components/Repeticoes';
@@ -176,15 +177,16 @@ export default function Pedidos() {
                   <TableHead>Posto</TableHead>
                   <TableHead>Solicitante</TableHead>
                   <TableHead>Itens</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
                   <TableHead>Situação</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {carregando && (
-                  <TableRow><TableCell colSpan={6} className="text-center py-10"><Loader2 className="h-5 w-5 animate-spin inline" /></TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center py-10"><Loader2 className="h-5 w-5 animate-spin inline" /></TableCell></TableRow>
                 )}
                 {!carregando && lista.length === 0 && (
-                  <TableRow><TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                  <TableRow><TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
                     {aba === 'minhas'
                       ? (meus.length === 0 && !souAdmin ? 'Você não tem papel nos pedidos (Configurações de Pedidos > Papéis).' : 'Nada esperando por você.')
                       : 'Nenhum pedido.'}
@@ -202,6 +204,10 @@ export default function Pedidos() {
                       <span className="line-clamp-2">
                         {p.itens.map(i => `${formatarNumero(i.quantidade_atendida ?? i.quantidade)} ${nomeMaterial(materiais.find(m => m.id === i.material_id), materiais)}`).join(', ')}
                       </span>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums whitespace-nowrap text-sm">
+                      {p.valor_total > 0 ? reais(p.valor_total) : <span className="text-muted-foreground">—</span>}
+                      {p.sem_preco && p.valor_total > 0 && <span className="block text-[11px] text-amber-600">item sem preço</span>}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
@@ -221,6 +227,7 @@ export default function Pedidos() {
 
       {pedidoAberto && (
         <DetalhePedido key={pedidoAberto.id} pedido={pedidoAberto} posto={nomePosto(pedidoAberto.posto_id)}
+          teto={postos.find(x => x.id === pedidoAberto.posto_id)?.teto_material ?? null}
           materiais={materiais} minhaVez={minhaVez(pedidoAberto)}
           podeCancelar={['enviada', 'devolvida', 'a_atender'].includes(pedidoAberto.status) && temPapel(['compras', 'gerencia'], pedidoAberto)}
           repeticao={recorrencias.find(r => r.origem_pedido_id === pedidoAberto.id || r.id === pedidoAberto.recorrencia_id)}
@@ -233,9 +240,9 @@ export default function Pedidos() {
   );
 }
 
-function DetalhePedido({ pedido: p, posto, materiais, minhaVez, podeCancelar, repeticao, podeRepetir,
+function DetalhePedido({ pedido: p, posto, teto, materiais, minhaVez, podeCancelar, repeticao, podeRepetir,
   podeEncerrarRepeticao, onRepeticao, onFechar, onAtualizado }: {
-  pedido: PedidoCompleto; posto: string; materiais: Material[];
+  pedido: PedidoCompleto; posto: string; teto: number | null; materiais: Material[];
   minhaVez: boolean; podeCancelar: boolean;
   repeticao: Recorrencia | undefined; podeRepetir: boolean; podeEncerrarRepeticao: boolean; onRepeticao: () => Promise<void>;
   onFechar: () => void; onAtualizado: () => Promise<void>;
@@ -256,6 +263,24 @@ function DetalhePedido({ pedido: p, posto, materiais, minhaVez, podeCancelar, re
     return quantidades[id] !== '' && Number.isFinite(v) ? v : original;
   };
   const mudados = p.itens.filter(i => digitada(i.id, i.quantidade) !== i.quantidade);
+  // Valor: na conferência acompanha o que está sendo digitado; fora dela, o conferido.
+  const qtdValor = (i: PedidoCompleto['itens'][number]) => (conferindo ? digitada(i.id, i.quantidade) : i.quantidade);
+  const comPreco = p.itens.some(i => i.preco_unit != null);
+  const totalAgora = p.itens.reduce((s, i) => s + qtdValor(i) * (i.preco_unit ?? 0), 0);
+  const [gastoMes, setGastoMes] = useState<number | null>(null);
+  useEffect(() => {
+    if (teto == null) return;
+    gastoDoMesNoBanco(p.posto_id, p.data_pedido).then(setGastoMes).catch(() => setGastoMes(null));
+  }, [teto, p.posto_id, p.data_pedido]);
+  // Preço do mesmo item no último pedido antes deste, para comparar com o preço deste pedido.
+  const [anteriores, setAnteriores] = useState<PrecoAnterior[]>([]);
+  useEffect(() => { if (comPreco) precosAnteriores(p.id).then(setAnteriores).catch(() => setAnteriores([])); }, [comPreco, p.id]);
+  const anterior = (materialId: string) => anteriores.find(a => a.material_id === materialId);
+  const variacoes = p.itens.map(i => variacaoPreco(anterior(i.material_id)?.preco_anterior ?? null, i.preco_unit)).filter((v): v is number => v != null);
+  const subiram = variacoes.filter(v => v > 0);
+  const cairam = variacoes.filter(v => v < 0);
+  // Gasto do mês com este pedido do jeito que está na tela (cancelado não conta).
+  const gastoComEste = gastoMes == null ? null : gastoMes - (p.status === 'cancelada' ? 0 : p.valor_total) + (p.status === 'cancelada' ? 0 : totalAgora);
   // Na conferência, excluir o item = conferir 0 (o banco tira o item do pedido e guarda no histórico).
   const excluido = (id: string) => conferindo && quantidades[id] === '0';
   const excluir = (id: string, original: number) =>
@@ -305,7 +330,7 @@ function DetalhePedido({ pedido: p, posto, materiais, minhaVez, podeCancelar, re
 
   return (
     <Dialog open onOpenChange={o => !o && onFechar()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 flex-wrap">
             <ClipboardList className="h-5 w-5 text-primary" /> {p.codigo}
@@ -338,6 +363,22 @@ function DetalhePedido({ pedido: p, posto, materiais, minhaVez, podeCancelar, re
 
         {['enviada', 'devolvida', 'a_atender'].includes(p.status) && <AnaliseEstoque pedidoId={p.id} materiais={materiais} />}
 
+        {comPreco && variacoes.length > 0 && (
+          <div className="flex flex-wrap gap-2 text-sm">
+            {subiram.length > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-destructive">
+                <TrendingUp className="h-4 w-4" /> {subiram.length} item(ns) mais caro(s) que na última compra (maior alta: +{Math.max(...subiram).toLocaleString('pt-BR')}%)
+              </span>
+            )}
+            {cairam.length > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-emerald-700 dark:text-emerald-400">
+                <TrendingDown className="h-4 w-4" /> {cairam.length} item(ns) mais barato(s)
+              </span>
+            )}
+            {subiram.length === 0 && cairam.length === 0 && <span className="text-muted-foreground">Preços iguais aos da última compra de cada item.</span>}
+          </div>
+        )}
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -345,6 +386,10 @@ function DetalhePedido({ pedido: p, posto, materiais, minhaVez, podeCancelar, re
               <TableHead className="text-right">Pedido</TableHead>
               <TableHead className="text-right w-28">Conferido</TableHead>
               <TableHead className="text-right w-28">Entregue</TableHead>
+              {comPreco && <TableHead className="text-right">Preço anterior<span className="block text-[10px] font-normal">última compra</span></TableHead>}
+              {comPreco && <TableHead className="text-right">Preço atual<span className="block text-[10px] font-normal">deste pedido</span></TableHead>}
+              {comPreco && <TableHead className="text-right">Variação</TableHead>}
+              {comPreco && <TableHead className="text-right">Valor</TableHead>}
               {conferindo && <TableHead className="w-12"><span className="sr-only">Excluir</span></TableHead>}
             </TableRow>
           </TableHeader>
@@ -370,6 +415,34 @@ function DetalhePedido({ pedido: p, posto, materiais, minhaVez, podeCancelar, re
                       <span className={entregue !== i.quantidade ? 'text-amber-700 dark:text-amber-400 font-medium' : ''}>{formatarNumero(entregue)}</span>
                     )}
                   </TableCell>
+                  {comPreco && (() => {
+                    const ant = anterior(i.material_id);
+                    return (
+                      <TableCell className="text-right tabular-nums text-sm text-muted-foreground whitespace-nowrap"
+                        title={ant?.codigo_anterior ? `${ant.codigo_anterior} de ${dataBr(ant.data_anterior ?? '')}` : undefined}>
+                        {ant?.preco_anterior == null ? <span className="text-xs">sem compra antes</span> : reais(ant.preco_anterior)}
+                        {ant?.data_anterior && <span className="block text-[10px]">{dataBr(ant.data_anterior)}</span>}
+                      </TableCell>
+                    );
+                  })()}
+                  {comPreco && (
+                    <TableCell className="text-right tabular-nums text-sm whitespace-nowrap font-medium">{i.preco_unit == null ? <span className="text-amber-600 text-xs">sem preço</span> : reais(i.preco_unit)}</TableCell>
+                  )}
+                  {comPreco && (() => {
+                    const v = variacaoPreco(anterior(i.material_id)?.preco_anterior ?? null, i.preco_unit);
+                    return (
+                      <TableCell className="text-right tabular-nums text-sm whitespace-nowrap">
+                        {v == null ? <span className="text-muted-foreground">—</span>
+                          : v === 0 ? <span className="text-muted-foreground">0%</span>
+                            : <span className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 font-semibold ${v > 0 ? 'bg-destructive/10 text-destructive' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'}`}>
+                              {v > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}{v > 0 ? '+' : ''}{v.toLocaleString('pt-BR')}%
+                            </span>}
+                      </TableCell>
+                    );
+                  })()}
+                  {comPreco && (
+                    <TableCell className="text-right tabular-nums whitespace-nowrap">{i.preco_unit == null || fora ? '—' : reais(qtdValor(i) * i.preco_unit)}</TableCell>
+                  )}
                   {conferindo && (
                     <TableCell className="p-1 text-right">
                       <Button type="button" variant="ghost" size="icon" className="h-8 w-8"
@@ -383,8 +456,37 @@ function DetalhePedido({ pedido: p, posto, materiais, minhaVez, podeCancelar, re
                 </TableRow>
               );
             })}
+            {comPreco && (
+              <TableRow className="bg-muted/40 hover:bg-muted/40">
+                <TableCell colSpan={7} className="text-right text-xs font-semibold uppercase text-muted-foreground">Total do pedido</TableCell>
+                <TableCell className="text-right tabular-nums font-bold whitespace-nowrap">{reais(totalAgora)}</TableCell>
+                {conferindo && <TableCell />}
+              </TableRow>
+            )}
           </TableBody>
         </Table>
+        </div>
+        {comPreco && <p className="text-xs text-muted-foreground">Preço anterior = preço do mesmo item na última compra (último pedido atendido antes deste, de qualquer posto). Preço atual = o deste pedido.</p>}
+        {p.sem_preco && comPreco && <p className="text-xs text-amber-600">Há item sem preço: ele fica fora do total. Cadastre o preço em Configurações de Pedidos → Itens.</p>}
+        {teto != null && gastoComEste != null && (() => {
+          const passou = gastoComEste > teto;
+          const pct = teto > 0 ? Math.round((gastoComEste / teto) * 100) : null;
+          return (
+            <div className={`rounded-md border px-3 py-2 text-sm ${passou ? 'border-destructive/50 bg-destructive/10' : ''}`}>
+              <p className={passou ? 'font-semibold text-destructive' : 'font-medium'}>
+                {passou ? 'Teto do posto ultrapassado' : 'Teto do posto'} em {p.data_pedido.slice(5, 7)}/{p.data_pedido.slice(0, 4)}:
+                {' '}{reais(gastoComEste)} de {reais(teto)}{pct != null && ` (${pct}%)`}
+              </p>
+              <div className="mt-1.5 h-2 rounded-full bg-muted overflow-hidden">
+                <div className={`h-full ${passou ? 'bg-destructive' : pct != null && pct >= 80 ? 'bg-amber-500' : 'bg-primary'}`} style={{ width: `${Math.min(100, pct ?? 0)}%` }} />
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Soma dos pedidos do posto no mês{conferindo ? ', já com as quantidades desta conferência' : ''}.
+                {passou ? ' Comercial e Gerência recebem um e-mail; o pedido segue normal.' : ` Sobra ${reais(teto - gastoComEste)}.`}
+              </p>
+            </div>
+          );
+        })()}
         {conferindo && <p className="text-xs text-muted-foreground">Para tirar um item do pedido, use a lixeira (ou confira 0). A exclusão fica no histórico.</p>}
         {atendendo && <p className="text-xs text-muted-foreground">A coluna "Entregue" vem com o conferido. Se for entregar menos, corrija e explique no comentário.</p>}
         {p.observacao && <p className="text-sm"><span className="text-muted-foreground">Observação do encarregado:</span> {p.observacao}</p>}

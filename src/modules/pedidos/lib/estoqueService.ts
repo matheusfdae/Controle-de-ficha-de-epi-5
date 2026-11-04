@@ -72,6 +72,36 @@ export async function fecharPlantao(plantaoId: string, foto: string,
   return data as { diferencas: number };
 }
 
+/** Lançamento do dia numa vez só: início, recebido e usado de cada item (vira um plantão já fechado). */
+export async function lancarDia(postoId: string, data: string, foto: string,
+  itens: { material_id: string; inicio: number; recebida: number; usada: number }[], assinatura: string, ciente: boolean, observacao: string) {
+  const { data: id, error } = await supabase.rpc('estoque_lancar_dia', {
+    _posto_id: postoId, _data: data, _foto: foto, _assinatura: assinatura, _ciente: ciente, _observacao: observacao.trim() || null,
+    _itens: itens.map(i => ({ material_id: i.material_id, inicio: q(i.inicio), recebida: q(i.recebida), usada: q(i.usada) })) as unknown as Json,
+  });
+  if (error) throw new Error(error.message);
+  return id as string;
+}
+
+/** Plantões fechados do posto com data (dia do lançamento, em Brasília) entre `desde` e `ate`, com os itens. */
+export async function consumoDoPosto(postoId: string, desde: string, ate: string): Promise<(Plantao & { itens: ItemPlantao[] })[]> {
+  const ini = new Date(`${desde}T00:00:00-03:00`).toISOString();
+  const fim = new Date(new Date(`${ate}T00:00:00-03:00`).getTime() + 864e5).toISOString();
+  const { data, error } = await supabase.from('estoque_plantoes')
+    .select('id, posto_id, uf, status, aberto_em, aberto_por_nome, fechado_em, fechado_por_nome, observacao_inicio, observacao_fim, assinatura, declaracao_aceita_em, tem_diferenca')
+    .eq('posto_id', postoId).eq('status', 'fechado').gte('aberto_em', ini).lt('aberto_em', fim).order('aberto_em').limit(500);
+  if (error) throw error;
+  const plantoes = (data ?? []) as Plantao[];
+  const itens: ItemPlantao[] = [];
+  for (let i = 0; i < plantoes.length; i += 100) {
+    const { data: it, error: e } = await supabase.from('estoque_plantao_itens').select('*').in('plantao_id', plantoes.slice(i, i + 100).map(p => p.id));
+    if (e) throw e;
+    itens.push(...(it ?? []).map(x => ({ ...x, qtd_inicio: Number(x.qtd_inicio), qtd_recebida: Number(x.qtd_recebida),
+      qtd_usada: n(x.qtd_usada), qtd_fim: n(x.qtd_fim), diferenca: n(x.diferenca) })) as ItemPlantao[]);
+  }
+  return plantoes.map(p => ({ ...p, itens: itens.filter(i => i.plantao_id === p.id) }));
+}
+
 export async function cancelarPlantao(plantaoId: string) {
   const { error } = await supabase.rpc('estoque_cancelar_plantao', { _plantao_id: plantaoId });
   if (error) throw new Error(error.message);

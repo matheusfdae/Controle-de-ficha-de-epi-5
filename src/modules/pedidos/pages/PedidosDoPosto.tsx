@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { HardHat, Loader2, Repeat } from 'lucide-react';
+import { FileDown, HardHat, Loader2, Repeat } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import BackButton from '@/components/BackButton';
 import PageHeader from '@/components/PageHeader';
@@ -14,6 +15,7 @@ import {
   ABERTOS, STATUS_PEDIDO, dataBr, formatarNumero, hojeBr, listMateriais, listPedidos, nomeMaterial, type Material, type PedidoCompleto,
 } from '../lib/pedidosService';
 import { entregaParcial, rotuloMes } from '../lib/gerencial';
+import { pdfPedidosDoPosto } from '../lib/relatoriosPdf';
 
 /** Todos os pedidos de um posto no mês (vindo do Painel Gerencial), com o que foi pedido e entregue de cada item. */
 export default function PedidosDoPosto() {
@@ -55,6 +57,15 @@ export default function PedidosDoPosto() {
     return [...t.entries()].map(([id, v]) => ({ id, ...v, m: materiais.find(x => x.id === id) })).sort((a, b) => b.pedido - a.pedido);
   }, [validos, materiais]);
 
+  const [gerandoPdf, setGerandoPdf] = useState(false);
+  const exportarPdf = async () => {
+    if (!posto) return;
+    setGerandoPdf(true);
+    try { await pdfPedidosDoPosto(posto, doMes, materiais, mes); }
+    catch (e) { toast.error('Não foi possível gerar o PDF: ' + (e as Error).message); }
+    finally { setGerandoPdf(false); }
+  };
+
   const resumo = [
     ['Pedidos no mês', `${validos.length}`],
     ['Em andamento', `${validos.filter(p => ABERTOS.includes(p.status)).length}`],
@@ -69,10 +80,15 @@ export default function PedidosDoPosto() {
         <PageHeader title={posto ? posto.nome : 'Pedidos do posto'} eyebrow={`Pedidos do posto · ${rotuloMes(mes)}`}
           description="Todos os pedidos do posto feitos no mês. Clique num pedido para abrir o detalhe." />
 
-        <div>
-          <Label htmlFor="mes-posto">Mês</Label>
-          <Input id="mes-posto" type="month" className="w-44" value={mes} max={hojeBr().slice(0, 7)}
-            onChange={e => e.target.value && setParams(p => { p.set('mes', e.target.value); return p; }, { replace: true })} />
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <Label htmlFor="mes-posto">Mês</Label>
+            <Input id="mes-posto" type="month" className="w-44" value={mes} max={hojeBr().slice(0, 7)}
+              onChange={e => e.target.value && setParams(p => { p.set('mes', e.target.value); return p; }, { replace: true })} />
+          </div>
+          <Button variant="outline" className="gap-2 ml-auto" disabled={carregando || gerandoPdf || !posto} onClick={exportarPdf}>
+            {gerandoPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />} Exportar PDF
+          </Button>
         </div>
 
         {carregando ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : <>
