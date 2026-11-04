@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { HardHat, Loader2, Mail, Pencil, Plus, Save, Search, Trash2 } from 'lucide-react';
+import { FileSpreadsheet, HardHat, Loader2, Mail, Pencil, Plus, Save, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import BackButton from '@/components/BackButton';
 import PageHeader from '@/components/PageHeader';
@@ -18,11 +18,21 @@ import EstadoSelect from '@/components/EstadoSelect';
 import { useAuth } from '@/contexts/AuthContext';
 import { listPostos, type Posto } from '@/services/postosService';
 import {
-  PAPEIS, avisarAgora, excluirAprovador, lerConfigAvisos, listAprovadores, listItensPorPosto, listMateriais, listUsuarios,
-  materiaisPediveis, nomeMaterial, rotuloPapel, salvarAprovador, salvarConfigAvisos, salvarListaDoPosto, salvarMaterial,
+  PAPEIS, avisarAgora, definirTeto, excluirAprovador, lerConfigAvisos, listAprovadores, listItensPorPosto, listMateriais, listUsuarios,
+  materiaisPediveis, nomeMaterial, reais, rotuloPapel, salvarAprovador, salvarConfigAvisos, salvarListaDoPosto, salvarMaterial,
   type Aprovador, type Material, type Papel,
 } from '../lib/pedidosService';
 import ImportarPlanilha from '../components/ImportarPlanilha';
+import ImportarPrecos from '../components/ImportarPrecos';
+
+/** "12,90" / "1.234,5" -> 12.9; vazio -> null; inválido -> NaN. */
+const lerValor = (t: string) => {
+  const v = t.trim().replace(/R\$|\s/g, '');
+  if (!v) return null;
+  const n = Number(v.includes(',') ? v.replace(/\./g, '').replace(',', '.') : v);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : NaN;
+};
+const valorTexto = (v: number | null) => (v == null ? '' : v.toFixed(2).replace('.', ','));
 
 /** Configuração dos pedidos: itens, lista de cada posto, papéis, avisos e importação da planilha. */
 export default function ConfigPedidos() {
@@ -65,8 +75,9 @@ export default function ConfigPedidos() {
 function Itens({ podeEditar }: { podeEditar: boolean }) {
   const [lista, setLista] = useState<Material[]>([]);
   const [busca, setBusca] = useState('');
-  const [edit, setEdit] = useState<{ id?: string; nome: string; item_pai_id: string; unidade: string; categoria: string; is_epi: boolean; ativo: boolean } | null>(null);
+  const [edit, setEdit] = useState<{ id?: string; nome: string; item_pai_id: string; unidade: string; categoria: string; is_epi: boolean; ativo: boolean; preco: string } | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [importandoPrecos, setImportandoPrecos] = useState(false);
   const carregar = useCallback(() => listMateriais().then(setLista).catch(e => toast.error(e.message)), []);
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -75,9 +86,11 @@ function Itens({ podeEditar }: { podeEditar: boolean }) {
 
   const salvar = async () => {
     if (!edit?.nome.trim()) return toast.error('Informe o nome.');
+    const preco = lerValor(edit.preco);
+    if (Number.isNaN(preco)) return toast.error('Preço inválido. Use, por exemplo, 12,90.');
     setSalvando(true);
     try {
-      await salvarMaterial({ ...edit, item_pai_id: edit.item_pai_id || null });
+      await salvarMaterial({ ...edit, item_pai_id: edit.item_pai_id || null, preco });
       toast.success('Item salvo.');
       setEdit(null);
       await carregar();
@@ -98,7 +111,8 @@ function Itens({ podeEditar }: { podeEditar: boolean }) {
         <CardTitle className="text-lg">Cadastro de itens</CardTitle>
         <CardDescription>
           Um item pode ter variações (ex.: Detergente → 500 ml, 5 L): o pai só agrupa, o encarregado pede a variação.
-          Item marcado como EPI avisa na hora os e-mails da aba Avisos. O preço fica na tabela de preços.
+          Item marcado como EPI avisa na hora os e-mails da aba Avisos. O preço entra no valor dos pedidos (e no teto do posto);
+          o pedido guarda o preço do dia em que foi feito.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -107,7 +121,12 @@ function Itens({ podeEditar }: { podeEditar: boolean }) {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Buscar item" value={busca} onChange={e => setBusca(e.target.value)} className="pl-8" />
           </div>
-          {podeEditar && <Button className="gap-2" onClick={() => setEdit({ nome: '', item_pai_id: '', unidade: 'un', categoria: '', is_epi: false, ativo: true })}><Plus className="h-4 w-4" /> Novo item</Button>}
+          {podeEditar && (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" className="gap-2" onClick={() => setImportandoPrecos(true)}><FileSpreadsheet className="h-4 w-4" /> Importar preços</Button>
+              <Button className="gap-2" onClick={() => setEdit({ nome: '', item_pai_id: '', unidade: 'un', categoria: '', is_epi: false, ativo: true, preco: '' })}><Plus className="h-4 w-4" /> Novo item</Button>
+            </div>
+          )}
         </div>
         {edit && (
           <div className="grid gap-3 sm:grid-cols-6 items-end rounded-md border p-3">
@@ -125,6 +144,7 @@ function Itens({ podeEditar }: { podeEditar: boolean }) {
             <div className="sm:col-span-2"><Label>Nome *</Label><Input value={edit.nome} onChange={e => setEdit({ ...edit, nome: e.target.value })} placeholder={edit.item_pai_id ? 'Ex.: 500 ml' : 'Ex.: Vassoura de pelo'} /></div>
             <div><Label>Unidade</Label><Input value={edit.unidade} onChange={e => setEdit({ ...edit, unidade: e.target.value })} placeholder="un, fardo, litro" /></div>
             <div><Label>Categoria</Label><Input value={edit.categoria} onChange={e => setEdit({ ...edit, categoria: e.target.value })} placeholder="Limpeza" /></div>
+            <div><Label>Preço (R$)</Label><Input inputMode="decimal" value={edit.preco} onChange={e => setEdit({ ...edit, preco: e.target.value })} placeholder="12,90" /></div>
             <div className="flex items-center gap-2 pb-2"><Switch checked={edit.is_epi} onCheckedChange={v => setEdit({ ...edit, is_epi: v })} id="epi" /><Label htmlFor="epi">É EPI</Label></div>
             <div className="flex items-center gap-2 pb-2"><Switch checked={edit.ativo} onCheckedChange={v => setEdit({ ...edit, ativo: v })} id="ativo" /><Label htmlFor="ativo">Ativo</Label></div>
             <div className="sm:col-span-4 flex gap-2 justify-end">
@@ -135,10 +155,10 @@ function Itens({ podeEditar }: { podeEditar: boolean }) {
         )}
         <Table>
           <TableHeader><TableRow>
-            <TableHead>Item</TableHead><TableHead>Unidade</TableHead><TableHead>Categoria</TableHead><TableHead>Situação</TableHead><TableHead className="w-10" />
+            <TableHead>Item</TableHead><TableHead>Unidade</TableHead><TableHead className="text-right">Preço</TableHead><TableHead>Categoria</TableHead><TableHead>Situação</TableHead><TableHead className="w-10" />
           </TableRow></TableHeader>
           <TableBody>
-            {filtrada.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Nenhum item cadastrado.</TableCell></TableRow>}
+            {filtrada.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum item cadastrado.</TableCell></TableRow>}
             {filtrada.map(m => (
               <TableRow key={m.id} className={m.ativo ? '' : 'opacity-60'}>
                 <TableCell className={m.item_pai_id ? 'pl-8' : 'font-medium'}>
@@ -146,17 +166,21 @@ function Itens({ podeEditar }: { podeEditar: boolean }) {
                   {m.is_epi && <Badge variant="outline" className="ml-2 gap-1"><HardHat className="h-3 w-3" /> EPI</Badge>}
                   {temFilhos(m.id) && <span className="ml-2 text-xs text-muted-foreground">(agrupa variações)</span>}
                 </TableCell>
-                <TableCell>{m.unidade}</TableCell><TableCell>{m.categoria ?? '—'}</TableCell>
+                <TableCell>{m.unidade}</TableCell>
+                <TableCell className="text-right tabular-nums whitespace-nowrap">{temFilhos(m.id) ? '' : m.preco == null ? <span className="text-amber-600 text-xs">sem preço</span> : reais(m.preco)}</TableCell>
+                <TableCell>{m.categoria ?? '—'}</TableCell>
                 <TableCell>{m.ativo ? 'Ativo' : 'Inativo'}</TableCell>
                 <TableCell>
                   {podeEditar && <Button variant="ghost" size="icon" aria-label={`Editar ${m.nome}`} onClick={() => setEdit({
                     id: m.id, nome: m.nome, item_pai_id: m.item_pai_id ?? '', unidade: m.unidade, categoria: m.categoria ?? '', is_epi: m.is_epi, ativo: m.ativo,
+                    preco: valorTexto(m.preco),
                   })}><Pencil className="h-4 w-4" /></Button>}
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
+        <ImportarPrecos open={importandoPrecos} onOpenChange={setImportandoPrecos} materiais={lista.filter(m => !temFilhos(m.id))} onImportado={carregar} />
       </CardContent>
     </Card>
   );
@@ -172,11 +196,23 @@ function ListaDoPosto({ podeEditar }: { podeEditar: boolean }) {
   const [itens, setItens] = useState<string[]>([]);
   const [busca, setBusca] = useState('');
   const [salvando, setSalvando] = useState(false);
+  const [teto, setTeto] = useState('');
+  const [salvandoTeto, setSalvandoTeto] = useState(false);
   const carregar = useCallback(() => Promise.all([listPostos(), listMateriais(), listItensPorPosto()])
     .then(([p, m, l]) => { setPostos(p.filter(x => x.ativo)); setMateriais(m); setListas(l); }).catch(e => toast.error(e.message)), []);
   useEffect(() => { carregar(); }, [carregar]);
 
-  const escolher = (id: string) => { setPostoId(id); setItens(listas.filter(l => l.posto_id === id).map(l => l.material_id)); };
+  const escolher = (id: string) => {
+    setPostoId(id); setItens(listas.filter(l => l.posto_id === id).map(l => l.material_id));
+    setTeto(valorTexto(postos.find(p => p.id === id)?.teto_material ?? null));
+  };
+  const salvarTeto = async () => {
+    const v = lerValor(teto);
+    if (Number.isNaN(v)) return toast.error('Teto inválido. Use, por exemplo, 22.438,77.');
+    setSalvandoTeto(true);
+    try { await definirTeto(postoId, v); toast.success(v == null ? 'Posto sem teto.' : `Teto do posto: ${reais(v)} por mês.`); await carregar(); }
+    catch (e) { toast.error((e as Error).message); } finally { setSalvandoTeto(false); }
+  };
   const salvar = async () => {
     setSalvando(true);
     try { await salvarListaDoPosto(postoId, itens); toast.success('Lista do posto salva.'); await carregar(); }
@@ -192,10 +228,12 @@ function ListaDoPosto({ podeEditar }: { podeEditar: boolean }) {
         <CardTitle className="text-lg">Itens por posto</CardTitle>
         <CardDescription>
           Posto com lista só vê, no link do encarregado, os itens da lista dele; posto sem lista vê o catálogo inteiro.
-          A lista também pode vir da aba Importar planilha.
+          O teto mensal é o limite de gasto de material do posto: passou, Comercial e Gerência recebem um e-mail (o pedido segue normal).
+          Lista e teto também podem vir da aba Importar planilha.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
+        <div className="flex flex-wrap items-end gap-3">
         <div className="w-full sm:w-96">
           <Label>Posto</Label>
           <Select value={postoId || undefined} onValueChange={escolher}>
@@ -205,6 +243,20 @@ function ListaDoPosto({ podeEditar }: { podeEditar: boolean }) {
               return <SelectItem key={p.id} value={p.id}>{p.nome} ({p.uf}){n ? ` — ${n} itens` : ' — catálogo inteiro'}</SelectItem>;
             })}</SelectContent>
           </Select>
+        </div>
+        {postoId && (
+          <div className="flex items-end gap-2">
+            <div className="w-40">
+              <Label htmlFor="teto-posto">Teto mensal (R$)</Label>
+              <Input id="teto-posto" inputMode="decimal" value={teto} disabled={!podeEditar} onChange={e => setTeto(e.target.value)} placeholder="sem teto" />
+            </div>
+            {podeEditar && (
+              <Button variant="outline" className="gap-2" disabled={salvandoTeto} onClick={salvarTeto}>
+                {salvandoTeto ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar teto
+              </Button>
+            )}
+          </div>
+        )}
         </div>
         {postoId && (
           <>

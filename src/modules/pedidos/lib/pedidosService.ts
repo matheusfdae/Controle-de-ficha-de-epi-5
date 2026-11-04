@@ -13,8 +13,9 @@ import type { Json } from '@/integrations/supabase/types';
 export type Papel = 'supervisor' | 'compras' | 'comercial' | 'gerencia';
 export const PAPEIS: { valor: Papel; rotulo: string; descricao: string }[] = [
   { valor: 'supervisor', rotulo: 'Supervisor', descricao: 'confere o pedido, ajusta quantidades ou devolve ao encarregado, e lança o estoque do posto' },
-  { valor: 'compras', rotulo: 'Compras', descricao: 'atende os pedidos e mantém itens e listas dos postos' },
-  { valor: 'gerencia', rotulo: 'Gerência', descricao: 'vê tudo do estado e pode cancelar pedidos' },
+  { valor: 'compras', rotulo: 'Compras', descricao: 'atende os pedidos e mantém itens, preços, tetos e listas dos postos' },
+  { valor: 'comercial', rotulo: 'Comercial', descricao: 'recebe o aviso quando um posto passa do teto de gasto do mês' },
+  { valor: 'gerencia', rotulo: 'Gerência', descricao: 'vê tudo do estado, pode cancelar pedidos e recebe o aviso de teto' },
 ];
 export const rotuloPapel = (p: string | null | undefined) =>
   PAPEIS.find(x => x.valor === p)?.rotulo ?? (p === 'encarregado' ? 'Encarregado' : p === 'comercial' ? 'Comercial' : p ?? '');
@@ -63,6 +64,8 @@ export const hojeBr = () => new Date().toLocaleDateString('en-CA', { timeZone: '
 
 export interface Material {
   id: string; nome: string; item_pai_id: string | null; unidade: string; categoria: string | null; is_epi: boolean; ativo: boolean;
+  /** Preço de referência (null = sem preço). */
+  preco: number | null;
 }
 
 /** "Detergente — 500 ml" para variação; o nome para item sem pai (igual a _pm_nome_material). */
@@ -140,6 +143,8 @@ export const cancelarPedidoPublico = (s: Solicitante, alvo: { pedidoId?: string;
 
 export interface ItemPedido {
   id: string; pedido_id: string; material_id: string; quantidade_pedida: number; quantidade: number; quantidade_atendida: number | null;
+  /** Preço do item no dia do pedido. */
+  preco_unit: number | null;
 }
 export interface EventoPedido {
   id: string; pedido_id: string; de_status: StatusPedido | null; para_status: StatusPedido; papel: string | null;
@@ -151,6 +156,8 @@ export interface Pedido {
   data_pedido: string; status: StatusPedido; tem_epi: boolean; conferida_em: string | null; atendida_em: string | null;
   observacao: string | null; solicitante_nome: string; solicitante_matricula: string | null;
   solicitante_cargo: string | null; solicitante_telefone: string | null; created_at: string;
+  /** Soma de quantidade conferida x preço; sem_preco = algum item sem preço (fora da soma). */
+  valor_total: number; sem_preco: boolean;
 }
 export interface PedidoCompleto extends Pedido { itens: ItemPedido[]; eventos: EventoPedido[] }
 
@@ -170,7 +177,7 @@ export async function listPedidos(desde: string): Promise<PedidoCompleto[]> {
     .or(`data_pedido.gte.${desde},status.in.(${ABERTOS.join(',')})`)
     .order('created_at', { ascending: false }).limit(5000);
   if (error) throw error;
-  const pedidos = (data ?? []) as unknown as Pedido[];
+  const pedidos = (data ?? []).map(p => ({ ...p, valor_total: Number(p.valor_total ?? 0) })) as unknown as Pedido[];
   const ids = pedidos.map(p => p.id);
   const itens: ItemPedido[] = [];
   const eventos: EventoPedido[] = [];
@@ -182,7 +189,7 @@ export async function listPedidos(desde: string): Promise<PedidoCompleto[]> {
     ]);
     if (it.error) throw it.error;
     if (ev.error) throw ev.error;
-    itens.push(...(it.data ?? []).map(x => num(x, ['quantidade', 'quantidade_pedida', 'quantidade_atendida'])) as ItemPedido[]);
+    itens.push(...(it.data ?? []).map(x => num(x, ['quantidade', 'quantidade_pedida', 'quantidade_atendida', 'preco_unit'])) as ItemPedido[]);
     eventos.push(...(ev.data ?? []) as unknown as EventoPedido[]);
   }
   return pedidos.map(p => ({ ...p, itens: itens.filter(i => i.pedido_id === p.id), eventos: eventos.filter(e => e.pedido_id === p.id) }));
@@ -228,11 +235,61 @@ export function proximaData(data: string, frequencia: Exclude<Frequencia, 'unica
 // ---------- Importação da planilha de material por posto ----------
 
 export async function importarPlanilha(postos: { posto_id: string | null; criar: { nome: string; uf: string } | null;
-  itens: { nome: string; unidade: string | null }[] }[]) {
+  teto: string | null; itens: { nome: string; unidade: string | null }[] }[]) {
   const { data, error } = await supabase.rpc('pedidos_importar_planilha', { _postos: postos as unknown as Json });
   if (error) throw new Error(error.message);
-  return data as { postos_criados: number; itens_criados: number; listas: number; itens_nas_listas: number };
+  return data as { postos_criados: number; itens_criados: number; listas: number; itens_nas_listas: number; tetos: number };
 }
+
+/** Preços de referência pelo nome do item ("Item" ou "Item — Variação"). */
+export async function importarPrecos(itens: { nome: string; preco: string }[]) {
+  const { data, error } = await supabase.rpc('pedidos_importar_precos', { _itens: itens as unknown as Json });
+  if (error) throw new Error(error.message);
+  return data as { atualizados: number; nao_encontrados: string[] };
+}
+
+/** Teto mensal de material do posto (null = sem teto). */
+export async function definirTeto(postoId: string, teto: number | null) {
+  const { error } = await supabase.rpc('pedidos_definir_teto', { _posto_id: postoId, _teto: teto });
+  if (error) throw new Error(error.message);
+}
+
+export const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+export interface PrecoAnterior { material_id: string; preco_anterior: number | null; data_anterior: string | null; codigo_anterior: string | null }
+
+/** Preço de cada item na última compra: último pedido atendido antes deste (qualquer posto). */
+export async function precosAnteriores(pedidoId: string): Promise<PrecoAnterior[]> {
+  const { data, error } = await supabase.rpc('pedido_precos_anteriores', { _pedido_id: pedidoId });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(p => ({ ...p, preco_anterior: p.preco_anterior == null ? null : Number(p.preco_anterior) }));
+}
+
+/** Variação em % do preço anterior para o atual (null quando falta um dos dois). */
+export const variacaoPreco = (anterior: number | null, atual: number | null) =>
+  anterior == null || atual == null || anterior === 0 ? null : Math.round(((atual - anterior) / anterior) * 1000) / 10;
+
+/** Pedidos do mês (só o necessário para somar o gasto por posto), sem os cancelados. */
+export async function pedidosDoMesParaTeto(mes: string) {
+  const [a, m] = mes.split('-').map(Number);
+  const fim = new Date(Date.UTC(a, m, 1)).toISOString().slice(0, 10);
+  const { data, error } = await supabase.from('pedidos_material').select('posto_id, data_pedido, status, valor_total, sem_preco')
+    .gte('data_pedido', `${mes}-01`).lt('data_pedido', fim).neq('status', 'cancelada').limit(10000);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(p => ({ ...p, status: p.status as StatusPedido, valor_total: Number(p.valor_total ?? 0) }));
+}
+
+/** Gasto do posto no mês de `data`, contado no banco (todos os pedidos do mês, sem os cancelados). */
+export async function gastoDoMesNoBanco(postoId: string, data: string): Promise<number> {
+  const { data: v, error } = await supabase.rpc('pedidos_gasto_mes', { _posto_id: postoId, _mes: data });
+  if (error) throw new Error(error.message);
+  return Number(v ?? 0);
+}
+
+/** Gasto do posto no mês (soma do valor dos pedidos, sem os cancelados). */
+export const gastoDoMes = (pedidos: Pick<Pedido, 'posto_id' | 'data_pedido' | 'status' | 'valor_total'>[], postoId: string, mes: string) =>
+  pedidos.filter(p => p.posto_id === postoId && p.status !== 'cancelada' && p.data_pedido.slice(0, 7) === mes.slice(0, 7))
+    .reduce((s, p) => s + (p.valor_total ?? 0), 0);
 
 export interface Tarefa {
   id: string; codigo: string; status: StatusPedido; posto: string; uf: string; itens: number; tem_epi: boolean; desde: string;
@@ -278,15 +335,16 @@ export async function minhasPendencias(): Promise<number> {
 // ---------- Cadastro ----------
 
 export async function listMateriais(): Promise<Material[]> {
-  const { data, error } = await supabase.from('materiais').select('id, nome, item_pai_id, unidade, categoria, is_epi, ativo').order('nome');
+  const { data, error } = await supabase.from('materiais').select('id, nome, item_pai_id, unidade, categoria, is_epi, ativo, preco').order('nome');
   if (error) throw error;
-  return (data ?? []) as Material[];
+  return (data ?? []).map(m => ({ ...m, preco: m.preco == null ? null : Number(m.preco) })) as Material[];
 }
 
 export async function salvarMaterial(m: Partial<Material> & { nome: string }) {
   const payload = {
     nome: m.nome.trim(), item_pai_id: m.item_pai_id || null, unidade: (m.unidade ?? 'un').trim() || 'un',
     categoria: m.categoria?.trim() || null, is_epi: !!m.is_epi, ativo: m.ativo ?? true,
+    ...(m.preco !== undefined ? { preco: m.preco, preco_atualizado_em: new Date().toISOString() } : {}),
   };
   const { error } = m.id
     ? await supabase.from('materiais').update(payload).eq('id', m.id)

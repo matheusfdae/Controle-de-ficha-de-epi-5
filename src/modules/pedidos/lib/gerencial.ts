@@ -8,7 +8,7 @@ import { ABERTOS, STATUS_PEDIDO, nomeMaterial, type Material, type PedidoComplet
 const doMes = (data: string | null | undefined, mes: string) => !!data && data.slice(0, 7) === mes;
 const dias = (a: string, b: string) => (Date.parse(b) - Date.parse(a)) / 864e5;
 const media = (v: number[]) => (v.length ? Math.round((v.reduce((s, x) => s + x, 0) / v.length) * 10) / 10 : null);
-const validos = (p: PedidoCompleto) => p.status !== 'cancelada';
+const validos = (p: Pick<PedidoCompleto, 'status'>) => p.status !== 'cancelada';
 /** Entregue = quantidade atendida (ou a conferida, enquanto não foi atendido). */
 const qtdItem = (i: PedidoCompleto['itens'][number]) => i.quantidade_atendida ?? i.quantidade;
 /** Compras entregou menos (ou diferente) do que foi conferido em algum item. */
@@ -106,4 +106,29 @@ export function indicadores(pedidos: PedidoCompleto[], mes: string, mesAnterior:
     comEpi: noMes.filter(p => p.tem_epi).length,
     diasAtendimento: media(atendidosNoMes.map(tempoAtendimento).filter((x): x is number => x != null)),
   };
+}
+
+export interface LinhaTeto {
+  id: string; nome: string; uf: string; teto: number | null; gasto: number; pedidos: number;
+  /** Gasto / teto em % (null = posto sem teto). */
+  pct: number | null; passou: boolean; semPreco: number;
+}
+
+/**
+ * Gasto de cada posto no mês contra o teto (soma do valor dos pedidos feitos
+ * no mês, sem os cancelados). Entram os postos com teto ou com gasto; primeiro
+ * os que passaram, depois do mais perto do teto ao mais longe, e os sem teto no fim.
+ */
+export function gastoTeto(pedidos: Pick<PedidoCompleto, 'posto_id' | 'data_pedido' | 'status' | 'valor_total' | 'sem_preco'>[], postos: { id: string; nome: string; uf: string; teto_material: number | null }[], mes: string): LinhaTeto[] {
+  return postos.map(po => {
+    const doPosto = pedidos.filter(p => p.posto_id === po.id && validos(p) && doMes(p.data_pedido, mes));
+    const gasto = Math.round(doPosto.reduce((s, p) => s + (p.valor_total ?? 0), 0) * 100) / 100;
+    const teto = po.teto_material;
+    const pct = teto != null && teto > 0 ? Math.round((gasto / teto) * 1000) / 10 : null;
+    return {
+      id: po.id, nome: po.nome, uf: po.uf, teto, gasto, pedidos: doPosto.length, pct,
+      passou: teto != null && gasto > teto, semPreco: doPosto.filter(p => p.sem_preco).length,
+    };
+  }).filter(l => l.teto != null || l.gasto > 0)
+    .sort((a, b) => Number(b.passou) - Number(a.passou) || (b.pct ?? -1) - (a.pct ?? -1) || b.gasto - a.gasto);
 }

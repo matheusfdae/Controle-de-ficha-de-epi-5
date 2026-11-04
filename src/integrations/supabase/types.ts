@@ -1046,9 +1046,9 @@ export type Database = {
         ]
       }
       materiais: {
-        Row: { id: string; nome: string; item_pai_id: string | null; unidade: string; categoria: string | null; is_epi: boolean; ativo: boolean; created_at: string; updated_at: string }
-        Insert: { id?: string; nome: string; item_pai_id?: string | null; unidade?: string; categoria?: string | null; is_epi?: boolean; ativo?: boolean }
-        Update: { id?: string; nome?: string; item_pai_id?: string | null; unidade?: string; categoria?: string | null; is_epi?: boolean; ativo?: boolean }
+        Row: { id: string; nome: string; item_pai_id: string | null; unidade: string; categoria: string | null; is_epi: boolean; ativo: boolean; preco: number | null; preco_atualizado_em: string | null; created_at: string; updated_at: string }
+        Insert: { id?: string; nome: string; item_pai_id?: string | null; unidade?: string; categoria?: string | null; is_epi?: boolean; ativo?: boolean; preco?: number | null; preco_atualizado_em?: string | null }
+        Update: { id?: string; nome?: string; item_pai_id?: string | null; unidade?: string; categoria?: string | null; is_epi?: boolean; ativo?: boolean; preco?: number | null; preco_atualizado_em?: string | null }
         Relationships: []
       }
       posto_materiais: {
@@ -1100,13 +1100,13 @@ export type Database = {
         Relationships: []
       }
       pedidos_material: {
-        Row: { id: string; ano: number; numero: number; codigo: string; posto_id: string; uf: string; recorrencia_id: string | null; data_pedido: string; status: string; tem_epi: boolean; conferida_em: string | null; atendida_em: string | null; observacao: string | null; notificado_status: string | null; epi_avisado: boolean; solicitante_senior_id: string | null; solicitante_nome: string; solicitante_matricula: string | null; solicitante_cargo: string | null; solicitante_telefone: string | null; created_at: string; updated_at: string }
+        Row: { id: string; ano: number; numero: number; codigo: string; posto_id: string; uf: string; recorrencia_id: string | null; data_pedido: string; status: string; tem_epi: boolean; conferida_em: string | null; atendida_em: string | null; observacao: string | null; notificado_status: string | null; epi_avisado: boolean; valor_total: number; sem_preco: boolean; teto_avisado: boolean; solicitante_senior_id: string | null; solicitante_nome: string; solicitante_matricula: string | null; solicitante_cargo: string | null; solicitante_telefone: string | null; created_at: string; updated_at: string }
         Insert: { [_ in never]: never }
         Update: { [_ in never]: never }
         Relationships: []
       }
       pedidos_material_itens: {
-        Row: { id: string; pedido_id: string; material_id: string; quantidade_pedida: number; quantidade: number; quantidade_atendida: number | null }
+        Row: { id: string; pedido_id: string; material_id: string; quantidade_pedida: number; quantidade: number; quantidade_atendida: number | null; preco_unit: number | null }
         Insert: { [_ in never]: never }
         Update: { [_ in never]: never }
         Relationships: []
@@ -2000,6 +2000,7 @@ export type Database = {
         Row: {
           apelidos: string[]
           ativo: boolean
+          teto_material: number | null
           created_at: string
           endereco: string | null
           id: string
@@ -2015,6 +2016,7 @@ export type Database = {
         Insert: {
           apelidos?: string[]
           ativo?: boolean
+          teto_material?: number | null
           created_at?: string
           endereco?: string | null
           id?: string
@@ -2029,6 +2031,7 @@ export type Database = {
         Update: {
           apelidos?: string[]
           ativo?: boolean
+          teto_material?: number | null
           created_at?: string
           endereco?: string | null
           id?: string
@@ -2489,6 +2492,26 @@ export type Database = {
       pedidos_importar_planilha: {
         Args: { _postos: Json }
         Returns: Json
+      }
+      pedidos_importar_precos: {
+        Args: { _itens: Json }
+        Returns: Json
+      }
+      pedidos_definir_teto: {
+        Args: { _posto_id: string; _teto: number | null }
+        Returns: undefined
+      }
+      pedido_precos_anteriores: {
+        Args: { _pedido_id: string }
+        Returns: { material_id: string; preco_anterior: number | null; data_anterior: string | null; codigo_anterior: string | null }[]
+      }
+      pedidos_gasto_mes: {
+        Args: { _posto_id: string; _mes: string }
+        Returns: number
+      }
+      estoque_lancar_dia: {
+        Args: { _posto_id: string; _data: string; _foto: string; _itens: Json; _assinatura: string; _ciente: boolean; _observacao?: string | null }
+        Returns: string
       }
       estoque_abrir_plantao: {
         Args: { _posto_id: string; _foto: string; _itens: Json; _observacao?: string | null }

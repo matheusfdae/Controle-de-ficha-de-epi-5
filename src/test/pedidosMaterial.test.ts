@@ -3,7 +3,7 @@ import { catalogoDoPosto, materiaisPediveis, nomeMaterial, proximaData, type Mat
 
 describe('catálogo', () => {
   const m = (id: string, nome: string, o: Partial<Material> = {}): Material =>
-    ({ id, nome, item_pai_id: null, unidade: 'un', categoria: null, is_epi: false, ativo: true, ...o });
+    ({ id, nome, item_pai_id: null, unidade: 'un', categoria: null, is_epi: false, ativo: true, preco: null, ...o });
   const todos = [
     m('det', 'Detergente'), m('d500', '500 ml', { item_pai_id: 'det' }), m('d5', '5 L', { item_pai_id: 'det', ativo: false }),
     m('vas', 'Vassoura'), m('rodo', 'Rodo', { ativo: false }),
