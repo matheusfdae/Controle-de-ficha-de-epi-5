@@ -12,7 +12,7 @@
 import { verifyCaller, serviceClient, json, corsHeaders } from '../_shared/clerk.ts';
 import { enviarComo, ErroMicrosoft } from '../_shared/microsoft.ts';
 import { acessoParaEnviar } from '../_shared/contaMicrosoft.ts';
-import { RESPONSAVEIS, agruparAvisos, montarEmailAviso, montarEmailEpi, type PedidoAviso } from '../_shared/avisoPedidos.ts';
+import { RESPONSAVEIS, agruparAvisos, montarEmailAviso, montarEmailEpi, type ItemAviso, type PedidoAviso } from '../_shared/avisoPedidos.ts';
 
 async function avisar(admin: any) {
   const { data: cfg } = await admin.from('pedido_config').select('avisar_email, link_sistema, emails_epi').eq('id', 1).maybeSingle();
@@ -33,7 +33,7 @@ async function avisar(admin: any) {
   const ids = todos.map((p: any) => p.id);
   const [{ data: postos }, { data: itens }, { data: aprovadores }] = await Promise.all([
     admin.from('postos').select('id, nome').in('id', [...new Set(todos.map((p: any) => p.posto_id))]),
-    admin.from('pedidos_material_itens').select('pedido_id, material_id, quantidade, materiais(nome, unidade, item_pai_id)').in('pedido_id', ids),
+    admin.from('pedidos_material_itens').select('pedido_id, material_id, quantidade, materiais(nome, unidade, item_pai_id, is_epi)').in('pedido_id', ids),
     admin.from('pedido_aprovadores').select('user_id, nivel, uf, postos'),
   ]);
   const paiIds = [...new Set((itens ?? []).map((i: any) => i.materiais?.item_pai_id).filter(Boolean))];
@@ -43,7 +43,6 @@ async function avisar(admin: any) {
     ? await admin.from('profiles').select('id, nome_completo, email, ativo').in('id', userIds)
     : { data: [] };
 
-  const qtd = (v: number) => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
   const nomeItem = (m: any) => {
     const pai = m?.item_pai_id ? (pais ?? []).find((x: any) => x.id === m.item_pai_id)?.nome : null;
     return pai ? `${pai} — ${m?.nome ?? ''}` : m?.nome ?? '';
@@ -54,7 +53,8 @@ async function avisar(admin: any) {
     data_pedido: p.data_pedido, solicitante_nome: p.solicitante_nome,
     tem_epi: p.tem_epi, recorrente: !!p.recorrencia_id,
     itens: (itens ?? []).filter((i: any) => i.pedido_id === p.id)
-      .map((i: any) => `${qtd(i.quantidade)} ${i.materiais?.unidade ?? ''} ${nomeItem(i.materiais)}`.replace(/\s+/g, ' ').trim()).join('; '),
+      .map((i: any) => ({ nome: nomeItem(i.materiais), quantidade: Number(i.quantidade), unidade: i.materiais?.unidade ?? '', epi: !!i.materiais?.is_epi }))
+      .sort((a: ItemAviso, b: ItemAviso) => a.nome.localeCompare(b.nome)),
   });
   const usuarios = (perfis ?? []).filter((u: any) => u.ativo !== false)
     .map((u: any) => ({ id: u.id, nome: u.nome_completo || u.email || '', email: u.email }));

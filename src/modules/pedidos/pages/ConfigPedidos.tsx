@@ -394,7 +394,7 @@ function Avisos({ podeEditar }: { podeEditar: boolean }) {
         <CardTitle className="text-lg">Avisos por e-mail</CardTitle>
         <CardDescription>
           Quando um pedido chega a uma etapa, quem tem o papel dela recebe um e-mail (um só, com todos os pedidos novos):
-          conferência → supervisor; orçamento e faturamento → compras; excesso de teto → comercial e gerência.
+          conferência → supervisor; atendimento → compras.
           Pedido com item de EPI avisa na hora os e-mails abaixo. Sai pela conta Microsoft conectada em Configurações &gt; E-mail,
           a cada 5 minutos, depois de rodar <code className="mx-1">configurar-email.sh</code> na VM.
         </CardDescription>

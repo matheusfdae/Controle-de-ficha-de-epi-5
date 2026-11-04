@@ -3,7 +3,8 @@ import { agruparAvisos, montarEmailAviso, montarEmailEpi, type PedidoAviso } fro
 
 const pedido = (o: Partial<PedidoAviso>): PedidoAviso => ({
   id: 'p1', codigo: 'SOL-2026-000007', posto_id: 'A', posto: 'POSTO A', uf: 'DF', status: 'enviada', data_pedido: '2026-10-30',
-  solicitante_nome: 'LIDER', tem_epi: false, recorrente: false, itens: '12 un Vassoura', ...o,
+  solicitante_nome: 'LIDER', tem_epi: false, recorrente: false,
+  itens: [{ nome: 'Vassoura', quantidade: 12, unidade: 'un', epi: false }], ...o,
 });
 
 describe('agruparAvisos', () => {
@@ -38,9 +39,10 @@ describe('e-mails', () => {
     const m = montarEmailAviso('Ana Souza', [
       pedido({ id: 'p1' }), pedido({ id: 'p2', codigo: 'SOL-2026-000008', status: 'a_atender', posto: '<b>X</b>', tem_epi: true }),
     ], 'https://epi.exemplo.com/');
-    expect(m.assunto).toBe('2 pedido(s) de material esperando por você');
+    expect(m.assunto).toBe('2 pedidos de material esperando por você');
     expect(m.html).toContain('Olá, Ana.');
-    expect(m.html).toContain('https://epi.exemplo.com/pedidos');
+    expect(m.html).toContain('https://epi.exemplo.com/pedidos?pedido=p1');
+    expect(m.html).toContain('Abrir todos os pedidos');
     expect(m.html).toContain('&lt;b&gt;X&lt;/b&gt;');
     expect(m.html).toContain('Conferir o material');
     expect(m.html).toContain('Atender');
@@ -50,8 +52,14 @@ describe('e-mails', () => {
     expect(montarEmailAviso('Bia', [pedido({})], null).html).toContain('Minhas tarefas');
   });
   it('aviso de EPI lista os pedidos', () => {
-    const m = montarEmailEpi([pedido({ tem_epi: true, itens: '2 par Luva PVC' })], null);
+    const m = montarEmailEpi([pedido({ tem_epi: true, itens: [{ nome: 'Luva PVC', quantidade: 2, unidade: 'par', epi: true }] })], null);
     expect(m.assunto).toContain('SOL-2026-000007');
-    expect(m.html).toContain('2 par Luva PVC');
+    expect(m.html).toMatch(/Luva PVC[\s\S]*>2<[\s\S]*par/);
+  });
+  it('um pedido só: assunto com o código e o posto, quantidades na tabela', () => {
+    const m = montarEmailAviso('Ana', [pedido({ itens: [{ nome: 'Água sanitária 5 L', quantidade: 1.5, unidade: 'galão', epi: false }] })], null);
+    expect(m.assunto).toBe('Pedido SOL-2026-000007 esperando por você — POSTO A');
+    expect(m.html).toContain('1,5');
+    expect(m.html).toContain('1 item');
   });
 });

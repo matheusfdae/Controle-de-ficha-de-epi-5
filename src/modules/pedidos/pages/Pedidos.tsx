@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Ban, Check, ClipboardList, Copy, HardHat, Loader2, PackageCheck, Repeat, Search, Undo2 } from 'lucide-react';
+import { Ban, Check, ClipboardList, Copy, HardHat, Loader2, PackageCheck, Repeat, Search, Trash2, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import BackButton from '@/components/BackButton';
 import PageHeader from '@/components/PageHeader';
@@ -256,6 +256,10 @@ function DetalhePedido({ pedido: p, posto, materiais, minhaVez, podeCancelar, re
     return quantidades[id] !== '' && Number.isFinite(v) ? v : original;
   };
   const mudados = p.itens.filter(i => digitada(i.id, i.quantidade) !== i.quantidade);
+  // Na conferência, excluir o item = conferir 0 (o banco tira o item do pedido e guarda no histórico).
+  const excluido = (id: string) => conferindo && quantidades[id] === '0';
+  const excluir = (id: string, original: number) =>
+    setQuantidades(q => ({ ...q, [id]: q[id] === '0' ? String(original).replace('.', ',') : '0' }));
 
   const agir = async (fn: () => Promise<unknown>, ok: string) => {
     setSalvando(true);
@@ -279,6 +283,7 @@ function DetalhePedido({ pedido: p, posto, materiais, minhaVez, podeCancelar, re
       if (!comentario.trim()) return toast.error('Escreva o motivo da devolução.');
       return agir(() => conferirPedido(p.id, false, comentario), 'Pedido devolvido ao encarregado.');
     }
+    if (p.itens.every(i => excluido(i.id))) return toast.error('Todos os itens foram excluídos. Para não atender, devolva com o motivo.');
     const ajustes = lerQuantidades();
     if (ajustes) agir(() => conferirPedido(p.id, true, comentario, ajustes), 'Conferido. Segue para compras atender.');
   };
@@ -340,6 +345,7 @@ function DetalhePedido({ pedido: p, posto, materiais, minhaVez, podeCancelar, re
               <TableHead className="text-right">Pedido</TableHead>
               <TableHead className="text-right w-28">Conferido</TableHead>
               <TableHead className="text-right w-28">Entregue</TableHead>
+              {conferindo && <TableHead className="w-12"><span className="sr-only">Excluir</span></TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -350,24 +356,36 @@ function DetalhePedido({ pedido: p, posto, materiais, minhaVez, podeCancelar, re
                   value={quantidades[i.id] ?? ''} onChange={e => setQuantidades(q => ({ ...q, [i.id]: e.target.value.replace(/[^\d.,]/g, '') }))} />
               );
               const entregue = i.quantidade_atendida;
+              const fora = excluido(i.id);
               return (
-                <TableRow key={i.id}>
-                  <TableCell>
+                <TableRow key={i.id} className={fora ? 'opacity-60' : undefined}>
+                  <TableCell className={fora ? 'line-through' : undefined}>
                     {nomeMaterial(m, materiais)} <span className="text-xs text-muted-foreground">{m?.unidade}</span>
                     {m?.is_epi && <HardHat className="inline h-3.5 w-3.5 ml-1 text-amber-600" aria-label="EPI" />}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{formatarNumero(i.quantidade_pedida)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{conferindo ? campo : p.status === 'enviada' || p.status === 'devolvida' ? '—' : formatarNumero(i.quantidade)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{conferindo ? (fora ? <span className="text-xs text-destructive">excluído</span> : campo) : p.status === 'enviada' || p.status === 'devolvida' ? '—' : formatarNumero(i.quantidade)}</TableCell>
                   <TableCell className="text-right tabular-nums">
                     {atendendo ? campo : entregue == null ? '—' : (
                       <span className={entregue !== i.quantidade ? 'text-amber-700 dark:text-amber-400 font-medium' : ''}>{formatarNumero(entregue)}</span>
                     )}
                   </TableCell>
+                  {conferindo && (
+                    <TableCell className="p-1 text-right">
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8"
+                        title={fora ? 'Desfazer exclusão' : 'Excluir item do pedido'}
+                        aria-label={`${fora ? 'Desfazer exclusão de' : 'Excluir do pedido'} ${nome(i.material_id)}`}
+                        onClick={() => excluir(i.id, i.quantidade)}>
+                        {fora ? <Undo2 className="h-4 w-4" /> : <Trash2 className="h-4 w-4 text-destructive" />}
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
+        {conferindo && <p className="text-xs text-muted-foreground">Para tirar um item do pedido, use a lixeira (ou confira 0). A exclusão fica no histórico.</p>}
         {atendendo && <p className="text-xs text-muted-foreground">A coluna "Entregue" vem com o conferido. Se for entregar menos, corrija e explique no comentário.</p>}
         {p.observacao && <p className="text-sm"><span className="text-muted-foreground">Observação do encarregado:</span> {p.observacao}</p>}
 
@@ -391,7 +409,7 @@ function DetalhePedido({ pedido: p, posto, materiais, minhaVez, podeCancelar, re
                   )}
                   {e.payload?.ajustes?.length ? (
                     <span className="block text-muted-foreground text-xs">
-                      {e.para_status === 'atendida' ? 'Entregue diferente do conferido' : 'Ajustes'}: {e.payload.ajustes.map(a => `${a.item}: ${formatarNumero(Number(a.de))} → ${formatarNumero(Number(a.para))}`).join('; ')}
+                      {e.para_status === 'atendida' ? 'Entregue diferente do conferido' : 'Ajustes'}: {e.payload.ajustes.map(a => e.para_status !== 'atendida' && Number(a.para) === 0 ? `${a.item}: excluído` : `${a.item}: ${formatarNumero(Number(a.de))} → ${formatarNumero(Number(a.para))}`).join('; ')}
                     </span>
                   ) : null}
                 </span>

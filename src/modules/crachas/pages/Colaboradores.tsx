@@ -1,6 +1,6 @@
 import type { TablesUpdate } from '@/integrations/supabase/types';
 import { revisarSolicitacao } from '@/modules/crachas/lib/solicitacaoService';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { MainLayout } from '@/modules/crachas/components/layout/MainLayout';
 import { BadgeRenderer } from '@/modules/crachas/components/badge/BadgeRenderer';
 import { mapEmployeeToBadgeData } from '@/modules/crachas/lib/badgeFieldMap';
@@ -20,7 +20,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Search, MoreVertical, Eye, Edit, FileDown, Printer, RefreshCw, UserPlus, Filter, Loader2, User, ShieldCheck, ShieldAlert, ImageOff, Trash2, CheckCircle2, XCircle, Clock, Inbox } from 'lucide-react';
+import { Search, MoreVertical, Eye, Edit, FileDown, Printer, RefreshCw, UserPlus, Filter, Loader2, User, ShieldCheck, ShieldAlert, ImageOff, Trash2, CheckCircle2, XCircle, Clock, Inbox, ImagePlus, Camera } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -37,6 +37,8 @@ import { usePhotoValidation } from '@/modules/crachas/hooks/usePhotoValidation';
 import { Progress } from '@/components/ui/progress';
 import { atualizarDaSenior } from '@/services/colaboradoresSeniorService';
 import { useAuth } from '@/contexts/AuthContext';
+import { ImportarFotosDialog } from '@/modules/crachas/components/employees/ImportarFotosDialog';
+import { enviarFotoColaborador } from '@/modules/crachas/lib/importarFotos';
 
 const Colaboradores = () => {
   const queryClient = useQueryClient();
@@ -48,6 +50,13 @@ const Colaboradores = () => {
   const [atualizandoSenior, setAtualizandoSenior] = useState(false);
   const { can } = useAuth();
   const podeAtualizarSenior = can('colaboradores', 'edit');
+  const podeMexerFotos = can('crachas', 'edit') || can('crachas', 'create');
+  const [showImportarFotos, setShowImportarFotos] = useState(false);
+  // Trocar a foto de um colaborador: um campo de arquivo só, para quem estiver na vez.
+  const campoFoto = useRef<HTMLInputElement>(null);
+  const [fotoDe, setFotoDe] = useState<Employee | null>(null);
+  const [enviandoFotoDe, setEnviandoFotoDe] = useState<string | null>(null);
+  const trocarFoto = (employee: Employee) => { setFotoDe(employee); campoFoto.current?.click(); };
 
   // Mesma atualização da tela Colaboradores Senior; o banco leva as mudanças para os crachás.
   const atualizarSenior = async () => {
@@ -154,6 +163,24 @@ const Colaboradores = () => {
   });
 
   const { data: employees = [], isLoading } = useEmployees();
+
+  const fotoEscolhida = async (arquivo: File | undefined) => {
+    const alvo = fotoDe;
+    if (campoFoto.current) campoFoto.current.value = '';
+    if (!arquivo || !alvo) return;
+    setEnviandoFotoDe(alvo.id);
+    try {
+      const url = await enviarFotoColaborador(alvo.id, arquivo);
+      if (selectedEmployee?.id === alvo.id) setEditForm(f => ({ ...f, photo_url: url }));
+      toast.success(`Foto de ${alvo.full_name} atualizada.`);
+      queryClient.invalidateQueries({ queryKey: ['cracha_employees'] });
+      queryClient.invalidateQueries({ queryKey: ['employee-stats'] });
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setEnviandoFotoDe(null);
+    }
+  };
 
   const { photoStatuses, isValidating, progress: validationProgress, validateAll, clearValidation, validCount, invalidCount } = usePhotoValidation();
 
@@ -401,6 +428,12 @@ const Colaboradores = () => {
               {isValidating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
               Validar Fotos
             </Button>
+            {podeMexerFotos && (
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowImportarFotos(true)}>
+                <ImagePlus className="h-4 w-4" />
+                Importar fotos
+              </Button>
+            )}
             <Button variant="outline" size="sm" className="gap-2" onClick={handleExport} disabled={isExporting}>
               {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
               Exportar
@@ -418,6 +451,11 @@ const Colaboradores = () => {
           </>
         }
       />
+      <input ref={campoFoto} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e => fotoEscolhida(e.target.files?.[0])} />
+      {podeMexerFotos && (
+        <ImportarFotosDialog open={showImportarFotos} onOpenChange={setShowImportarFotos} colaboradores={employees}
+          onConcluido={() => { queryClient.invalidateQueries({ queryKey: ['cracha_employees'] }); queryClient.invalidateQueries({ queryKey: ['employee-stats'] }); }} />
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-4 mb-6 p-4 bg-card rounded-xl border border-border shadow-card">
@@ -566,7 +604,9 @@ const Colaboradores = () => {
                   </td>
                   <td className="px-2 py-1">
                     <div className="w-8 h-8 rounded overflow-hidden bg-muted flex items-center justify-center">
-                      {employee.photo_url ? (
+                      {enviandoFotoDe === employee.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      ) : employee.photo_url ? (
                         <img src={getPhotoUrl(employee.photo_url)} alt={employee.full_name} className="w-full h-full object-cover" style={{ objectPosition: 'center top' }} referrerPolicy="no-referrer" />
                       ) : (
                         <User className="h-4 w-4 text-muted-foreground" />
@@ -643,6 +683,11 @@ const Colaboradores = () => {
                         <DropdownMenuItem onClick={() => handleEditEmployee(employee)}>
                           <Edit className="h-4 w-4 mr-2" /> Editar
                         </DropdownMenuItem>
+                        {podeMexerFotos && (
+                          <DropdownMenuItem onClick={() => trocarFoto(employee)}>
+                            <Camera className="h-4 w-4 mr-2" /> {employee.photo_url ? 'Trocar foto' : 'Enviar foto'}
+                          </DropdownMenuItem>
+                        )}
                         {employee.request_status && (
                           <>
                             <DropdownMenuSeparator />
@@ -771,8 +816,20 @@ const Colaboradores = () => {
               <Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} />
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label>URL da Foto</Label>
-              <Input value={editForm.photo_url} onChange={(e) => setEditForm({ ...editForm, photo_url: e.target.value })} placeholder="https://..." />
+              <Label>Foto</Label>
+              <div className="flex gap-2 items-center">
+                {editForm.photo_url && (
+                  <img src={getPhotoUrl(editForm.photo_url)} alt="" className="h-10 w-10 rounded object-cover shrink-0" style={{ objectPosition: 'center top' }} referrerPolicy="no-referrer" />
+                )}
+                <Input value={editForm.photo_url} onChange={(e) => setEditForm({ ...editForm, photo_url: e.target.value })} placeholder="Endereço da foto (https://...)" />
+                {podeMexerFotos && selectedEmployee && (
+                  <Button type="button" variant="outline" className="gap-2 shrink-0" disabled={enviandoFotoDe === selectedEmployee.id} onClick={() => trocarFoto(selectedEmployee)}>
+                    {enviandoFotoDe === selectedEmployee.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                    {editForm.photo_url ? 'Trocar foto' : 'Enviar foto'}
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">A foto enviada já fica gravada no colaborador (não precisa salvar).</p>
             </div>
             <div className="space-y-2">
               <Label>QR Code (valor)</Label>
