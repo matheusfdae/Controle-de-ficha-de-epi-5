@@ -2,7 +2,9 @@
 // Alerta de pedido de material por WhatsApp, via WA-AKG (instalado na VM).
 // Cada posto tem um dia do mês previsto para pedir (postos.pedido_dia). 2 dias
 // antes e no dia, quem fez pedido daquele posto pelo link nos últimos 90 dias
-// recebe o lembrete com o link. Não manda se o posto já pediu perto da data, nem
+// recebe o lembrete com o link: celular da Senior primeiro (sem celular lá, o
+// digitado no link), com os ajustes da tela (pedido_alerta_contatos: corrigido,
+// tirado da lista ou adicionado à mão). Não manda se o posto já pediu perto da data, nem
 // duas vezes para o mesmo número (pedido_alertas_whatsapp).
 //
 //  * Agendador da VM (todo dia às 8h de Brasília): header x-cron-secret,
@@ -17,7 +19,19 @@
 // gravados pelo deploy/producao/configurar-whatsapp.sh.
 import { verifyCaller, serviceClient, json, corsHeaders } from '../_shared/clerk.ts';
 import { agendarEnvios, ErroWhatsApp, novoLote, type ContaWhatsApp, type EnvioWhatsApp } from '../_shared/whatsapp.ts';
-import { DIAS_CONTATOS, JANELA_JA_PEDIU, alertaDeHoje, contatosDoPosto, jaPediu, mensagemAlerta, proximaPrevista, type Momento } from '../_shared/alertaPedido.ts';
+import {
+  DIAS_CONTATOS, JANELA_JA_PEDIU, alertaDeHoje, aplicarAjustes, contatosDoPosto, jaPediu, mensagemAlerta, proximaPrevista,
+  type AjusteContato, type Momento, type PedidoContato,
+} from '../_shared/alertaPedido.ts';
+
+const CAMPOS_PEDIDO = 'posto_id, solicitante_nome, solicitante_telefone, solicitante_senior_id, data_pedido, status, colaboradores_senior(telefone)';
+/** Linha do banco -> pedido com o celular da Senior de quem pediu. */
+const comSenior = (x: any): PedidoContato & { posto_id: string; status: string } => ({ ...x, senior_telefone: x.colaboradores_senior?.telefone ?? null });
+
+/** Quem recebe o alerta do posto: pedidos pelo link + ajustes da tela. */
+function destinatarios(pedidos: PedidoContato[], ajustes: AjusteContato[], hoje: string) {
+  return aplicarAjustes(contatosDoPosto(pedidos, hoje), ajustes).recebem;
+}
 
 const hojeBr = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
 const menosDias = (dia: string, n: number) => new Date(Date.parse(`${dia}T12:00:00Z`) - n * 864e5).toISOString().slice(0, 10);
@@ -47,23 +61,26 @@ async function alertar(admin: any, modo: 'automatico' | 'agora' | 'simular') {
 
   const ids = doDia.map((x: any) => x.p.id);
   const desde = menosDias(hoje, Math.max(DIAS_CONTATOS, 31 + JANELA_JA_PEDIU));
-  const [{ data: pedidos, error: ePed }, { data: jaEnviados, error: eEnv }] = await Promise.all([
-    admin.from('pedidos_material').select('posto_id, solicitante_nome, solicitante_telefone, data_pedido, status')
-      .in('posto_id', ids).gte('data_pedido', desde).limit(10000),
+  const [{ data: brutos, error: ePed }, { data: jaEnviados, error: eEnv }, { data: ajustes, error: eAj }] = await Promise.all([
+    admin.from('pedidos_material').select(CAMPOS_PEDIDO).in('posto_id', ids).gte('data_pedido', desde).limit(10000),
     admin.from('pedido_alertas_whatsapp').select('posto_id, data_prevista, momento, numero').in('posto_id', ids).gte('data_prevista', hoje),
+    admin.from('pedido_alerta_contatos').select('id, posto_id, acao, chave, nome, numero').in('posto_id', ids),
   ]);
   if (ePed) throw new Error(ePed.message);
   if (eEnv) throw new Error(eEnv.message);
+  if (eAj) throw new Error(eAj.message);
+  const pedidos = (brutos ?? []).map(comSenior);
 
   const alertas: Alerta[] = [];
   const pulados: { posto: string; motivo: string }[] = [];
   for (const { p, a } of doDia as any[]) {
     const doPosto = (pedidos ?? []).filter((x: any) => x.posto_id === p.id);
     if (jaPediu(doPosto, a.data, hoje)) { pulados.push({ posto: p.nome, motivo: 'já fez o pedido deste mês' }); continue; }
-    const contatos = contatosDoPosto(doPosto, hoje).filter(c => !(jaEnviados ?? []).some((e: any) =>
+    const contatos = destinatarios(doPosto, (ajustes ?? []).filter((x: any) => x.posto_id === p.id), hoje).filter(c => !(jaEnviados ?? []).some((e: any) =>
       e.posto_id === p.id && e.data_prevista === a.data && e.momento === a.momento && e.numero === c.numero));
     if (!contatos.length) {
-      pulados.push({ posto: p.nome, motivo: doPosto.some((x: any) => x.solicitante_telefone) ? 'alerta de hoje já enviado' : 'ninguém pediu por este posto nos últimos 90 dias' });
+      const temAlguem = destinatarios(doPosto, (ajustes ?? []).filter((x: any) => x.posto_id === p.id), hoje).length > 0;
+      pulados.push({ posto: p.nome, motivo: temAlguem ? 'alerta de hoje já enviado' : 'ninguém para receber (ninguém pediu pelo link nos últimos 90 dias nem foi adicionado)' });
       continue;
     }
     alertas.push({
@@ -95,11 +112,14 @@ async function alertarPosto(admin: any, postoId: string) {
   if (!posto) return { enviado: false, motivo: 'posto não encontrado' };
   const { data: cfg } = await admin.from('pedido_config').select('link_sistema').eq('id', 1).maybeSingle();
   const hoje = hojeBr();
-  const { data: pedidos, error: ePed } = await admin.from('pedidos_material').select('solicitante_nome, solicitante_telefone, data_pedido')
-    .eq('posto_id', postoId).gte('data_pedido', menosDias(hoje, DIAS_CONTATOS)).limit(5000);
+  const [{ data: brutos, error: ePed }, { data: ajustes, error: eAj }] = await Promise.all([
+    admin.from('pedidos_material').select(CAMPOS_PEDIDO).eq('posto_id', postoId).gte('data_pedido', menosDias(hoje, DIAS_CONTATOS)).limit(5000),
+    admin.from('pedido_alerta_contatos').select('id, posto_id, acao, chave, nome, numero').eq('posto_id', postoId),
+  ]);
   if (ePed) throw new Error(ePed.message);
-  const contatos = contatosDoPosto(pedidos ?? [], hoje);
-  if (!contatos.length) return { enviado: false, motivo: `ninguém pediu por este posto pelo link nos últimos ${DIAS_CONTATOS} dias` };
+  if (eAj) throw new Error(eAj.message);
+  const contatos = destinatarios((brutos ?? []).map(comSenior), ajustes ?? [], hoje);
+  if (!contatos.length) return { enviado: false, motivo: `ninguém para receber: ninguém pediu por este posto pelo link nos últimos ${DIAS_CONTATOS} dias nem foi adicionado` };
   const data = posto.pedido_dia ? proximaPrevista(posto.pedido_dia, hoje) : null;
   const envios = contatos.map(c => ({ nome: c.nome || posto.nome, numero: c.numero,
     texto: mensagemAlerta({ nome: c.nome, posto: posto.nome, data, momento: data === hoje ? 'dia' : 'manual', link: cfg?.link_sistema ?? null }) }));

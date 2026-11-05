@@ -418,12 +418,32 @@ export async function definirDiaPedido(postoId: string, dia: number | null) {
   if (error) throw new Error(error.message);
 }
 
-/** Quem pediu por este posto pelo link (nome e telefone digitados), do mais recente ao mais antigo. */
-export async function quemPediuPeloLink(postoId: string, desde: string) {
-  const { data, error } = await supabase.from('pedidos_material').select('solicitante_nome, solicitante_telefone, data_pedido')
-    .eq('posto_id', postoId).gte('data_pedido', desde).not('solicitante_telefone', 'is', null).order('data_pedido', { ascending: false }).limit(500);
+/**
+ * Base da lista do alerta de um posto: pedidos pelo link dos últimos 90 dias (com o
+ * celular da Senior de quem pediu) e os ajustes feitos na tela.
+ */
+export async function baseDoAlerta(postoId: string) {
+  const [p, a] = await Promise.all([
+    supabase.rpc('pedidos_alerta_base', { _posto_id: postoId }),
+    supabase.from('pedido_alerta_contatos').select('id, acao, chave, nome, numero').eq('posto_id', postoId),
+  ]);
+  if (p.error) throw new Error(p.error.message);
+  if (a.error) throw new Error(a.error.message);
+  return {
+    pedidos: (p.data ?? []) as { solicitante_nome: string | null; solicitante_telefone: string | null; data_pedido: string; solicitante_senior_id: string | null; senior_telefone: string | null }[],
+    ajustes: (a.data ?? []) as { id: string; acao: 'corrigir' | 'remover' | 'adicionar'; chave: string | null; nome: string | null; numero: string | null }[],
+  };
+}
+
+/** Corrige o número de alguém da lista, tira da lista ou adiciona um contato (número já no formato 55DDD9...). */
+export async function ajustarContatoAlerta(postoId: string, acao: 'corrigir' | 'remover' | 'adicionar', chave: string | null, nome: string | null, numero: string | null) {
+  const { error } = await supabase.rpc('pedidos_alerta_ajustar', { _posto_id: postoId, _acao: acao, _chave: chave, _nome: nome, _numero: numero });
   if (error) throw new Error(error.message);
-  return data ?? [];
+}
+
+export async function desfazerAjusteAlerta(id: string) {
+  const { error } = await supabase.rpc('pedidos_alerta_desfazer', { _id: id });
+  if (error) throw new Error(error.message);
 }
 
 export interface ResultadoAlerta {

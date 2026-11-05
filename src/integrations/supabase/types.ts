@@ -1093,6 +1093,12 @@ export type Database = {
         Update: { [_ in never]: never }
         Relationships: []
       }
+      pedido_alerta_contatos: {
+        Row: { id: string; posto_id: string; acao: string; chave: string | null; nome: string | null; numero: string | null; criado_por: string | null; criado_em: string }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
       pedido_aprovadores: {
         Row: { id: string; user_id: string; nivel: string; uf: string; postos: string[]; created_at: string }
         Insert: { id?: string; user_id: string; nivel: string; uf: string; postos?: string[] }
@@ -2505,6 +2511,18 @@ export type Database = {
       pedidos_importar_precos: {
         Args: { _itens: Json }
         Returns: Json
+      }
+      pedidos_alerta_base: {
+        Args: { _posto_id: string }
+        Returns: { solicitante_nome: string | null; solicitante_telefone: string | null; data_pedido: string; solicitante_senior_id: string | null; senior_telefone: string | null }[]
+      }
+      pedidos_alerta_ajustar: {
+        Args: { _posto_id: string; _acao: string; _chave: string | null; _nome: string | null; _numero: string | null }
+        Returns: undefined
+      }
+      pedidos_alerta_desfazer: {
+        Args: { _id: string }
+        Returns: undefined
       }
       pedidos_definir_dia_pedido: {
         Args: { _posto_id: string; _dia: number | null }

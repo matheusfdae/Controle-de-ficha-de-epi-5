@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { alertaDeHoje, contatosDoPosto, jaPediu, mensagemAlerta, previstaNoMes, proximaPrevista } from '../../supabase/functions/_shared/alertaPedido';
+import { alertaDeHoje, aplicarAjustes, contatosDoPosto, jaPediu, mensagemAlerta, previstaNoMes, proximaPrevista } from '../../supabase/functions/_shared/alertaPedido';
 
 describe('data prevista', () => {
   it('mês mais curto usa o último dia', () => {
@@ -39,7 +39,28 @@ describe('quem recebe', () => {
       { solicitante_nome: 'Antigo', solicitante_telefone: '61988887777', data_pedido: '2026-06-01' },
       { solicitante_nome: 'Ana', solicitante_telefone: null, data_pedido: '2026-11-03' },
     ], '2026-11-05');
-    expect(c).toEqual([{ nome: 'Maria Aparecida Souza', numero: '5561999991111', ultimo: '2026-11-01' }]);
+    expect(c).toEqual([{ chave: '5561999991111', nome: 'Maria Aparecida Souza', numero: '5561999991111', ultimo: '2026-11-01', origem: 'link' }]);
+  });
+  it('celular da Senior primeiro; sem celular lá, o digitado; uma linha por pessoa da Senior', () => {
+    const c = contatosDoPosto([
+      { solicitante_nome: 'Ana', solicitante_telefone: '61988881111', data_pedido: '2026-11-03', solicitante_senior_id: 's1', senior_telefone: '(61) 99777-2222' },
+      { solicitante_nome: 'Ana', solicitante_telefone: '61988881111', data_pedido: '2026-10-20', solicitante_senior_id: 's1', senior_telefone: '(61) 99777-2222' },
+      { solicitante_nome: 'Bruno', solicitante_telefone: '61966663333', data_pedido: '2026-11-02', solicitante_senior_id: 's2', senior_telefone: '(61) 3333-4444' },
+    ], '2026-11-05');
+    expect(c.map(x => [x.chave, x.numero, x.origem])).toEqual([['s1', '5561997772222', 'senior'], ['s2', '5561966663333', 'link']]);
+  });
+  it('ajustes: corrigir, tirar da lista e adicionar', () => {
+    const base = contatosDoPosto([
+      { solicitante_nome: 'Ana', solicitante_telefone: '61988881111', data_pedido: '2026-11-03', solicitante_senior_id: 's1' },
+      { solicitante_nome: 'Bruno', solicitante_telefone: '61966663333', data_pedido: '2026-11-02', solicitante_senior_id: 's2' },
+    ], '2026-11-05');
+    const r = aplicarAjustes(base, [
+      { id: 'a1', acao: 'corrigir', chave: 's1', nome: 'Ana', numero: '5561911112222' },
+      { id: 'a2', acao: 'remover', chave: 's2', nome: 'Bruno', numero: null },
+      { id: 'a3', acao: 'adicionar', chave: null, nome: 'Carla', numero: '5561933334444' },
+    ]);
+    expect(r.recebem.map(x => [x.nome, x.numero, x.origem])).toEqual([['Ana', '5561911112222', 'corrigido'], ['Carla', '5561933334444', 'manual']]);
+    expect(r.removidos.map(x => x.nome)).toEqual(['Bruno']);
   });
 });
 
@@ -49,6 +70,7 @@ describe('mensagem', () => {
     expect(antes).toContain('Olá, Maria!');
     expect(antes).toContain('*ARMANDO MONTEIRO* está previsto para *25/11/2026*');
     expect(antes).toContain('https://epi.exemplo.com.br/pedido-material');
+    expect(antes).toContain('Salve este número nos seus contatos para o link ficar clicável');
     const dia = mensagemAlerta({ nome: '', posto: 'CNI', data: '2026-11-25', momento: 'dia', link: null });
     expect(dia).toContain('Olá!');
     expect(dia).toContain('é *hoje (25/11/2026)*');

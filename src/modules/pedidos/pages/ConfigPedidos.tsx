@@ -18,13 +18,14 @@ import EstadoSelect from '@/components/EstadoSelect';
 import { useAuth } from '@/contexts/AuthContext';
 import { listPostos, type Posto } from '@/services/postosService';
 import {
-  PAPEIS, alertarPedidosWhatsApp, avisarAgora, definirDiaPedido, definirTeto, excluirAprovador, hojeBr, quemPediuPeloLink, lerConfigAvisos, listAprovadores, listItensPorPosto, listMateriais, listUsuarios,
+  PAPEIS, alertarPedidosWhatsApp, avisarAgora, definirDiaPedido, definirTeto, excluirAprovador, hojeBr, lerConfigAvisos, listAprovadores, listItensPorPosto, listMateriais, listUsuarios,
   materiaisPediveis, nomeMaterial, reais, rotuloPapel, salvarAprovador, salvarConfigAvisos, salvarListaDoPosto, salvarMaterial,
   type Aprovador, type Material, type Papel, type ResultadoAlerta,
 } from '../lib/pedidosService';
 import ImportarPlanilha from '../components/ImportarPlanilha';
 import ImportarPrecos from '../components/ImportarPrecos';
-import { DIAS_CONTATOS, contatosDoPosto, proximaPrevista, type Contato } from '../../../../supabase/functions/_shared/alertaPedido';
+import ContatosAlerta from '../components/ContatosAlerta';
+import { DIAS_CONTATOS, proximaPrevista } from '../../../../supabase/functions/_shared/alertaPedido';
 
 /** "12,90" / "1.234,5" -> 12.9; vazio -> null; inválido -> NaN. */
 const lerValor = (t: string) => {
@@ -200,8 +201,6 @@ function ListaDoPosto({ podeEditar }: { podeEditar: boolean }) {
   const [teto, setTeto] = useState('');
   const [diaPedido, setDiaPedido] = useState('');
   const [salvandoDia, setSalvandoDia] = useState(false);
-  const [contatos, setContatos] = useState<Contato[] | null>(null);
-  const [alertandoPosto, setAlertandoPosto] = useState(false);
   const [salvandoTeto, setSalvandoTeto] = useState(false);
   const carregar = useCallback(() => Promise.all([listPostos(), listMateriais(), listItensPorPosto()])
     .then(([p, m, l]) => { setPostos(p.filter(x => x.ativo)); setMateriais(m); setListas(l); }).catch(e => toast.error(e.message)), []);
@@ -211,10 +210,6 @@ function ListaDoPosto({ podeEditar }: { podeEditar: boolean }) {
     setPostoId(id); setItens(listas.filter(l => l.posto_id === id).map(l => l.material_id));
     setTeto(valorTexto(postos.find(p => p.id === id)?.teto_material ?? null));
     setDiaPedido(String(postos.find(p => p.id === id)?.pedido_dia ?? ''));
-    setContatos(null);
-    const hoje = hojeBr();
-    const desde = new Date(Date.parse(`${hoje}T12:00:00Z`) - DIAS_CONTATOS * 864e5).toISOString().slice(0, 10);
-    quemPediuPeloLink(id, desde).then(l => setContatos(contatosDoPosto(l, hoje))).catch(() => setContatos([]));
   };
   const salvarDia = async () => {
     const t = diaPedido.trim();
@@ -226,18 +221,6 @@ function ListaDoPosto({ podeEditar }: { podeEditar: boolean }) {
       toast.success(v == null ? 'Posto sem data prevista de pedido.' : `Pedido previsto todo dia ${v}. Próximo: ${proximaPrevista(v, hojeBr()).split('-').reverse().join('/')}.`);
       await carregar();
     } catch (e) { toast.error((e as Error).message); } finally { setSalvandoDia(false); }
-  };
-  const alertarAgora = async () => {
-    const posto = postos.find(p => p.id === postoId);
-    if (!contatos?.length || !posto) return;
-    if (!confirm(`Enviar agora pelo WhatsApp o lembrete do pedido de ${posto.nome} para ${contatos.length} pessoa(s)?`)) return;
-    setAlertandoPosto(true);
-    try {
-      const r = await alertarPedidosWhatsApp('posto', postoId);
-      if (r.enviado) toast.success(`${r.agendados} lembrete(s) agendado(s) no WhatsApp. O primeiro sai em cerca de 1 minuto.`);
-      else toast.info(r.motivo ?? 'Nenhuma mensagem enviada.');
-      if (r.sem_whatsapp?.length) toast.warning(`Sem WhatsApp: ${r.sem_whatsapp.join(', ')}`);
-    } catch (e) { toast.error((e as Error).message); } finally { setAlertandoPosto(false); }
   };
   const salvarTeto = async () => {
     const v = lerValor(teto);
@@ -306,24 +289,8 @@ function ListaDoPosto({ podeEditar }: { podeEditar: boolean }) {
         )}
         </div>
         {postoId && (
-          <div className="rounded-md border p-3 text-sm space-y-1">
-            <p className="font-medium flex items-center gap-2"><MessageCircle className="h-4 w-4 text-emerald-600" /> Alerta de pedido por WhatsApp</p>
-            <p className="text-xs text-muted-foreground">
-              {diaPedido ? <>Sai 2 dias antes e no dia {diaPedido} de cada mês, às 8h, com o link do pedido (não sai se o posto já pediu perto da data).</>
-                : <>Defina o dia do pedido para o posto receber o lembrete.</>}
-              {' '}Vai para quem pediu por este posto pelo link nos últimos {DIAS_CONTATOS} dias (o telefone que a pessoa digitou):
-            </p>
-            {contatos === null ? <Loader2 className="h-4 w-4 animate-spin" />
-              : contatos.length === 0 ? <p className="text-xs text-amber-600">Ninguém pediu por este posto pelo link nos últimos {DIAS_CONTATOS} dias: o alerta ainda não tem para quem ir.</p>
-                : <ul className="text-xs flex flex-wrap gap-x-4 gap-y-1">{contatos.map(c => (
-                  <li key={c.numero}>{c.nome || 'Sem nome'} · ({c.numero.slice(2, 4)}) {c.numero.slice(4, 9)}-{c.numero.slice(9)} <span className="text-muted-foreground">· pediu em {c.ultimo.split('-').reverse().join('/')}</span></li>
-                ))}</ul>}
-            {podeEditar && !!contatos?.length && (
-              <Button size="sm" variant="outline" className="gap-2 mt-1 border-emerald-600/40 text-emerald-700 dark:text-emerald-400" disabled={alertandoPosto} onClick={alertarAgora}>
-                {alertandoPosto ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Enviar alerta agora
-              </Button>
-            )}
-          </div>
+          <ContatosAlerta postoId={postoId} postoNome={postos.find(p => p.id === postoId)?.nome ?? ''}
+            diaPedido={String(postos.find(p => p.id === postoId)?.pedido_dia ?? '')} podeEditar={podeEditar} />
         )}
         {postoId && (
           <>

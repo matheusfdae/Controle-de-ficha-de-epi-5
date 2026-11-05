@@ -45,20 +45,66 @@ export function jaPediu(pedidos: { data_pedido: string; status: string }[], data
   return pedidos.some(p => p.status !== 'cancelada' && p.data_pedido >= desde && p.data_pedido <= hoje);
 }
 
-export interface Contato { nome: string; numero: string; ultimo: string }
+/** De onde veio o número: Senior, digitado no link, corrigido na tela ou adicionado à mão. */
+export type OrigemContato = 'senior' | 'link' | 'corrigido' | 'manual';
+/**
+ * `chave` identifica a pessoa para os ajustes da tela (id da Senior, ou o número
+ * digitado quando o pedido não tem a pessoa da Senior); contato adicionado não tem chave.
+ */
+export interface Contato { chave: string | null; nome: string; numero: string; ultimo: string | null; origem: OrigemContato; ajusteId?: string }
 
-/** Quem pediu pelo link nos últimos `dias` dias: um por celular válido, com o nome do pedido mais recente. */
-export function contatosDoPosto(pedidos: { solicitante_nome: string | null; solicitante_telefone: string | null; data_pedido: string }[],
-  hoje: string, dias = DIAS_CONTATOS): Contato[] {
+export interface PedidoContato {
+  solicitante_nome: string | null; solicitante_telefone: string | null; data_pedido: string;
+  solicitante_senior_id?: string | null; senior_telefone?: string | null;
+}
+
+/**
+ * Quem pediu pelo link nos últimos `dias` dias, uma linha por pessoa (pelo id da
+ * Senior; sem ele, pelo número digitado), com o nome do pedido mais recente. Número:
+ * o celular da Senior; se lá não houver celular válido, o mais recente digitado no link.
+ */
+export function contatosDoPosto(pedidos: PedidoContato[], hoje: string, dias = DIAS_CONTATOS): Contato[] {
   const desde = somarDias(hoje, -dias);
-  const porNumero = new Map<string, Contato>();
+  const pessoas = new Map<string, Contato>();
   for (const p of [...pedidos].sort((a, b) => b.data_pedido.localeCompare(a.data_pedido))) {
     if (p.data_pedido < desde) continue;
-    const numero = numeroWhatsApp(p.solicitante_telefone);
-    if (!numero || porNumero.has(numero)) continue;
-    porNumero.set(numero, { nome: (p.solicitante_nome ?? '').trim(), numero, ultimo: p.data_pedido });
+    const doLink = numeroWhatsApp(p.solicitante_telefone);
+    const daSenior = numeroWhatsApp(p.senior_telefone);
+    const chave = p.solicitante_senior_id ?? doLink;
+    if (!chave) continue;
+    const atual = pessoas.get(chave);
+    if (atual) {
+      // Pedido mais antigo da mesma pessoa: só completa o número se ainda faltar.
+      if (!atual.numero && doLink) { atual.numero = doLink; atual.origem = 'link'; }
+      continue;
+    }
+    pessoas.set(chave, { chave, nome: (p.solicitante_nome ?? '').trim(), numero: daSenior ?? doLink ?? '', ultimo: p.data_pedido, origem: daSenior ? 'senior' : 'link' });
   }
-  return [...porNumero.values()];
+  // Uma mensagem por número (duas pessoas com o mesmo celular recebem uma só).
+  const vistos = new Set<string>();
+  return [...pessoas.values()].filter(c => c.numero && !vistos.has(c.numero) && vistos.add(c.numero));
+}
+
+export interface AjusteContato { id: string; acao: 'corrigir' | 'remover' | 'adicionar'; chave: string | null; nome: string | null; numero: string | null }
+
+/**
+ * Aplica os ajustes da tela: corrige o número ou tira a pessoa da lista e soma os
+ * contatos adicionados. Devolve quem recebe e quem foi tirado (para a tela mostrar).
+ */
+export function aplicarAjustes(contatos: Contato[], ajustes: AjusteContato[]): { recebem: Contato[]; removidos: Contato[] } {
+  const recebem: Contato[] = [];
+  const removidos: Contato[] = [];
+  for (const c of contatos) {
+    const a = ajustes.find(x => x.chave && x.chave === c.chave);
+    if (a?.acao === 'remover') removidos.push({ ...c, ajusteId: a.id });
+    else if (a?.acao === 'corrigir' && a.numero) recebem.push({ ...c, numero: a.numero, origem: 'corrigido', ajusteId: a.id });
+    else recebem.push(c);
+  }
+  for (const a of ajustes.filter(x => x.acao === 'adicionar' && x.numero)) {
+    recebem.push({ chave: null, nome: a.nome ?? '', numero: a.numero!, ultimo: null, origem: 'manual', ajusteId: a.id });
+  }
+  const vistos = new Set<string>();
+  return { recebem: recebem.filter(c => !vistos.has(c.numero) && vistos.add(c.numero)), removidos };
 }
 
 const dataBr = (d: string) => d.split('-').reverse().join('/');
@@ -79,5 +125,6 @@ export function mensagemAlerta(a: { nome: string; posto: string; data: string | 
   return `${ola} Aqui é do Grupo 5 Estrelas.\n\n`
     + `Lembrete: o pedido de material de limpeza do posto *${a.posto}* ${quando}.\n\n`
     + (link ? `Faça o pedido por este link, com a sua matrícula ou CPF:\n${link}\n\n` : 'Faça o pedido pelo link do pedido de material, com a sua matrícula ou CPF.\n\n')
-    + 'Se já fez o pedido, pode desconsiderar esta mensagem.';
+    + 'Se já fez o pedido, pode desconsiderar esta mensagem.\n\n'
+    + '_Salve este número nos seus contatos para o link ficar clicável._';
 }
