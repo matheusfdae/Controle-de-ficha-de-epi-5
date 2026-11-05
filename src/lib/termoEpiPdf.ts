@@ -1,5 +1,6 @@
 import type { jsPDF as JsPDF } from 'jspdf';
 import logoUrl from '@/assets/logo-5estrelas-horizontal.png';
+import type { TermoColetivoFull } from '@/services/termoColetivoService';
 
 // PDF do Termo de Entrega de EPI no modelo da planilha "19. MODELO - Entrega EPI"
 // (Rev 00): logo, POSTO / MÊS / LÍDER, tabela Nome | Material | Qtd | Assinatura,
@@ -112,6 +113,13 @@ function rodape(doc: JsPDF, y: number, linhas: LinhaTermoPdf[]) {
   doc.setFont('helvetica', 'normal');
   for (const c of listaCas(linhas)) { y += 4.5; doc.text(c, M, y); }
 }
+
+/** Baixa o PDF de um termo coletivo do banco. */
+export const pdfDoTermoColetivo = ({ termo, itens }: TermoColetivoFull) => pdfTermoEntregaEpi({
+  posto: termo.posto, mes_referencia: termo.mes_referencia, lider: termo.lider ?? null,
+  linhas: itens.map(i => ({ colaborador_nome: i.colaborador_nome, material: i.material, ca: i.ca ?? null, quantidade: i.quantidade,
+    assinatura_url: i.assinatura_url ?? null, data_assinatura: i.data_assinatura ?? null })),
+});
 
 /** Gera o PDF do termo (uma ou mais páginas; completa com linhas em branco como a planilha). */
 export async function pdfTermoEntregaEpi(t: TermoPdf, baixar = true): Promise<JsPDF> {

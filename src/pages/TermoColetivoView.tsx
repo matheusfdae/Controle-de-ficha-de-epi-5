@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import SignaturePad from '@/components/SignaturePad';
 import BackButton from '@/components/BackButton';
 import { useConfirm } from '@/hooks/use-confirm';
-import { pdfTermoEntregaEpi } from '@/lib/termoEpiPdf';
+import { pdfDoTermoColetivo } from '@/lib/termoEpiPdf';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TermoOficialView from '@/components/TermoOficialView';
 import { assinarItemColetivo, finalizarTermo, getTermoColetivoFull, gerarTokenTermoItem, TermoColetivoFull } from '@/services/termoColetivoService';
@@ -87,11 +87,7 @@ export default function TermoColetivoView() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <BackButton />
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => pdfTermoEntregaEpi({
-              posto: termo.posto, mes_referencia: termo.mes_referencia, lider: termo.lider ?? null,
-              linhas: itens.map(i => ({ colaborador_nome: i.colaborador_nome, material: i.material, ca: i.ca ?? null, quantidade: i.quantidade,
-                assinatura_url: i.assinatura_url ?? null, data_assinatura: i.data_assinatura ?? null })),
-            }).catch(e => toast.error((e as Error).message))}><FileDown className="h-4 w-4 mr-1" /> Baixar PDF</Button>
+            <Button variant="outline" onClick={() => pdfDoTermoColetivo(data).catch(e => toast.error((e as Error).message))}><FileDown className="h-4 w-4 mr-1" /> Baixar PDF</Button>
             <Button variant="outline" onClick={startTablet} disabled={pendentes.length === 0}><Tablet className="h-4 w-4 mr-1" /> Assinar no tablet ({pendentes.length})</Button>
             <Button variant="default" onClick={finalizar} disabled={termo.status === 'finalizado'}>Finalizar</Button>
           </div>
