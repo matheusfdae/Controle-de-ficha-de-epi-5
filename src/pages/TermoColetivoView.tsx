@@ -10,6 +10,8 @@ import SignaturePad from '@/components/SignaturePad';
 import BackButton from '@/components/BackButton';
 import { useConfirm } from '@/hooks/use-confirm';
 import { pdfTermoEntregaEpi } from '@/lib/termoEpiPdf';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import TermoOficialView from '@/components/TermoOficialView';
 import { assinarItemColetivo, finalizarTermo, getTermoColetivoFull, gerarTokenTermoItem, TermoColetivoFull } from '@/services/termoColetivoService';
 
 export default function TermoColetivoView() {
@@ -112,6 +114,13 @@ export default function TermoColetivoView() {
         </CardContent>
       </Card>
 
+      <Tabs defaultValue="termo">
+        <TabsList>
+          <TabsTrigger value="termo">Visualizar termo</TabsTrigger>
+          <TabsTrigger value="linhas">Linhas e assinaturas</TabsTrigger>
+        </TabsList>
+        <TabsContent value="termo"><TermoOficialView termo={termo} itens={itens} /></TabsContent>
+        <TabsContent value="linhas">
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-base">Linhas</CardTitle></CardHeader>
         <CardContent className="overflow-x-auto">
@@ -162,6 +171,8 @@ export default function TermoColetivoView() {
           </table>
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={!!signing} onOpenChange={open => { if (!open) { setSigning(null); setSequencial(false); } }}>
         <DialogContent className="max-w-xl">

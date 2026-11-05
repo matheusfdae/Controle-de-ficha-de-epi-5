@@ -3,14 +3,22 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, FileSignature } from 'lucide-react';
-import { listTermosColetivos, TermoColetivo } from '@/services/termoColetivoService';
+import { Plus, FileSignature, Eye } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import TermoOficialView from '@/components/TermoOficialView';
+import { getTermoColetivoFull, listTermosColetivos, TermoColetivo, TermoColetivoFull } from '@/services/termoColetivoService';
 import BackButton from '@/components/BackButton';
 import PageHeader from '@/components/PageHeader';
 
 export default function TermosColetivos() {
   const [termos, setTermos] = useState<TermoColetivo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [vendo, setVendo] = useState<TermoColetivoFull | null>(null);
+
+  const visualizar = async (e: React.MouseEvent, id?: string) => {
+    e.preventDefault(); e.stopPropagation();
+    if (id) setVendo(await getTermoColetivoFull(id));
+  };
 
   useEffect(() => {
     listTermosColetivos().then(t => { setTermos(t); setLoading(false); });
@@ -38,7 +46,10 @@ export default function TermosColetivos() {
                         <FileSignature className="h-4 w-4" /> {t.posto} — {t.mes_referencia}
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="text-xs text-muted-foreground space-y-1">
+                    <CardContent className="text-xs text-muted-foreground space-y-1 relative">
+                      <Button size="sm" variant="outline" className="absolute right-4 bottom-3" onClick={e => visualizar(e, t.id)}>
+                        <Eye className="h-3.5 w-3.5 mr-1" /> Visualizar
+                      </Button>
                       <p>Líder: {t.lider || '—'}</p>
                       <p>Empresa: {t.empresa || '—'}</p>
                       <Badge variant={t.status === 'finalizado' ? 'default' : 'secondary'} className="mt-1">
@@ -52,6 +63,12 @@ export default function TermosColetivos() {
           )
         }
       </div>
+      <Dialog open={!!vendo} onOpenChange={o => { if (!o) setVendo(null); }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{vendo ? `${vendo.termo.posto} — ${vendo.termo.mes_referencia}` : ''}</DialogTitle></DialogHeader>
+          {vendo && <TermoOficialView termo={vendo.termo} itens={vendo.itens} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
