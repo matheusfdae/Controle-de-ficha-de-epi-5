@@ -512,6 +512,27 @@ export async function alertarPedidosWhatsApp(modo: 'simular' | 'agora' | 'posto'
   return data;
 }
 
+export interface TermoAberto {
+  pedido_id: string; codigo: string; posto: string; lider: string; numero: string | null; situacao: string;
+  ultimo_envio: string | null; lembretes: number;
+}
+async function chamarAvisos<T>(body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke('avisar-pedidos-material', { body });
+  if (error) {
+    let msg = '';
+    if ('context' in error) {
+      try { msg = (await (error.context as Response).json()).error; } catch { /* corpo não é JSON */ }
+    }
+    throw new Error(msg || error.message);
+  }
+  return data as T;
+}
+/** Pedidos atendidos com EPI cujo termo ainda não finalizou. */
+export const termosAbertos = () => chamarAvisos<{ termos: TermoAberto[] }>({ modo: 'termo_listar' }).then(r => r.termos);
+/** Manda agora o WhatsApp "Termo de EPI disponível" ao líder do pedido. */
+export const enviarAvisoTermo = (pedidoId: string) =>
+  chamarAvisos<{ enviado: boolean; motivo?: string; numero?: string }>({ modo: 'termo_enviar', pedido_id: pedidoId });
+
 export async function avisarAgora(): Promise<{ enviado: boolean; motivo?: string; emails?: number; pedidos?: number; sem_destinatario?: string[]; falhas?: string[] }> {
   const { data, error } = await supabase.functions.invoke('avisar-pedidos-material', { body: { modo: 'manual' } });
   if (error) {

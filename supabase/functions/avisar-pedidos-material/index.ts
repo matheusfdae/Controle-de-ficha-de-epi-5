@@ -11,17 +11,20 @@
 // Pedido com EPI que Compras atendeu avisa o líder (quem pediu) pelo WhatsApp que
 // o Termo de EPI está pronto para as assinaturas (uma vez: termo_whatsapp_avisado).
 // Enquanto o termo não finaliza, manda lembrete a cada 2 dias, até 3 vezes, só das
-// 8h às 18h (termo_whatsapp_em, termo_whatsapp_lembretes).
+// 8h às 18h (termo_whatsapp_em, termo_whatsapp_lembretes). Celular: o digitado pelo
+// líder no link do pedido; sem esse, o da Senior.
 // Segue o liga/desliga do alerta por WhatsApp e não depende dos e-mails.
 //
 //  * Agendador da VM (a cada 5 min): header x-cron-secret, corpo { modo: 'automatico' }.
 //  * Botão "Avisar agora" (Configurações de Pedidos): Bearer de quem edita o módulo.
+//  * Tela do aviso do termo: { modo: 'termo_listar' } lista os termos abertos e
+//    { modo: 'termo_enviar', pedido_id } manda o aviso daquele pedido na hora.
 
 import { verifyCaller, serviceClient, json, corsHeaders } from '../_shared/clerk.ts';
 import { enviarComo, ErroMicrosoft } from '../_shared/microsoft.ts';
 import { acessoParaEnviar } from '../_shared/contaMicrosoft.ts';
-import { agendarEnvios, contaWhatsApp, novoLote, numeroWhatsApp } from '../_shared/whatsapp.ts';
-import { LEMBRETE_MAX, lembreteTermoDevido, mensagemTermoEpi, type SituacaoTermo } from '../_shared/alertaPedido.ts';
+import { agendarEnvios, contaWhatsApp, ErroWhatsApp, novoLote, numeroWhatsApp } from '../_shared/whatsapp.ts';
+import { LEMBRETE_MAX, faltaNoTermo, lembreteTermoDevido, mensagemTermoEpi, type SituacaoTermo } from '../_shared/alertaPedido.ts';
 import {
   RESPONSAVEIS, agruparAvisos, avisaTeto, montarEmailAviso, montarEmailEpi, montarEmailTeto, passouTeto, type ItemAviso, type PedidoAviso,
 } from '../_shared/avisoPedidos.ts';
@@ -32,67 +35,114 @@ const inicioMesAnterior = (hoje: string) => {
   return new Date(Date.UTC(a, m - 2, 1)).toISOString().slice(0, 10);
 };
 
-async function avisarTermoEpi(admin: any) {
-  const { data: cfg } = await admin.from('pedido_config').select('alerta_whatsapp, link_sistema').eq('id', 1).maybeSingle();
-  if (cfg && cfg.alerta_whatsapp === false) return { enviado: false, motivo: 'alerta por WhatsApp desligado' };
-  const agora = new Date();
-  // Novos (nunca avisados) e candidatos a lembrete (avisados por aqui, ainda com lembrete sobrando).
-  const { data: brutos, error } = await admin.from('pedidos_material')
-    .select('id, codigo, solicitante_nome, solicitante_telefone, termo_whatsapp_avisado, termo_whatsapp_em, termo_whatsapp_lembretes, colaboradores_senior(telefone), postos(nome)')
-    .eq('status', 'atendida').eq('tem_epi', true)
-    .or(`termo_whatsapp_avisado.eq.false,and(termo_whatsapp_em.not.is.null,termo_whatsapp_lembretes.lt.${LEMBRETE_MAX})`)
-    .limit(500);
-  if (error) throw new Error(error.message);
-  const ids = (brutos ?? []).map((p: any) => p.id);
-  const { data: termos, error: eTermos } = ids.length
+const CAMPOS_TERMO = 'id, codigo, solicitante_nome, solicitante_telefone, termo_whatsapp_avisado, termo_whatsapp_em, termo_whatsapp_lembretes, colaboradores_senior(telefone), postos(nome)';
+
+/** Celular do líder: o que ele digitou no link do pedido; sem esse, o da Senior. */
+const celularDoLider = (p: any) => numeroWhatsApp(p.solicitante_telefone) ?? numeroWhatsApp(p.colaboradores_senior?.telefone);
+
+/** Situação do termo de cada pedido (linhas, assinadas, finalizado). */
+async function situacoes(admin: any, ids: string[]): Promise<(id: string) => SituacaoTermo | null> {
+  const { data: termos, error } = ids.length
     ? await admin.from('termos_epi_coletivos').select('pedido_id, status, termos_epi_coletivos_itens(data_assinatura)').in('pedido_id', ids)
     : { data: [], error: null };
-  if (eTermos) throw new Error(eTermos.message);
-  const situacao = (id: string): SituacaoTermo | null => {
+  if (error) throw new Error(error.message);
+  return (id: string) => {
     const t = (termos ?? []).find((x: any) => x.pedido_id === id);
     if (!t) return null;
     const ls = t.termos_epi_coletivos_itens ?? [];
     return { linhas: ls.length, assinadas: ls.filter((l: any) => l.data_assinatura).length, finalizado: t.status === 'finalizado' };
   };
-  const pedidos = (brutos ?? []).filter((p: any) => !p.termo_whatsapp_avisado || lembreteTermoDevido({
-    ultimoEnvio: p.termo_whatsapp_em, lembretes: p.termo_whatsapp_lembretes ?? 0, termo: situacao(p.id), agora,
-  }));
-  if (!pedidos.length) return { enviado: false, motivo: 'nenhum termo novo nem lembrete devido' };
+}
+
+/** Monta e agenda as mensagens (primeiro aviso ou lembrete, conforme `lembrete(p)`). */
+async function enviarTermo(admin: any, pedidos: any[], situacao: (id: string) => SituacaoTermo | null, lembrete: (p: any) => boolean, agora: Date) {
+  const { data: cfg } = await admin.from('pedido_config').select('link_sistema').eq('id', 1).maybeSingle();
   const { data: itens } = await admin.from('pedidos_material_itens')
     .select('pedido_id, quantidade, quantidade_atendida, materiais!inner(nome, unidade, is_epi)')
     .in('pedido_id', pedidos.map((p: any) => p.id)).eq('materiais.is_epi', true);
-
   const envios: { nome: string; numero: string; texto: string }[] = [];
   const semCelular: string[] = [];
-  for (const p of pedidos as any[]) {
-    // Celular da Senior primeiro; sem celular lá, o digitado no link do pedido.
-    const numero = numeroWhatsApp(p.colaboradores_senior?.telefone) ?? numeroWhatsApp(p.solicitante_telefone);
+  for (const p of pedidos) {
+    const numero = celularDoLider(p);
     if (!numero) { semCelular.push(p.codigo); continue; }
     const epis = (itens ?? []).filter((i: any) => i.pedido_id === p.id)
       .map((i: any) => `${Number(i.quantidade_atendida ?? i.quantidade)} ${i.materiais.unidade} ${i.materiais.nome}`);
     envios.push({ nome: p.solicitante_nome || p.codigo, numero,
       texto: mensagemTermoEpi({ nome: p.solicitante_nome ?? '', codigo: p.codigo, posto: p.postos?.nome ?? '—', epis, link: cfg?.link_sistema ?? null,
-        lembrete: p.termo_whatsapp_avisado ? { termo: situacao(p.id) } : null }) });
+        lembrete: lembrete(p) ? { termo: situacao(p.id) } : null }) });
   }
   const r = envios.length ? await agendarEnvios(await contaWhatsApp(admin), envios, 30, novoLote(agora, 'termo-epi')) : null;
+  return { r, semCelular, numeros: envios.map(e => e.numero) };
+}
+
+async function avisarTermoEpi(admin: any) {
+  const { data: cfg } = await admin.from('pedido_config').select('alerta_whatsapp').eq('id', 1).maybeSingle();
+  if (cfg && cfg.alerta_whatsapp === false) return { enviado: false, motivo: 'alerta por WhatsApp desligado' };
+  const agora = new Date();
+  // Novos (nunca avisados) e candidatos a lembrete (avisados por aqui, ainda com lembrete sobrando).
+  const { data: brutos, error } = await admin.from('pedidos_material').select(CAMPOS_TERMO)
+    .eq('status', 'atendida').eq('tem_epi', true)
+    .or(`termo_whatsapp_avisado.eq.false,and(termo_whatsapp_em.not.is.null,termo_whatsapp_lembretes.lt.${LEMBRETE_MAX})`)
+    .limit(500);
+  if (error) throw new Error(error.message);
+  const situacao = await situacoes(admin, (brutos ?? []).map((p: any) => p.id));
+  const pedidos = (brutos ?? []).filter((p: any) => !p.termo_whatsapp_avisado || lembreteTermoDevido({
+    ultimoEnvio: p.termo_whatsapp_em, lembretes: p.termo_whatsapp_lembretes ?? 0, termo: situacao(p.id), agora,
+  }));
+  if (!pedidos.length) return { enviado: false, motivo: 'nenhum termo novo nem lembrete devido' };
+
+  const { r, semCelular } = await enviarTermo(admin, pedidos, situacao, (p: any) => p.termo_whatsapp_avisado, agora);
   // Marca todos (sem celular ou sem WhatsApp também: não fica tentando a cada 5 min).
   // Sem celular no primeiro aviso, não entra nos lembretes (termo_whatsapp_em fica vazio).
   const novos = pedidos.filter((p: any) => !p.termo_whatsapp_avisado);
-  const comCelular = (p: any) => !semCelular.includes(p.codigo);
   for (const p of pedidos as any[]) {
     await admin.from('pedidos_material').update(p.termo_whatsapp_avisado
       ? { termo_whatsapp_em: agora.toISOString(), termo_whatsapp_lembretes: (p.termo_whatsapp_lembretes ?? 0) + 1 }
-      : { termo_whatsapp_avisado: true, termo_whatsapp_em: comCelular(p) ? agora.toISOString() : null }).eq('id', p.id);
+      : { termo_whatsapp_avisado: true, termo_whatsapp_em: semCelular.includes(p.codigo) ? null : agora.toISOString() }).eq('id', p.id);
   }
   return { enviado: (r?.agendados ?? 0) > 0, agendados: r?.agendados ?? 0, novos: novos.length, lembretes: pedidos.length - novos.length,
     sem_whatsapp: r?.semWhatsApp ?? [], sem_celular: semCelular };
 }
 
+/** Tela: pedidos atendidos com EPI cujo termo ainda não finalizou (para mandar o aviso à mão). */
+async function listarTermos(admin: any) {
+  const { data: brutos, error } = await admin.from('pedidos_material').select(CAMPOS_TERMO)
+    .eq('status', 'atendida').eq('tem_epi', true).order('ano', { ascending: false }).order('numero', { ascending: false }).limit(200);
+  if (error) throw new Error(error.message);
+  const situacao = await situacoes(admin, (brutos ?? []).map((p: any) => p.id));
+  return {
+    termos: (brutos ?? []).filter((p: any) => !situacao(p.id)?.finalizado).map((p: any) => ({
+      pedido_id: p.id, codigo: p.codigo, posto: p.postos?.nome ?? '—', lider: p.solicitante_nome ?? '',
+      numero: celularDoLider(p), situacao: faltaNoTermo(situacao(p.id)).replace(/\*/g, ''),
+      ultimo_envio: p.termo_whatsapp_em, lembretes: p.termo_whatsapp_lembretes ?? 0,
+    })),
+  };
+}
+
+/** Botão da tela: manda o aviso do termo deste pedido agora (não conta como lembrete automático). */
+async function enviarTermoAgora(admin: any, pedidoId: string) {
+  const { data: p, error } = await admin.from('pedidos_material').select(CAMPOS_TERMO + ', status, tem_epi').eq('id', pedidoId).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!p) return { enviado: false, motivo: 'pedido não encontrado' };
+  if (p.status !== 'atendida' || !p.tem_epi) return { enviado: false, motivo: 'o termo só existe em pedido com EPI já atendido' };
+  const situacao = await situacoes(admin, [p.id]);
+  if (situacao(p.id)?.finalizado) return { enviado: false, motivo: 'o termo deste pedido já foi finalizado' };
+  const agora = new Date();
+  // Termo já começado (ou já avisado): vai como lembrete, dizendo o que falta.
+  const { r, semCelular, numeros } = await enviarTermo(admin, [p], situacao, (x: any) => x.termo_whatsapp_avisado || !!situacao(x.id), agora);
+  if (semCelular.length) return { enviado: false, motivo: 'o líder não tem celular: nem digitado no link do pedido, nem na Senior' };
+  if (r?.semWhatsApp.length) return { enviado: false, motivo: `o número ${numeros[0]} não tem WhatsApp` };
+  await admin.from('pedidos_material').update({ termo_whatsapp_avisado: true, termo_whatsapp_em: agora.toISOString() }).eq('id', p.id);
+  return { enviado: true, numero: numeros[0], termina: r?.termina ?? null };
+}
+
 /** O aviso do termo não derruba os e-mails (nem o contrário). */
 async function avisarTudo(admin: any) {
-  let termo: unknown;
+  let termo: any;
   try { termo = await avisarTermoEpi(admin); } catch (e) { termo = { erro: e instanceof Error ? e.message : String(e) }; }
-  return { ...(await avisar(admin)), termo_epi_whatsapp: termo };
+  const emails = await avisar(admin);
+  // "enviado" no topo também conta o WhatsApp (e o erro dele): o agendador só grava no log o que não é "enviado":false.
+  return { ...emails, enviado: emails.enviado || !!termo?.enviado || !!termo?.erro, termo_epi_whatsapp: termo };
 }
 
 async function avisar(admin: any) {
@@ -238,9 +288,15 @@ Deno.serve(async (req) => {
     if (!caller) return json({ error: 'Não autenticado' }, 401);
     const { data: pode } = await admin.rpc('has_permission', { _user_id: caller.profileId, _module: 'pedidos_material', _action: 'edit' });
     if (pode !== true) return json({ error: 'Sem permissão para configurar os pedidos' }, 403);
+    const corpo = await req.json().catch(() => ({}));
+    if (corpo.modo === 'termo_listar') return json(await listarTermos(admin));
+    if (corpo.modo === 'termo_enviar') {
+      if (!/^[0-9a-f-]{36}$/.test(String(corpo.pedido_id ?? ''))) return json({ error: 'Informe o pedido' }, 400);
+      return json(await enviarTermoAgora(admin, String(corpo.pedido_id)));
+    }
     return json(await avisarTudo(admin));
   } catch (e) {
-    if (e instanceof ErroMicrosoft) return json({ error: e.message }, 502);
+    if (e instanceof ErroMicrosoft || e instanceof ErroWhatsApp) return json({ error: e.message }, 502);
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
   }
 });

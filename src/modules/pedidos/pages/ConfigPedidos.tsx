@@ -25,6 +25,7 @@ import {
 import ImportarPlanilha from '../components/ImportarPlanilha';
 import ImportarPrecos from '../components/ImportarPrecos';
 import ContatosAlerta from '../components/ContatosAlerta';
+import AvisoTermoEpi from '../components/AvisoTermoEpi';
 import { DIAS_CONTATOS, proximaPrevista } from '../../../../supabase/functions/_shared/alertaPedido';
 
 /** "12,90" / "1.234,5" -> 12.9; vazio -> null; inválido -> NaN. */
@@ -594,6 +595,8 @@ function Avisos({ podeEditar }: { podeEditar: boolean }) {
         </>}
       </CardContent>
     </Card>
+
+    <AvisoTermoEpi podeEditar={podeEditar} />
     </div>
   );
 }
