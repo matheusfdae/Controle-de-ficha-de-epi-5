@@ -143,3 +143,30 @@ export async function finalizarTermo(id: string): Promise<void> {
 export async function deletarTermo(id: string): Promise<void> {
   await supabase.from('termos_epi_coletivos').delete().eq('id', id);
 }
+
+/** Termo resumido para a consulta: assinaturas, EPIs e o estado (do pedido de material, quando houver). */
+export interface TermoResumo {
+  id: string; posto: string; mes_referencia: string; lider: string | null; status: string; criado_em: string;
+  uf: string | null; codigo: string | null; linhas: number; assinadas: number; epis_assinados: number; colaboradores: string[];
+}
+
+export async function listTermosResumo(): Promise<TermoResumo[]> {
+  const { data, error } = await supabase
+    .from('termos_epi_coletivos')
+    .select('id, posto, mes_referencia, lider, status, created_at, pedidos_material(uf, codigo), termos_epi_coletivos_itens(colaborador_nome, quantidade, data_assinatura)')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  type Linha = { colaborador_nome: string; quantidade: number; data_assinatura: string | null };
+  type Bruto = { id: string; posto: string; mes_referencia: string; lider: string | null; status: string; created_at: string;
+    pedidos_material: { uf: string | null; codigo: string | null } | null; termos_epi_coletivos_itens: Linha[] | null };
+  return ((data ?? []) as unknown as Bruto[]).map(t => {
+    const ls = t.termos_epi_coletivos_itens ?? [];
+    const feitas = ls.filter(l => l.data_assinatura);
+    return {
+      id: t.id, posto: t.posto, mes_referencia: t.mes_referencia, lider: t.lider, status: t.status, criado_em: t.created_at,
+      uf: t.pedidos_material?.uf ?? null, codigo: t.pedidos_material?.codigo ?? null,
+      linhas: ls.length, assinadas: feitas.length, epis_assinados: feitas.reduce((s, l) => s + (l.quantidade || 0), 0),
+      colaboradores: ls.map(l => l.colaborador_nome),
+    };
+  });
+}
