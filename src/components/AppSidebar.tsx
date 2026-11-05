@@ -71,7 +71,7 @@ const adminItems: Array<{ title: string; guia: string; url: string; icon: typeof
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const { user, logout, isAdmin, can } = useAuth();
   const [assinaturaAberta, setAssinaturaAberta] = useState(false);
   const [master, setMaster] = useState(false);
@@ -79,6 +79,13 @@ export function AppSidebar() {
 
   const isActive = (path: string, end?: boolean) =>
     end ? pathname === path : pathname === path || pathname.startsWith(path + '/');
+  // Itens de EPI e de Uniforme dividem a rota (?tipo=epi|uniforme): só acende o do tipo aberto.
+  const tipoAberto = new URLSearchParams(search).get('tipo') === 'uniforme' ? 'uniforme' : 'epi';
+  const isActiveTipo = (url: string, end?: boolean) => {
+    const [path, query] = url.split('?');
+    const tipo = new URLSearchParams(query).get('tipo');
+    return isActive(path, end) && (!tipo || tipo === tipoAberto);
+  };
 
   const visibleBaseItems = baseItems.filter(i => can(i.module, 'view'));
   const visibleEpiItems = epiItems.filter(i => !i.module || can(i.module, i.action ?? 'view'));
@@ -146,7 +153,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {visibleEpiItems.map(item => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url.split('?')[0], item.end)} tooltip={item.title}>
+                  <SidebarMenuButton asChild isActive={isActiveTipo(item.url, item.end)} tooltip={item.title}>
                     <NavLink to={item.url} end={item.end} data-guia={item.guia} className="flex items-center gap-2.5">
                       <item.icon className="h-4 w-4" />
                       {!collapsed && <span className="text-sm">{item.title}</span>}
@@ -164,7 +171,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {visibleUniformeItems.map(item => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url.split('?')[0], item.end)} tooltip={item.title}>
+                  <SidebarMenuButton asChild isActive={isActiveTipo(item.url, item.end)} tooltip={item.title}>
                     <NavLink to={item.url} end={item.end} data-guia={item.guia} className="flex items-center gap-2.5">
                       <item.icon className="h-4 w-4" />
                       {!collapsed && <span className="text-sm">{item.title}</span>}
