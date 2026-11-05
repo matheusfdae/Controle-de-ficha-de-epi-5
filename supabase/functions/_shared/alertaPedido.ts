@@ -141,14 +141,47 @@ export function mensagemAlerta(a: {
     + '_Salve este número nos seus contatos para o link ficar clicável._';
 }
 
-/** Aviso ao líder: pedido com EPI atendido, o Termo de EPI está pronto para as assinaturas. */
-export function mensagemTermoEpi(a: { nome: string; codigo: string; posto: string; epis: string[]; link: string | null }): string {
+/** Lembrete do Termo de EPI: a cada LEMBRETE_DIAS dias, no máximo LEMBRETE_MAX vezes, só em horário comercial. */
+export const LEMBRETE_DIAS = 2;
+export const LEMBRETE_MAX = 3;
+const HORARIO_LEMBRETE = { de: 8, ate: 18 }; // horas de Brasília
+
+/** Situação do termo para o lembrete: sem termo/linhas, assinaturas faltando ou quantidade faltando. */
+export interface SituacaoTermo { linhas: number; assinadas: number; finalizado: boolean }
+
+/** Hora (0–23) em Brasília. */
+export const horaBrasilia = (agora: Date) => Number(agora.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', hour: 'numeric', hourCycle: 'h23' }));
+
+/** O pedido (já avisado uma vez) deve receber outro lembrete agora? */
+export function lembreteTermoDevido(a: { ultimoEnvio: string | null; lembretes: number; termo: SituacaoTermo | null; agora: Date }): boolean {
+  if (!a.ultimoEnvio || a.lembretes >= LEMBRETE_MAX || a.termo?.finalizado) return false;
+  const h = horaBrasilia(a.agora);
+  if (h < HORARIO_LEMBRETE.de || h >= HORARIO_LEMBRETE.ate) return false;
+  return a.agora.getTime() - Date.parse(a.ultimoEnvio) >= LEMBRETE_DIAS * 864e5;
+}
+
+/** O que falta no termo, para o lembrete. */
+export function faltaNoTermo(t: SituacaoTermo | null): string {
+  if (!t || t.linhas === 0) return 'ainda não tem nenhum colaborador';
+  const faltam = t.linhas - t.assinadas;
+  if (faltam > 0) return `ainda tem *${faltam} assinatura${faltam > 1 ? 's' : ''}* faltando`;
+  return 'ainda não tem a quantidade entregue inteira distribuída';
+}
+
+/** Aviso ao líder: pedido com EPI atendido, o Termo de EPI está pronto para as assinaturas (ou lembrete). */
+export function mensagemTermoEpi(a: {
+  nome: string; codigo: string; posto: string; epis: string[]; link: string | null; lembrete?: { termo: SituacaoTermo | null } | null;
+}): string {
   const ola = primeiroNome(a.nome) ? `Olá, ${primeiroNome(a.nome)}!` : 'Olá!';
   const link = a.link ? `${a.link.replace(/\/+$/, '')}/pedido-material` : null;
+  const corpo = a.lembrete
+    ? `*Lembrete:* o Termo de EPI do pedido *${a.codigo}* do posto *${a.posto}* ${faltaNoTermo(a.lembrete.termo)}.\n\n`
+      + 'Entregue o EPI e colha a assinatura de cada colaborador para concluir o termo.\n\n'
+    : `O pedido *${a.codigo}* do posto *${a.posto}* foi atendido e tem EPI`
+      + (a.epis.length ? ` (${a.epis.join(', ')})` : '') + '.\n\n'
+      + 'O *Termo de EPI* já está disponível: entregue o EPI e colha a assinatura de cada colaborador.\n\n';
   return `${ola} Aqui é do Grupo 5 Estrelas.\n\n`
-    + `O pedido *${a.codigo}* do posto *${a.posto}* foi atendido e tem EPI`
-    + (a.epis.length ? ` (${a.epis.join(', ')})` : '') + '.\n\n'
-    + 'O *Termo de EPI* já está disponível: entregue o EPI e colha a assinatura de cada colaborador.\n\n'
+    + corpo
     + (link ? `Abra por este link, com a sua matrícula ou CPF, na aba *Termo de EPI*:\n${link}\n\n`
       : 'Abra o link do pedido de material, com a sua matrícula ou CPF, na aba *Termo de EPI*.\n\n')
     + '_Salve este número nos seus contatos para o link ficar clicável._';
