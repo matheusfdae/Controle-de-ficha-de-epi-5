@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { alertaDeHoje, aplicarAjustes, contatosDoPosto, jaPediu, mensagemAlerta, mensagemTermoEpi, previstaNoMes, proximaPrevista, ultimoPedido } from '../../supabase/functions/_shared/alertaPedido';
+import { alertaDeHoje, aplicarAjustes, contatosDoPosto, faltaNoTermo, jaPediu, lembreteTermoDevido, mensagemAlerta, mensagemTermoEpi, previstaNoMes, proximaPrevista, ultimoPedido } from '../../supabase/functions/_shared/alertaPedido';
 
 describe('data prevista', () => {
   it('mês mais curto usa o último dia', () => {
@@ -97,5 +97,26 @@ describe('mensagem', () => {
     expect(m).toContain('Olá, Armando!');
     expect(m).toContain('*SOL-2026-000774* do posto *CNI* foi atendido e tem EPI (10 un LUVA)');
     expect(m).toContain('https://sistema.exemplo/pedido-material');
+  });
+
+  it('lembrete do Termo de EPI: a cada 2 dias, até 3 vezes, em horário comercial, enquanto não finaliza', () => {
+    const agora = new Date('2026-11-09T13:00:00Z'); // 10h em Brasília
+    const termo = { linhas: 2, assinadas: 1, finalizado: false };
+    const base = { ultimoEnvio: '2026-11-07T12:00:00Z', lembretes: 0, termo, agora };
+    expect(lembreteTermoDevido(base)).toBe(true);
+    expect(lembreteTermoDevido({ ...base, ultimoEnvio: '2026-11-08T12:00:00Z' })).toBe(false); // só 1 dia
+    expect(lembreteTermoDevido({ ...base, lembretes: 3 })).toBe(false);
+    expect(lembreteTermoDevido({ ...base, termo: { ...termo, finalizado: true } })).toBe(false);
+    expect(lembreteTermoDevido({ ...base, ultimoEnvio: null })).toBe(false); // nunca avisado (atendido antes do aviso existir)
+    expect(lembreteTermoDevido({ ...base, agora: new Date('2026-11-09T23:30:00Z') })).toBe(false); // 20h30
+    expect(lembreteTermoDevido({ ...base, termo: null })).toBe(true); // termo nem começado
+  });
+
+  it('lembrete do Termo de EPI: diz o que falta', () => {
+    expect(faltaNoTermo(null)).toBe('ainda não tem nenhum colaborador');
+    expect(faltaNoTermo({ linhas: 3, assinadas: 1, finalizado: false })).toBe('ainda tem *2 assinaturas* faltando');
+    expect(faltaNoTermo({ linhas: 2, assinadas: 2, finalizado: false })).toBe('ainda não tem a quantidade entregue inteira distribuída');
+    const m = mensagemTermoEpi({ nome: 'Ana', codigo: 'SOL-1', posto: 'CNI', epis: [], link: null, lembrete: { termo: { linhas: 2, assinadas: 1, finalizado: false } } });
+    expect(m).toContain('*Lembrete:* o Termo de EPI do pedido *SOL-1* do posto *CNI* ainda tem *1 assinatura* faltando.');
   });
 });
