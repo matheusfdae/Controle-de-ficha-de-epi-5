@@ -64,6 +64,7 @@ MIGRACOES=(
   "20261104140000_pedidos_preco_anterior.sql|SELECT to_regprocedure('public.pedido_precos_anteriores(uuid)') IS NOT NULL"
   "20261105120000_alerta_pedido_whatsapp.sql|SELECT to_regclass('public.pedido_alertas_whatsapp') IS NOT NULL"
   "20261105130000_alerta_contatos.sql|SELECT to_regclass('public.pedido_alerta_contatos') IS NOT NULL"
+  "20261105140000_master.sql|SELECT to_regclass('public.master_lixeira_lotes') IS NOT NULL"
 )
 # A ordem acima é a ordem em que as pendentes são aplicadas: sempre da mais antiga para a mais nova.
 PENDENTES=()

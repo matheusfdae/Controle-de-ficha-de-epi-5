@@ -53,6 +53,7 @@ const Pedidos             = lazy(() => import('./modules/pedidos/pages/Pedidos')
 const PedidosGerencial    = lazy(() => import('./modules/pedidos/pages/PainelGerencial'));
 const PedidosEstoque      = lazy(() => import('./modules/pedidos/pages/EstoquePosto'));
 const PedidosDoPosto      = lazy(() => import('./modules/pedidos/pages/PedidosDoPosto'));
+const Master              = lazy(() => import('./modules/master/pages/Master'));
 const PedidosConfig       = lazy(() => import('./modules/pedidos/pages/ConfigPedidos'));
 
 const queryClient = new QueryClient({
@@ -139,6 +140,7 @@ function AppRoutes() {
           <Route path="/rank-postos"  element={<RequireModule module="rank"><RankPostos /></RequireModule>} />
           <Route path="/configuracoes" element={<RequireModule module="configuracoes"><Configuracoes /></RequireModule>} />
           <Route path="/usuarios"     element={<AdminRoute><Usuarios /></AdminRoute>} />
+          <Route path="/master"       element={<Master />} />
           <Route path="/convites"     element={<Convites />} />
           <Route path="/estoque"      element={<RequireModule module="estoque"><Estoque /></RequireModule>} />
           <Route path="/estoque/entrada" element={<RequireModule module="estoque" action="create"><EntradaEstoque /></RequireModule>} />

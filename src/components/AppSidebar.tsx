@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FilePlus2, Search, CalendarClock, Settings, ShieldCheck, LogOut, Users, Package, Briefcase, UserPlus, ClipboardSignature, HardHat, Shirt, FileSignature, MapPin, FileStack,
-  IdCard, Palette, Printer, History, BarChart3, Inbox, PenTool, ShoppingCart, ClipboardList, Gauge, Warehouse,
+  IdCard, Palette, Printer, History, BarChart3, Inbox, PenTool, ShoppingCart, ClipboardList, Gauge, Warehouse, ShieldAlert,
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import MinhaAssinatura from '@/components/MinhaAssinatura';
 import { supabase } from '@/integrations/supabase/client';
 import { minhasPendencias } from '@/modules/pedidos/lib/pedidosService';
+import { souMaster } from '@/modules/master/lib/masterService';
 
 const baseItems: Array<{ title: string; guia: string; url: string; icon: typeof LayoutDashboard; end: boolean; module: ModuleId }> = [
   { title: 'Dashboard', guia: 'menu-dashboard', url: '/', icon: LayoutDashboard, end: true, module: 'dashboard' },
@@ -73,6 +74,8 @@ export function AppSidebar() {
   const { pathname } = useLocation();
   const { user, logout, isAdmin, can } = useAuth();
   const [assinaturaAberta, setAssinaturaAberta] = useState(false);
+  const [master, setMaster] = useState(false);
+  useEffect(() => { if (isAdmin) souMaster().then(setMaster); }, [isAdmin]);
 
   const isActive = (path: string, end?: boolean) =>
     end ? pathname === path : pathname === path || pathname.startsWith(path + '/');
@@ -237,6 +240,16 @@ export function AppSidebar() {
                       <NavLink to="/usuarios" data-guia="menu-usuarios" className="flex items-center gap-2.5">
                         <Users className="h-4 w-4" />
                         {!collapsed && <span className="text-sm">Usuários</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+                {master && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={isActive('/master', false)} tooltip="Master">
+                      <NavLink to="/master" className="flex items-center gap-2.5 text-destructive">
+                        <ShieldAlert className="h-4 w-4" />
+                        {!collapsed && <span className="text-sm">Master</span>}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
