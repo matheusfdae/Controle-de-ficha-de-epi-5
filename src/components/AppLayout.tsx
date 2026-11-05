@@ -11,6 +11,7 @@ const titles: Record<string, string> = {
   '/': 'Dashboard',
   '/nova-ficha': 'Nova Ficha',
   '/consultar': 'Consultar Fichas',
+  '/termos-epi': 'Consultar Termos EPI',
   '/colaboradores': 'Colaboradores Senior',
   '/vencimentos': 'Controle de Vencimentos',
   '/configuracoes': 'Configurações',

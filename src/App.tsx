@@ -34,6 +34,7 @@ const Integracao          = lazy(() => import('./pages/Integracao'));
 const TermosColetivos     = lazy(() => import('./pages/TermosColetivos'));
 const TermoColetivoNovo   = lazy(() => import('./pages/TermoColetivoNovo'));
 const TermoColetivoView   = lazy(() => import('./pages/TermoColetivoView'));
+const ConsultarTermosEpi  = lazy(() => import('./pages/ConsultarTermosEpi'));
 const AssinarTermoColetivo = lazy(() => import('./pages/AssinarTermoColetivo'));
 const NotFound            = lazy(() => import('./pages/NotFound'));
 // Módulo Crachás
@@ -150,6 +151,7 @@ function AppRoutes() {
           <Route path="/postos" element={<RequireModule module="configuracoes"><Postos /></RequireModule>} />
           <Route path="/integracao"   element={<RequireModule module="integracao"><Integracao /></RequireModule>} />
           <Route path="/termos-coletivos" element={<RequireModule module="termos_coletivos"><TermosColetivos /></RequireModule>} />
+          <Route path="/termos-epi" element={<RequireModule module="termos_coletivos"><ConsultarTermosEpi /></RequireModule>} />
           <Route path="/termo-coletivo/novo" element={<RequireModule module="termos_coletivos" action="create"><TermoColetivoNovo /></RequireModule>} />
           <Route path="/termo-coletivo/:id" element={<RequireModule module="termos_coletivos"><TermoColetivoView /></RequireModule>} />
           <Route path="/crachas"               element={<RequireModule module="crachas"><CrachasPainel /></RequireModule>} />
