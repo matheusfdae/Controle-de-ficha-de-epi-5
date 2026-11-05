@@ -200,9 +200,9 @@ const PedidoMaterialPublico = () => {
   };
 
   const catalogo = useMemo(() => catalogoDoPosto(dados?.materiais ?? [], dados?.postos.find(p => p.id === postoId)), [dados, postoId]);
-  const pedidosEpi = useMemo(() => (dados?.pedidos ?? []).filter(p => p.tem_epi && p.status !== 'cancelada'), [dados]);
+  const pedidosEpi = useMemo(() => (dados?.pedidos ?? []).filter(p => p.tem_epi && p.status === 'atendida'), [dados]);
   // Pedidos com EPI entregue e assinatura faltando: o número aparece na aba.
-  const termosPendentes = pedidosEpi.filter(p => p.status === 'atendida' && (!p.termo?.linhas || p.termo.linhas > p.termo.assinadas)).length;
+  const termosPendentes = pedidosEpi.filter(p => !p.termo?.linhas || p.termo.linhas > p.termo.assinadas).length;
   const pedidoEnviado = enviado ? dados?.pedidos.find(p => p.codigo === enviado.codigo) : undefined;
   const comLista = dados?.postos.find(p => p.id === postoId)?.itens != null && catalogo.length > 0;
   const noPedido = linhas.filter(l => l.material_id && l.quantidade.trim()).length;
@@ -372,9 +372,8 @@ const PedidoMaterialPublico = () => {
                         <div className="rounded-md border border-amber-500/60 bg-amber-500/10 p-3 text-sm text-left space-y-2">
                           <p className="flex items-center gap-1.5 font-medium"><HardHat className="h-4 w-4 text-amber-600" /> Este pedido tem EPI</p>
                           <p className="text-muted-foreground">
-                            O Termo de EPI já foi criado. Monte agora quem vai receber cada EPI; as assinaturas liberam quando o EPI for entregue.
+                            Quando Compras atender o pedido, o Termo de EPI aparece na aba <b>Termo de EPI</b> para você colher as assinaturas.
                           </p>
-                          <Button className="w-full gap-1" onClick={() => setTermoDe(pedidoEnviado)}><HardHat className="h-4 w-4" /> Abrir Termo de EPI</Button>
                         </div>
                       )}
                       <div className="flex justify-center gap-2 flex-wrap">
@@ -496,7 +495,7 @@ const PedidoMaterialPublico = () => {
               <TabsContent value="termo" className="mt-4 space-y-3">
                 {pedidosEpi.length === 0 && (
                   <p className="text-center text-sm text-muted-foreground py-8">
-                    Nenhum pedido com EPI. Quando você pedir um item com <HardHat className="inline h-3.5 w-3.5 text-amber-600" />, o termo aparece aqui.
+                    Nenhum termo para assinar. Quando Compras atender um pedido com <HardHat className="inline h-3.5 w-3.5 text-amber-600" />, o termo aparece aqui.
                   </p>
                 )}
                 {pedidosEpi.map(p => {
@@ -516,12 +515,11 @@ const PedidoMaterialPublico = () => {
                             <li key={i.material_id}>{formatarNumero(i.quantidade_atendida ?? i.quantidade)} {i.unidade} · {i.nome}</li>
                           ))}
                         </ul>
-                        <p className={`text-xs ${p.status === 'atendida' && (falta > 0 || !p.termo?.linhas) ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}>
+                        <p className={`text-xs ${falta > 0 || !p.termo?.linhas ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}>
                           {!p.termo?.linhas ? 'Termo ainda sem colaboradores.'
                             : `${p.termo.assinadas} de ${p.termo.linhas} assinaturas.`}
-                          {p.status !== 'atendida' && ' As assinaturas liberam quando o EPI for entregue.'}
                         </p>
-                        <Button size="sm" className="gap-1" variant={p.status === 'atendida' && (falta > 0 || !p.termo?.linhas) ? 'default' : 'outline'}
+                        <Button size="sm" className="gap-1" variant={falta > 0 || !p.termo?.linhas ? 'default' : 'outline'}
                           onClick={() => setTermoDe(p)}>
                           <HardHat className="h-4 w-4" /> Abrir termo
                         </Button>
@@ -601,8 +599,8 @@ function CartaoPedido({ p, carregando, catalogo, quem, onTermoFechado, onCancela
           </div>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {p.tem_epi && p.status !== 'cancelada' && (
-              <Button size="sm" variant={p.status === 'atendida' && (pendentes > 0 || !p.termo?.linhas) ? 'default' : 'outline'} className="gap-1"
+            {p.tem_epi && p.status === 'atendida' && (
+              <Button size="sm" variant={pendentes > 0 || !p.termo?.linhas ? 'default' : 'outline'} className="gap-1"
                 onClick={() => setTermoAberto(true)}>
                 <HardHat className="h-4 w-4" /> Termo de EPI
                 {p.termo?.linhas ? <span className="text-xs opacity-80">({p.termo.assinadas}/{p.termo.linhas} assinadas)</span> : null}
@@ -618,8 +616,8 @@ function CartaoPedido({ p, carregando, catalogo, quem, onTermoFechado, onCancela
             )}
           </div>
         )}
-        {p.tem_epi && p.status === 'atendida' && pendentes > 0 && (
-          <p className="text-xs text-amber-700 dark:text-amber-400">EPI entregue: colete as assinaturas do Termo de EPI ({pendentes} faltando).</p>
+        {p.tem_epi && p.status === 'atendida' && (pendentes > 0 || !p.termo?.linhas) && (
+          <p className="text-xs text-amber-700 dark:text-amber-400">EPI entregue: colete as assinaturas do Termo de EPI{pendentes > 0 ? ` (${pendentes} faltando)` : ''}.</p>
         )}
       </CardContent>
       {termoAberto && (

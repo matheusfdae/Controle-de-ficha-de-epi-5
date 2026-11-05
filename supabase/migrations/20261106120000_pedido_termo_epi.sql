@@ -3,7 +3,8 @@
 --   * o encarregado, pelo link do pedido (matrícula/CPF), monta quem recebe o quê
 --     (colaborador buscado pelo nome na Senior);
 --   * a soma por item não passa da quantidade do pedido (atendida, depois da entrega);
---   * as assinaturas só abrem quando o pedido está atendido (EPI chegou): o
+--   * o termo só abre com o pedido atendido (EPI chegou) e só assina com a
+--     quantidade entregue inteira distribuída: o
 --     colaborador assina no celular do encarregado ou pelo link
 --     /assinar-termo-coletivo/:token (o mesmo dos termos coletivos).
 -- materiais.ca guarda o CA do EPI (sai no termo).
@@ -24,6 +25,8 @@ BEGIN
   SELECT * INTO _p FROM pedidos_material WHERE id = _pedido_id AND solicitante_senior_id = _s.id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Pedido não encontrado.'; END IF;
   IF _p.status = 'cancelada' THEN RAISE EXCEPTION 'Este pedido foi cancelado.'; END IF;
+  -- O termo só existe depois que Compras atende o pedido (EPI entregue).
+  IF _p.status <> 'atendida' THEN RAISE EXCEPTION 'O Termo de EPI abre quando Compras atender o pedido.'; END IF;
   IF NOT EXISTS (SELECT 1 FROM pedidos_material_itens i JOIN materiais m ON m.id = i.material_id WHERE i.pedido_id = _p.id AND m.is_epi) THEN
     RAISE EXCEPTION 'Este pedido não tem item de EPI.';
   END IF;
@@ -161,7 +164,7 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   _l public.termos_epi_coletivos_itens;
   _p public.pedidos_material;
-  _i public.pedidos_material_itens;
+  _falta text;
 BEGIN
   SELECT l.* INTO _l FROM termos_epi_coletivos_itens l JOIN termos_epi_coletivos t ON t.id = l.termo_id
   JOIN pedidos_material p ON p.id = t.pedido_id
@@ -170,9 +173,10 @@ BEGIN
   SELECT p.* INTO _p FROM pedidos_material p JOIN termos_epi_coletivos t ON t.pedido_id = p.id WHERE t.id = _l.termo_id;
   IF _p.status <> 'atendida' THEN RAISE EXCEPTION 'As assinaturas abrem quando o pedido for atendido (EPI entregue no posto).'; END IF;
   IF _l.data_assinatura IS NOT NULL THEN RAISE EXCEPTION 'Esta linha já foi assinada.'; END IF;
-  SELECT * INTO _i FROM pedidos_material_itens WHERE id = _l.pedido_item_id;
-  IF FOUND AND (SELECT sum(quantidade) FROM termos_epi_coletivos_itens WHERE termo_id = _l.termo_id AND pedido_item_id = _i.id) > public._pm_termo_limite(_i) THEN
-    RAISE EXCEPTION 'Chegaram só % de %: ajuste as quantidades do termo antes de assinar.', public._pm_termo_limite(_i), public._pm_nome_material(_i.material_id);
+  -- Só assina com a quantidade entregue inteira distribuída (pediu 10: a soma tem que dar 10).
+  _falta := public._pm_termo_falta(_l.termo_id);
+  IF _falta IS NOT NULL THEN
+    RAISE EXCEPTION 'Distribua a quantidade inteira entregue antes de assinar: %.', _falta;
   END IF;
   RETURN _l;
 END $$;

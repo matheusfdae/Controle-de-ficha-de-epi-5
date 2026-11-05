@@ -81,6 +81,8 @@ export default function TermoEpiPedido({ quem, pedidoId, codigo, posto, aberto, 
 
   const nomeEpi = (id: string) => termo?.epis.find(e => e.item_id === id);
   const faltando = (termo?.epis ?? []).filter(e => (soma[e.item_id] ?? 0) < e.limite);
+  // Assina só com a quantidade entregue inteira distribuída (nem menos, nem mais).
+  const completo = (termo?.epis ?? []).every(e => (soma[e.item_id] ?? 0) === e.limite);
   const colaboradores = termo?.colaboradores ?? [];
 
   return (
@@ -122,7 +124,7 @@ export default function TermoEpiPedido({ quem, pedidoId, codigo, posto, aberto, 
             </div>
             {faltando.length > 0 && (
               <p className="rounded-md border border-amber-500/50 bg-amber-500/10 p-2 text-xs text-amber-800 dark:text-amber-300">
-                O termo só finaliza com a quantidade do pedido inteira. Falta distribuir: {faltando.map(e => `${e.limite - (soma[e.item_id] ?? 0)} ${e.unidade} de ${e.nome}`).join(', ')}.
+                As assinaturas liberam quando a quantidade entregue estiver inteira no termo. Falta distribuir: {faltando.map(e => `${e.limite - (soma[e.item_id] ?? 0)} ${e.unidade} de ${e.nome}`).join(', ')}.
               </p>
             )}
             {!termo.liberado && (
@@ -158,7 +160,7 @@ export default function TermoEpiPedido({ quem, pedidoId, codigo, posto, aberto, 
                     <Input className="w-20" inputMode="numeric" aria-label="Quantidade" value={l.quantidade}
                       onChange={e => mudar(l.chave, { quantidade: e.target.value.replace(/\D/g, '').slice(0, 4) })} />
                   </div>
-                  {termo.liberado && l.id && l.colaborador_senior_id && !alterado && (
+                  {termo.liberado && completo && l.id && l.colaborador_senior_id && !alterado && (
                     <div className="flex flex-wrap gap-2">
                       <Button size="sm" className="gap-1" onClick={() => setAssinando(l)}><PenLine className="h-4 w-4" /> Assinar aqui</Button>
                       <Button size="sm" variant="outline" className="gap-1" onClick={() => gerarLink(l)}><Link2 className="h-4 w-4" /> Enviar link</Button>
