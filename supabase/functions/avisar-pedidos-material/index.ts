@@ -90,9 +90,11 @@ async function avisarTermoEpi(admin: any) {
 
 /** O aviso do termo não derruba os e-mails (nem o contrário). */
 async function avisarTudo(admin: any) {
-  let termo: unknown;
+  let termo: any;
   try { termo = await avisarTermoEpi(admin); } catch (e) { termo = { erro: e instanceof Error ? e.message : String(e) }; }
-  return { ...(await avisar(admin)), termo_epi_whatsapp: termo };
+  const emails = await avisar(admin);
+  // "enviado" no topo também conta o WhatsApp (e o erro dele): o agendador só grava no log o que não é "enviado":false.
+  return { ...emails, enviado: emails.enviado || !!termo?.enviado || !!termo?.erro, termo_epi_whatsapp: termo };
 }
 
 async function avisar(admin: any) {
