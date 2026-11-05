@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { Fragment, lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate, useSearchParams } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -105,7 +105,8 @@ function RequireNovaFicha({ children }: { children: React.ReactNode }) {
   const [searchParams] = useSearchParams();
   const module: ModuleId = searchParams.get('tipo') === 'uniforme' ? 'fichas_uniforme' : 'fichas_epi';
   if (!can(module, 'create')) return <Navigate to="/" replace />;
-  return <>{children}</>;
+  // A chave pelo módulo remonta a tela ao trocar EPI ↔ Uniforme: nada preenchido passa de uma para a outra.
+  return <Fragment key={module}>{children}</Fragment>;
 }
 
 // /consultar é compartilhada por EPI e Uniforme (?tipo=epi|uniforme,
@@ -115,7 +116,7 @@ function RequireConsultar({ children }: { children: React.ReactNode }) {
   const [searchParams] = useSearchParams();
   const module: ModuleId = searchParams.get('tipo') === 'uniforme' ? 'fichas_uniforme' : 'fichas_epi';
   if (!can(module, 'view')) return <Navigate to="/" replace />;
-  return <>{children}</>;
+  return <Fragment key={module}>{children}</Fragment>;
 }
 
 function AppRoutes() {

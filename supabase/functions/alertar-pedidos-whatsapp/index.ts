@@ -18,7 +18,7 @@
 // Endereço, sessão e chave do WA-AKG ficam em config_segredos (waakg_*),
 // gravados pelo deploy/producao/configurar-whatsapp.sh.
 import { verifyCaller, serviceClient, json, corsHeaders } from '../_shared/clerk.ts';
-import { agendarEnvios, ErroWhatsApp, novoLote, type ContaWhatsApp, type EnvioWhatsApp } from '../_shared/whatsapp.ts';
+import { agendarEnvios, contaWhatsApp as conta, ErroWhatsApp, novoLote, type EnvioWhatsApp } from '../_shared/whatsapp.ts';
 import {
   DIAS_CONTATOS, JANELA_JA_PEDIU, alertaDeHoje, aplicarAjustes, contatosDoPosto, jaPediu, mensagemAlerta, proximaPrevista, ultimoPedido,
   type AjusteContato, type Momento, type PedidoContato,
@@ -35,17 +35,6 @@ function destinatarios(pedidos: PedidoContato[], ajustes: AjusteContato[], hoje:
 
 const hojeBr = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
 const menosDias = (dia: string, n: number) => new Date(Date.parse(`${dia}T12:00:00Z`) - n * 864e5).toISOString().slice(0, 10);
-
-async function conta(admin: any): Promise<ContaWhatsApp> {
-  const { data, error } = await admin.from('config_segredos').select('chave, valor')
-    .in('chave', ['waakg_url', 'waakg_sessao', 'waakg_api_key']);
-  if (error) throw new Error(error.message);
-  const s = Object.fromEntries((data ?? []).map((r: any) => [r.chave, r.valor]));
-  if (!s.waakg_url || !s.waakg_sessao || !s.waakg_api_key) {
-    throw new ErroWhatsApp('WhatsApp ainda não configurado no servidor (rode deploy/producao/configurar-whatsapp.sh na VM)');
-  }
-  return { url: s.waakg_url, sessao: s.waakg_sessao, apiKey: s.waakg_api_key };
-}
 
 interface Alerta { posto_id: string; posto: string; data: string; momento: Momento; envios: (EnvioWhatsApp & { numero: string })[] }
 

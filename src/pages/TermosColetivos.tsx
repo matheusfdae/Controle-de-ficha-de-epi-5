@@ -3,14 +3,36 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, FileSignature } from 'lucide-react';
-import { listTermosColetivos, TermoColetivo } from '@/services/termoColetivoService';
+import { Plus, FileSignature, Eye, FileDown, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { pdfDoTermoColetivo } from '@/lib/termoEpiPdf';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import TermoOficialView from '@/components/TermoOficialView';
+import { getTermoColetivoFull, listTermosColetivos, TermoColetivo, TermoColetivoFull } from '@/services/termoColetivoService';
 import BackButton from '@/components/BackButton';
 import PageHeader from '@/components/PageHeader';
 
 export default function TermosColetivos() {
   const [termos, setTermos] = useState<TermoColetivo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [vendo, setVendo] = useState<TermoColetivoFull | null>(null);
+  const [baixando, setBaixando] = useState<string | null>(null);
+
+  const baixar = async (e: React.MouseEvent, id?: string) => {
+    e.preventDefault(); e.stopPropagation();
+    if (!id) return;
+    setBaixando(id);
+    try {
+      const full = await getTermoColetivoFull(id);
+      if (!full) throw new Error('Termo não encontrado.');
+      await pdfDoTermoColetivo(full);
+    } catch (err) { toast.error((err as Error).message); } finally { setBaixando(null); }
+  };
+
+  const visualizar = async (e: React.MouseEvent, id?: string) => {
+    e.preventDefault(); e.stopPropagation();
+    if (id) setVendo(await getTermoColetivoFull(id));
+  };
 
   useEffect(() => {
     listTermosColetivos().then(t => { setTermos(t); setLoading(false); });
@@ -38,7 +60,15 @@ export default function TermosColetivos() {
                         <FileSignature className="h-4 w-4" /> {t.posto} — {t.mes_referencia}
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="text-xs text-muted-foreground space-y-1">
+                    <CardContent className="text-xs text-muted-foreground space-y-1 relative">
+                      <div className="absolute right-4 bottom-3 flex gap-2">
+                        <Button size="sm" variant="outline" onClick={e => visualizar(e, t.id)}>
+                          <Eye className="h-3.5 w-3.5 mr-1" /> Visualizar
+                        </Button>
+                        <Button size="sm" variant="outline" disabled={baixando === t.id} onClick={e => baixar(e, t.id)}>
+                          {baixando === t.id ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <FileDown className="h-3.5 w-3.5 mr-1" />} PDF
+                        </Button>
+                      </div>
                       <p>Líder: {t.lider || '—'}</p>
                       <p>Empresa: {t.empresa || '—'}</p>
                       <Badge variant={t.status === 'finalizado' ? 'default' : 'secondary'} className="mt-1">
@@ -52,6 +82,21 @@ export default function TermosColetivos() {
           )
         }
       </div>
+      <Dialog open={!!vendo} onOpenChange={o => { if (!o) setVendo(null); }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex flex-wrap items-center justify-between gap-2 pr-6">
+              {vendo ? `${vendo.termo.posto} — ${vendo.termo.mes_referencia}` : ''}
+              {vendo && (
+                <Button size="sm" variant="outline" onClick={() => pdfDoTermoColetivo(vendo).catch(e => toast.error((e as Error).message))}>
+                  <FileDown className="h-4 w-4 mr-1" /> Baixar PDF
+                </Button>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {vendo && <TermoOficialView termo={vendo.termo} itens={vendo.itens} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

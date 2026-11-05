@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { alertaDeHoje, aplicarAjustes, contatosDoPosto, jaPediu, mensagemAlerta, previstaNoMes, proximaPrevista, ultimoPedido } from '../../supabase/functions/_shared/alertaPedido';
+import { alertaDeHoje, aplicarAjustes, contatosDoPosto, jaPediu, mensagemAlerta, mensagemTermoEpi, previstaNoMes, proximaPrevista, ultimoPedido } from '../../supabase/functions/_shared/alertaPedido';
 
 describe('data prevista', () => {
   it('mês mais curto usa o último dia', () => {
@@ -90,5 +90,12 @@ describe('mensagem', () => {
   it('envio pelo botão: com a próxima data, ou sem data prevista', () => {
     expect(mensagemAlerta({ nome: 'Ana', posto: 'CNI', data: '2026-11-25', momento: 'manual', link: null })).toContain('está previsto para *25/11/2026*');
     expect(mensagemAlerta({ nome: 'Ana', posto: 'CNI', data: null, momento: 'manual', link: null })).toContain('*CNI* precisa ser feito.');
+  });
+
+  it('aviso do Termo de EPI: pedido, posto, EPIs e o link', () => {
+    const m = mensagemTermoEpi({ nome: 'ARMANDO MONTEIRO', codigo: 'SOL-2026-000774', posto: 'CNI', epis: ['10 un LUVA'], link: 'https://sistema.exemplo/' });
+    expect(m).toContain('Olá, Armando!');
+    expect(m).toContain('*SOL-2026-000774* do posto *CNI* foi atendido e tem EPI (10 un LUVA)');
+    expect(m).toContain('https://sistema.exemplo/pedido-material');
   });
 });

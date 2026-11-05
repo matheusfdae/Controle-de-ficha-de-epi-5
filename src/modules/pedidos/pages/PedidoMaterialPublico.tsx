@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle2, ClipboardList, Loader2, LogOut, Pencil, Plus, Repeat, Search, Send, ShoppingCart, Trash2, UserCheck, X } from 'lucide-react';
+import { CheckCircle2, ClipboardList, HardHat, Loader2, LogOut, Pencil, Plus, Repeat, Search, Send, ShoppingCart, Trash2, UserCheck, X } from 'lucide-react';
+import TermoEpiPedido from '../components/TermoEpiPedido';
 import { toast } from 'sonner';
 import { cpfValido, formatarCpf, formatarTelefone, matriculaValida, soDigitos } from '@/modules/crachas/lib/solicitacaoService';
 import {
@@ -189,6 +190,7 @@ const PedidoMaterialPublico = () => {
   const [observacao, setObservacao] = useState('');
   const [telefone, setTelefone] = useState(lembrado().telefone ?? '');
   const [enviado, setEnviado] = useState<{ codigo: string; recorrente: boolean } | null>(null);
+  const [termoDe, setTermoDe] = useState<PedidoDoSolicitante | null>(null);
   const [carregando, setCarregando] = useState(false);
 
   const tentar = async (acao: () => Promise<void>) => {
@@ -198,6 +200,10 @@ const PedidoMaterialPublico = () => {
   };
 
   const catalogo = useMemo(() => catalogoDoPosto(dados?.materiais ?? [], dados?.postos.find(p => p.id === postoId)), [dados, postoId]);
+  const pedidosEpi = useMemo(() => (dados?.pedidos ?? []).filter(p => p.tem_epi && p.status === 'atendida'), [dados]);
+  // Pedidos com EPI entregue e assinatura faltando: o número aparece na aba.
+  const termosPendentes = pedidosEpi.filter(p => !p.termo?.linhas || p.termo.linhas > p.termo.assinadas).length;
+  const pedidoEnviado = enviado ? dados?.pedidos.find(p => p.codigo === enviado.codigo) : undefined;
   const comLista = dados?.postos.find(p => p.id === postoId)?.itens != null && catalogo.length > 0;
   const noPedido = linhas.filter(l => l.material_id && l.quantidade.trim()).length;
 
@@ -341,10 +347,13 @@ const PedidoMaterialPublico = () => {
             </div>
 
             <Tabs value={aba} onValueChange={v => { setAba(v); setEnviado(null); }}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="novo" className="gap-1"><Plus className="h-4 w-4" /> Novo pedido</TabsTrigger>
-                <TabsTrigger value="meus" className="gap-1">
-                  <ClipboardList className="h-4 w-4" /> Meus pedidos{dados.pedidos.length ? ` (${dados.pedidos.length})` : ''}
+              <TabsList className="grid w-full grid-cols-3 h-auto">
+                <TabsTrigger value="novo" className="gap-1 px-1 text-xs sm:text-sm"><Plus className="h-4 w-4 shrink-0" /> Novo pedido</TabsTrigger>
+                <TabsTrigger value="meus" className="gap-1 px-1 text-xs sm:text-sm">
+                  <ClipboardList className="h-4 w-4 shrink-0" /> Meus pedidos{dados.pedidos.length ? ` (${dados.pedidos.length})` : ''}
+                </TabsTrigger>
+                <TabsTrigger value="termo" className="gap-1 px-1 text-xs sm:text-sm">
+                  <HardHat className="h-4 w-4 shrink-0" /> Termo de EPI{termosPendentes ? ` (${termosPendentes})` : ''}
                 </TabsTrigger>
               </TabsList>
 
@@ -359,6 +368,14 @@ const PedidoMaterialPublico = () => {
                         {enviado.recorrente && ' Como é recorrente, o próximo pedido será criado automaticamente na data certa.'}
                         {' '}Acompanhe em "Meus pedidos".
                       </p>
+                      {pedidoEnviado?.tem_epi && (
+                        <div className="rounded-md border border-amber-500/60 bg-amber-500/10 p-3 text-sm text-left space-y-2">
+                          <p className="flex items-center gap-1.5 font-medium"><HardHat className="h-4 w-4 text-amber-600" /> Este pedido tem EPI</p>
+                          <p className="text-muted-foreground">
+                            Quando Compras atender o pedido, o Termo de EPI aparece na aba <b>Termo de EPI</b> para você colher as assinaturas.
+                          </p>
+                        </div>
+                      )}
                       <div className="flex justify-center gap-2 flex-wrap">
                         <Button variant="outline" onClick={() => { setEnviado(null); setAba('meus'); }}>Ver meus pedidos</Button>
                         <Button onClick={() => setEnviado(null)}>Fazer outro pedido</Button>
@@ -468,13 +485,54 @@ const PedidoMaterialPublico = () => {
                   <p className="text-center text-sm text-muted-foreground py-8">Você ainda não fez nenhum pedido.</p>
                 )}
                 {dados.pedidos.map(p => (
-                  <CartaoPedido key={p.id} p={p} carregando={carregando}
+                  <CartaoPedido key={p.id} p={p} carregando={carregando} quem={quem!} onTermoFechado={() => { recarregar().catch(() => {}); }}
                     catalogo={catalogoDoPosto(dados.materiais, dados.postos.find(x => x.id === p.posto_id))}
                     onCancelar={() => cancelar({ pedidoId: p.id }, `Cancelar o pedido ${p.codigo}?`)}
                     onReenviar={(ls, obs) => reenviar(p, ls, obs)} />
                 ))}
               </TabsContent>
+
+              <TabsContent value="termo" className="mt-4 space-y-3">
+                {pedidosEpi.length === 0 && (
+                  <p className="text-center text-sm text-muted-foreground py-8">
+                    Nenhum termo para assinar. Quando Compras atender um pedido com <HardHat className="inline h-3.5 w-3.5 text-amber-600" />, o termo aparece aqui.
+                  </p>
+                )}
+                {pedidosEpi.map(p => {
+                  const falta = p.termo ? p.termo.linhas - p.termo.assinadas : 0;
+                  return (
+                    <Card key={p.id}>
+                      <CardContent className="p-4 space-y-2 text-sm">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-semibold">{p.codigo}</p>
+                            <p className="text-xs text-muted-foreground">{p.posto} · {dataBr(p.data_pedido)}</p>
+                          </div>
+                          <Badge className={`${COR_STATUS[p.status] ?? ''} border-0 text-right`}>{STATUS_ENCARREGADO[p.status] ?? p.status}</Badge>
+                        </div>
+                        <ul className="text-muted-foreground">
+                          {(p.itens ?? []).filter(i => i.is_epi).map(i => (
+                            <li key={i.material_id}>{formatarNumero(i.quantidade_atendida ?? i.quantidade)} {i.unidade} · {i.nome}</li>
+                          ))}
+                        </ul>
+                        <p className={`text-xs ${falta > 0 || !p.termo?.linhas ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}>
+                          {!p.termo?.linhas ? 'Termo ainda sem colaboradores.'
+                            : `${p.termo.assinadas} de ${p.termo.linhas} assinaturas.`}
+                        </p>
+                        <Button size="sm" className="gap-1" variant={falta > 0 || !p.termo?.linhas ? 'default' : 'outline'}
+                          onClick={() => setTermoDe(p)}>
+                          <HardHat className="h-4 w-4" /> Abrir termo
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </TabsContent>
             </Tabs>
+            {termoDe && quem && (
+              <TermoEpiPedido quem={quem} pedidoId={termoDe.id} codigo={termoDe.codigo} posto={termoDe.posto} aberto
+                fechar={() => { setTermoDe(null); recarregar().catch(() => {}); }} />
+            )}
           </>
         )}
       </div>
@@ -482,11 +540,13 @@ const PedidoMaterialPublico = () => {
   );
 };
 
-function CartaoPedido({ p, carregando, catalogo, onCancelar, onReenviar }: {
-  p: PedidoDoSolicitante; carregando: boolean; catalogo: MaterialPublico[];
+function CartaoPedido({ p, carregando, catalogo, quem, onTermoFechado, onCancelar, onReenviar }: {
+  p: PedidoDoSolicitante; carregando: boolean; catalogo: MaterialPublico[]; quem: Solicitante; onTermoFechado: () => void;
   onCancelar: () => void; onReenviar: (linhas: Linha[], observacao: string) => boolean;
 }) {
   const [editando, setEditando] = useState(false);
+  const [termoAberto, setTermoAberto] = useState(false);
+  const pendentes = p.termo ? p.termo.linhas - p.termo.assinadas : 0;
   const [linhas, setLinhas] = useState<Linha[]>([]);
   const [obs, setObs] = useState('');
   const motivo = [...(p.historico ?? [])].reverse().find(h => h.comentario && ['devolvida', 'cancelada', 'atendida'].includes(h.status));
@@ -512,6 +572,7 @@ function CartaoPedido({ p, carregando, catalogo, onCancelar, onReenviar }: {
             {(p.itens ?? []).map(i => (
               <li key={i.material_id}>
                 {formatarNumero(i.quantidade)} {i.unidade} · {i.nome}
+                {i.is_epi && <HardHat className="ml-1 inline h-3.5 w-3.5 text-amber-600" aria-label="EPI" />}
                 {i.quantidade !== i.quantidade_pedida && <span className="text-xs"> (pedido: {formatarNumero(i.quantidade_pedida)})</span>}
                 {i.quantidade_atendida != null && i.quantidade_atendida !== i.quantidade && (
                   <span className="text-xs text-amber-700 dark:text-amber-400"> · entregue: {formatarNumero(i.quantidade_atendida)}</span>
@@ -538,6 +599,13 @@ function CartaoPedido({ p, carregando, catalogo, onCancelar, onReenviar }: {
           </div>
         ) : (
           <div className="flex flex-wrap gap-2">
+            {p.tem_epi && p.status === 'atendida' && (
+              <Button size="sm" variant={pendentes > 0 || !p.termo?.linhas ? 'default' : 'outline'} className="gap-1"
+                onClick={() => setTermoAberto(true)}>
+                <HardHat className="h-4 w-4" /> Termo de EPI
+                {p.termo?.linhas ? <span className="text-xs opacity-80">({p.termo.assinadas}/{p.termo.linhas} assinadas)</span> : null}
+              </Button>
+            )}
             {p.status === 'devolvida' && (
               <Button size="sm" className="gap-1" disabled={carregando} onClick={corrigir}><Pencil className="h-4 w-4" /> Corrigir e reenviar</Button>
             )}
@@ -548,7 +616,14 @@ function CartaoPedido({ p, carregando, catalogo, onCancelar, onReenviar }: {
             )}
           </div>
         )}
+        {p.tem_epi && p.status === 'atendida' && (pendentes > 0 || !p.termo?.linhas) && (
+          <p className="text-xs text-amber-700 dark:text-amber-400">EPI entregue: colete as assinaturas do Termo de EPI{pendentes > 0 ? ` (${pendentes} faltando)` : ''}.</p>
+        )}
       </CardContent>
+      {termoAberto && (
+        <TermoEpiPedido quem={quem} pedidoId={p.id} codigo={p.codigo} posto={p.posto} aberto
+          fechar={() => { setTermoAberto(false); onTermoFechado(); }} />
+      )}
     </Card>
   );
 }

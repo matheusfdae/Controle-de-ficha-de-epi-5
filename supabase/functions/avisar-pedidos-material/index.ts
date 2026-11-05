@@ -8,6 +8,9 @@
 //    avisa Comercial e Gerência do estado com os pedidos que fizeram passar
 //    (uma vez por pedido: teto_avisado). O pedido segue normal.
 // Antes, gera os pedidos recorrentes que venceram.
+// Pedido com EPI que Compras atendeu avisa o líder (quem pediu) pelo WhatsApp que
+// o Termo de EPI está pronto para as assinaturas (uma vez: termo_whatsapp_avisado).
+// Segue o liga/desliga do alerta por WhatsApp e não depende dos e-mails.
 //
 //  * Agendador da VM (a cada 5 min): header x-cron-secret, corpo { modo: 'automatico' }.
 //  * Botão "Avisar agora" (Configurações de Pedidos): Bearer de quem edita o módulo.
@@ -15,6 +18,8 @@
 import { verifyCaller, serviceClient, json, corsHeaders } from '../_shared/clerk.ts';
 import { enviarComo, ErroMicrosoft } from '../_shared/microsoft.ts';
 import { acessoParaEnviar } from '../_shared/contaMicrosoft.ts';
+import { agendarEnvios, contaWhatsApp, novoLote, numeroWhatsApp } from '../_shared/whatsapp.ts';
+import { mensagemTermoEpi } from '../_shared/alertaPedido.ts';
 import {
   RESPONSAVEIS, agruparAvisos, avisaTeto, montarEmailAviso, montarEmailEpi, montarEmailTeto, passouTeto, type ItemAviso, type PedidoAviso,
 } from '../_shared/avisoPedidos.ts';
@@ -24,6 +29,42 @@ const inicioMesAnterior = (hoje: string) => {
   const [a, m] = hoje.split('-').map(Number);
   return new Date(Date.UTC(a, m - 2, 1)).toISOString().slice(0, 10);
 };
+
+async function avisarTermoEpi(admin: any) {
+  const { data: cfg } = await admin.from('pedido_config').select('alerta_whatsapp, link_sistema').eq('id', 1).maybeSingle();
+  if (cfg && cfg.alerta_whatsapp === false) return { enviado: false, motivo: 'alerta por WhatsApp desligado' };
+  const { data: pedidos, error } = await admin.from('pedidos_material')
+    .select('id, codigo, solicitante_nome, solicitante_telefone, colaboradores_senior(telefone), postos(nome)')
+    .eq('status', 'atendida').eq('tem_epi', true).eq('termo_whatsapp_avisado', false).limit(200);
+  if (error) throw new Error(error.message);
+  if (!(pedidos ?? []).length) return { enviado: false, motivo: 'nenhum termo novo' };
+  const { data: itens } = await admin.from('pedidos_material_itens')
+    .select('pedido_id, quantidade, quantidade_atendida, materiais!inner(nome, unidade, is_epi)')
+    .in('pedido_id', pedidos.map((p: any) => p.id)).eq('materiais.is_epi', true);
+
+  const envios: { nome: string; numero: string; texto: string }[] = [];
+  const semCelular: string[] = [];
+  for (const p of pedidos as any[]) {
+    // Celular da Senior primeiro; sem celular lá, o digitado no link do pedido.
+    const numero = numeroWhatsApp(p.colaboradores_senior?.telefone) ?? numeroWhatsApp(p.solicitante_telefone);
+    if (!numero) { semCelular.push(p.codigo); continue; }
+    const epis = (itens ?? []).filter((i: any) => i.pedido_id === p.id)
+      .map((i: any) => `${Number(i.quantidade_atendida ?? i.quantidade)} ${i.materiais.unidade} ${i.materiais.nome}`);
+    envios.push({ nome: p.solicitante_nome || p.codigo, numero,
+      texto: mensagemTermoEpi({ nome: p.solicitante_nome ?? '', codigo: p.codigo, posto: p.postos?.nome ?? '—', epis, link: cfg?.link_sistema ?? null }) });
+  }
+  const r = envios.length ? await agendarEnvios(await contaWhatsApp(admin), envios, 30, novoLote(new Date(), 'termo-epi')) : null;
+  // Marca todos (sem celular ou sem WhatsApp também: não fica tentando a cada 5 min).
+  await admin.from('pedidos_material').update({ termo_whatsapp_avisado: true }).in('id', pedidos.map((p: any) => p.id));
+  return { enviado: (r?.agendados ?? 0) > 0, agendados: r?.agendados ?? 0, sem_whatsapp: r?.semWhatsApp ?? [], sem_celular: semCelular };
+}
+
+/** O aviso do termo não derruba os e-mails (nem o contrário). */
+async function avisarTudo(admin: any) {
+  let termo: unknown;
+  try { termo = await avisarTermoEpi(admin); } catch (e) { termo = { erro: e instanceof Error ? e.message : String(e) }; }
+  return { ...(await avisar(admin)), termo_epi_whatsapp: termo };
+}
 
 async function avisar(admin: any) {
   const { data: cfg } = await admin.from('pedido_config').select('avisar_email, link_sistema, emails_epi').eq('id', 1).maybeSingle();
@@ -161,14 +202,14 @@ Deno.serve(async (req) => {
     if (segredo) {
       const { data: seg } = await admin.from('config_segredos').select('valor').eq('chave', 'cron_secret').maybeSingle();
       if (!seg?.valor || segredo !== seg.valor) return json({ error: 'Não autorizado' }, 401);
-      return json(await avisar(admin));
+      return json(await avisarTudo(admin));
     }
 
     const caller = await verifyCaller(req);
     if (!caller) return json({ error: 'Não autenticado' }, 401);
     const { data: pode } = await admin.rpc('has_permission', { _user_id: caller.profileId, _module: 'pedidos_material', _action: 'edit' });
     if (pode !== true) return json({ error: 'Sem permissão para configurar os pedidos' }, 403);
-    return json(await avisar(admin));
+    return json(await avisarTudo(admin));
   } catch (e) {
     if (e instanceof ErroMicrosoft) return json({ error: e.message }, 502);
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);

@@ -4,11 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Tablet, Link2, CheckCircle2 } from 'lucide-react';
+import { Tablet, Link2, CheckCircle2, FileDown } from 'lucide-react';
 import { toast } from 'sonner';
 import SignaturePad from '@/components/SignaturePad';
 import BackButton from '@/components/BackButton';
 import { useConfirm } from '@/hooks/use-confirm';
+import { pdfDoTermoColetivo } from '@/lib/termoEpiPdf';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import TermoOficialView from '@/components/TermoOficialView';
 import { assinarItemColetivo, finalizarTermo, getTermoColetivoFull, gerarTokenTermoItem, TermoColetivoFull } from '@/services/termoColetivoService';
 
 export default function TermoColetivoView() {
@@ -69,7 +72,7 @@ export default function TermoColetivoView() {
   const finalizar = async () => {
     if (!id) return;
     if (pendentes.length > 0 && !(await confirm('Ainda há assinaturas pendentes. Finalizar mesmo assim?'))) return;
-    await finalizarTermo(id);
+    try { await finalizarTermo(id); } catch (e) { return toast.error((e as Error).message); }
     toast.success('Termo finalizado');
     load();
   };
@@ -83,7 +86,8 @@ export default function TermoColetivoView() {
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <BackButton />
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => pdfDoTermoColetivo(data).catch(e => toast.error((e as Error).message))}><FileDown className="h-4 w-4 mr-1" /> Baixar PDF</Button>
             <Button variant="outline" onClick={startTablet} disabled={pendentes.length === 0}><Tablet className="h-4 w-4 mr-1" /> Assinar no tablet ({pendentes.length})</Button>
             <Button variant="default" onClick={finalizar} disabled={termo.status === 'finalizado'}>Finalizar</Button>
           </div>
@@ -106,6 +110,13 @@ export default function TermoColetivoView() {
         </CardContent>
       </Card>
 
+      <Tabs defaultValue="termo">
+        <TabsList>
+          <TabsTrigger value="termo">Visualizar termo</TabsTrigger>
+          <TabsTrigger value="linhas">Linhas e assinaturas</TabsTrigger>
+        </TabsList>
+        <TabsContent value="termo"><TermoOficialView termo={termo} itens={itens} /></TabsContent>
+        <TabsContent value="linhas">
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-base">Linhas</CardTitle></CardHeader>
         <CardContent className="overflow-x-auto">
@@ -156,6 +167,8 @@ export default function TermoColetivoView() {
           </table>
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={!!signing} onOpenChange={open => { if (!open) { setSigning(null); setSequencial(false); } }}>
         <DialogContent className="max-w-xl">

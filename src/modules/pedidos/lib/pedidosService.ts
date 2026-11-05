@@ -64,6 +64,8 @@ export const hojeBr = () => new Date().toLocaleDateString('en-CA', { timeZone: '
 
 export interface Material {
   id: string; nome: string; item_pai_id: string | null; unidade: string; categoria: string | null; is_epi: boolean; ativo: boolean;
+  /** CA do EPI (sai no Termo de EPI). */
+  ca?: string | null;
   /** Preço de referência (null = sem preço). */
   preco: number | null;
 }
@@ -91,7 +93,10 @@ export interface PostoPublico { id: string; nome: string; uf: string; itens: str
 export interface PedidoDoSolicitante {
   id: string; codigo: string; status: StatusPedido; data_pedido: string; criado_em: string; posto_id: string;
   recorrente: boolean; posto: string; observacao: string | null;
-  itens: { material_id: string; nome: string; unidade: string; quantidade: number; quantidade_pedida: number; quantidade_atendida: number | null }[] | null;
+  /** Tem item de EPI: o pedido ganha o Termo de EPI. */
+  tem_epi?: boolean;
+  termo?: { linhas: number; assinadas: number } | null;
+  itens: { material_id: string; nome: string; unidade: string; quantidade: number; quantidade_pedida: number; quantidade_atendida: number | null; is_epi?: boolean }[] | null;
   historico: { status: StatusPedido; em: string; comentario: string | null }[] | null;
 }
 export interface RecorrenciaDoSolicitante {
@@ -110,7 +115,8 @@ export const nomePublico = (m: MaterialPublico) => (m.grupo ? `${m.grupo} — ${
 export const catalogoDoPosto = (materiais: MaterialPublico[], posto: PostoPublico | undefined) =>
   posto?.itens == null ? materiais : materiais.filter(m => posto.itens!.includes(m.id));
 
-type FuncaoPublica = 'pedido_material_identificar' | 'pedido_material_enviar' | 'pedido_material_cancelar' | 'pedido_material_reenviar';
+type FuncaoPublica = 'pedido_material_identificar' | 'pedido_material_enviar' | 'pedido_material_cancelar' | 'pedido_material_reenviar'
+  | 'pedido_material_termo' | 'pedido_material_termo_salvar' | 'pedido_material_termo_assinar' | 'pedido_material_termo_link' | 'pedido_material_termo_buscar';
 async function chamarPublica<T>(fn: FuncaoPublica, args: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.rpc(fn, args as never);
   if (error) throw new Error(error.message?.includes('Failed to fetch') ? 'Sem conexão com o servidor. Verifique a internet.' : error.message);
@@ -138,6 +144,43 @@ export const cancelarPedidoPublico = (s: Solicitante, alvo: { pedidoId?: string;
   chamarPublica<{ ok: true }>('pedido_material_cancelar', {
     ...solicitanteArgs(s), _pedido_id: alvo.pedidoId ?? null, _recorrencia_id: alvo.recorrenciaId ?? null,
   });
+
+// ---------- Termo de EPI do pedido (link do encarregado) ----------
+
+export interface LinhaTermo {
+  id: string; pedido_item_id: string | null; colaborador_senior_id: string | null; colaborador_nome: string;
+  material: string; ca: string | null; quantidade: number; assinado_em: string | null;
+}
+export interface TermoDoPedido {
+  pedido_id: string; codigo: string; status: StatusPedido;
+  /** Assinaturas abertas: o pedido foi atendido (EPI chegou no posto). */
+  liberado: boolean;
+  termo_id: string | null;
+  epis: { item_id: string; nome: string; unidade: string; ca: string | null; limite: number }[];
+  linhas: LinhaTermo[];
+  colaboradores: { id: string; nome: string; cargo: string | null }[];
+}
+export interface LinhaTermoSalvar { id?: string; pedido_item_id: string; colaborador_senior_id: string | null; colaborador_nome: string | null; quantidade: number }
+
+export const termoDoPedido = (s: Solicitante, pedidoId: string) =>
+  chamarPublica<TermoDoPedido>('pedido_material_termo', { ...solicitanteArgs(s), _pedido_id: pedidoId });
+export const salvarTermo = (s: Solicitante, pedidoId: string, linhas: LinhaTermoSalvar[]) =>
+  chamarPublica<TermoDoPedido>('pedido_material_termo_salvar', { ...solicitanteArgs(s), _pedido_id: pedidoId, _linhas: linhas });
+export const assinarLinhaTermo = (s: Solicitante, linhaId: string, assinatura: string) =>
+  chamarPublica<TermoDoPedido>('pedido_material_termo_assinar', { ...solicitanteArgs(s), _linha_id: linhaId, _assinatura: assinatura });
+export const linkLinhaTermo = (s: Solicitante, linhaId: string) =>
+  chamarPublica<{ token: string; colaborador: string }>('pedido_material_termo_link', { ...solicitanteArgs(s), _linha_id: linhaId });
+export interface ColaboradorBusca { id: string; nome: string; cargo: string | null; matricula: number | null }
+/** Colaboradores ativos da Senior pelo nome (mínimo 3 letras; até 15). */
+export const buscarColaboradorTermo = (s: Solicitante, pedidoId: string, busca: string) =>
+  chamarPublica<ColaboradorBusca[]>('pedido_material_termo_buscar', { ...solicitanteArgs(s), _pedido_id: pedidoId, _busca: busca });
+
+/** Quanto de cada EPI o termo já distribui (pedido_item_id -> soma). */
+export function distribuidoPorEpi(linhas: { pedido_item_id: string | null; quantidade: number }[]): Record<string, number> {
+  const r: Record<string, number> = {};
+  for (const l of linhas) if (l.pedido_item_id) r[l.pedido_item_id] = (r[l.pedido_item_id] ?? 0) + (Number(l.quantidade) || 0);
+  return r;
+}
 
 // ---------- Telas do sistema ----------
 
@@ -335,7 +378,7 @@ export async function minhasPendencias(): Promise<number> {
 // ---------- Cadastro ----------
 
 export async function listMateriais(): Promise<Material[]> {
-  const { data, error } = await supabase.from('materiais').select('id, nome, item_pai_id, unidade, categoria, is_epi, ativo, preco').order('nome');
+  const { data, error } = await supabase.from('materiais').select('id, nome, item_pai_id, unidade, categoria, is_epi, ativo, preco, ca').order('nome');
   if (error) throw error;
   return (data ?? []).map(m => ({ ...m, preco: m.preco == null ? null : Number(m.preco) })) as Material[];
 }
@@ -344,6 +387,7 @@ export async function salvarMaterial(m: Partial<Material> & { nome: string }) {
   const payload = {
     nome: m.nome.trim(), item_pai_id: m.item_pai_id || null, unidade: (m.unidade ?? 'un').trim() || 'un',
     categoria: m.categoria?.trim() || null, is_epi: !!m.is_epi, ativo: m.ativo ?? true,
+    ca: m.is_epi ? m.ca?.trim() || null : null,
     ...(m.preco !== undefined ? { preco: m.preco, preco_atualizado_em: new Date().toISOString() } : {}),
   };
   const { error } = m.id
