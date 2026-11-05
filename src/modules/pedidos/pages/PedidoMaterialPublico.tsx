@@ -190,6 +190,7 @@ const PedidoMaterialPublico = () => {
   const [observacao, setObservacao] = useState('');
   const [telefone, setTelefone] = useState(lembrado().telefone ?? '');
   const [enviado, setEnviado] = useState<{ codigo: string; recorrente: boolean } | null>(null);
+  const [termoDe, setTermoDe] = useState<PedidoDoSolicitante | null>(null);
   const [carregando, setCarregando] = useState(false);
 
   const tentar = async (acao: () => Promise<void>) => {
@@ -199,6 +200,10 @@ const PedidoMaterialPublico = () => {
   };
 
   const catalogo = useMemo(() => catalogoDoPosto(dados?.materiais ?? [], dados?.postos.find(p => p.id === postoId)), [dados, postoId]);
+  const pedidosEpi = useMemo(() => (dados?.pedidos ?? []).filter(p => p.tem_epi && p.status !== 'cancelada'), [dados]);
+  // Pedidos com EPI entregue e assinatura faltando: o número aparece na aba.
+  const termosPendentes = pedidosEpi.filter(p => p.status === 'atendida' && (!p.termo?.linhas || p.termo.linhas > p.termo.assinadas)).length;
+  const pedidoEnviado = enviado ? dados?.pedidos.find(p => p.codigo === enviado.codigo) : undefined;
   const comLista = dados?.postos.find(p => p.id === postoId)?.itens != null && catalogo.length > 0;
   const noPedido = linhas.filter(l => l.material_id && l.quantidade.trim()).length;
 
@@ -342,10 +347,13 @@ const PedidoMaterialPublico = () => {
             </div>
 
             <Tabs value={aba} onValueChange={v => { setAba(v); setEnviado(null); }}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="novo" className="gap-1"><Plus className="h-4 w-4" /> Novo pedido</TabsTrigger>
-                <TabsTrigger value="meus" className="gap-1">
-                  <ClipboardList className="h-4 w-4" /> Meus pedidos{dados.pedidos.length ? ` (${dados.pedidos.length})` : ''}
+              <TabsList className="grid w-full grid-cols-3 h-auto">
+                <TabsTrigger value="novo" className="gap-1 px-1 text-xs sm:text-sm"><Plus className="h-4 w-4 shrink-0" /> Novo pedido</TabsTrigger>
+                <TabsTrigger value="meus" className="gap-1 px-1 text-xs sm:text-sm">
+                  <ClipboardList className="h-4 w-4 shrink-0" /> Meus pedidos{dados.pedidos.length ? ` (${dados.pedidos.length})` : ''}
+                </TabsTrigger>
+                <TabsTrigger value="termo" className="gap-1 px-1 text-xs sm:text-sm">
+                  <HardHat className="h-4 w-4 shrink-0" /> Termo de EPI{termosPendentes ? ` (${termosPendentes})` : ''}
                 </TabsTrigger>
               </TabsList>
 
@@ -360,6 +368,15 @@ const PedidoMaterialPublico = () => {
                         {enviado.recorrente && ' Como é recorrente, o próximo pedido será criado automaticamente na data certa.'}
                         {' '}Acompanhe em "Meus pedidos".
                       </p>
+                      {pedidoEnviado?.tem_epi && (
+                        <div className="rounded-md border border-amber-500/60 bg-amber-500/10 p-3 text-sm text-left space-y-2">
+                          <p className="flex items-center gap-1.5 font-medium"><HardHat className="h-4 w-4 text-amber-600" /> Este pedido tem EPI</p>
+                          <p className="text-muted-foreground">
+                            O Termo de EPI já foi criado. Monte agora quem vai receber cada EPI; as assinaturas liberam quando o EPI for entregue.
+                          </p>
+                          <Button className="w-full gap-1" onClick={() => setTermoDe(pedidoEnviado)}><HardHat className="h-4 w-4" /> Abrir Termo de EPI</Button>
+                        </div>
+                      )}
                       <div className="flex justify-center gap-2 flex-wrap">
                         <Button variant="outline" onClick={() => { setEnviado(null); setAba('meus'); }}>Ver meus pedidos</Button>
                         <Button onClick={() => setEnviado(null)}>Fazer outro pedido</Button>
@@ -475,7 +492,49 @@ const PedidoMaterialPublico = () => {
                     onReenviar={(ls, obs) => reenviar(p, ls, obs)} />
                 ))}
               </TabsContent>
+
+              <TabsContent value="termo" className="mt-4 space-y-3">
+                {pedidosEpi.length === 0 && (
+                  <p className="text-center text-sm text-muted-foreground py-8">
+                    Nenhum pedido com EPI. Quando você pedir um item com <HardHat className="inline h-3.5 w-3.5 text-amber-600" />, o termo aparece aqui.
+                  </p>
+                )}
+                {pedidosEpi.map(p => {
+                  const falta = p.termo ? p.termo.linhas - p.termo.assinadas : 0;
+                  return (
+                    <Card key={p.id}>
+                      <CardContent className="p-4 space-y-2 text-sm">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-semibold">{p.codigo}</p>
+                            <p className="text-xs text-muted-foreground">{p.posto} · {dataBr(p.data_pedido)}</p>
+                          </div>
+                          <Badge className={`${COR_STATUS[p.status] ?? ''} border-0 text-right`}>{STATUS_ENCARREGADO[p.status] ?? p.status}</Badge>
+                        </div>
+                        <ul className="text-muted-foreground">
+                          {(p.itens ?? []).filter(i => i.is_epi).map(i => (
+                            <li key={i.material_id}>{formatarNumero(i.quantidade_atendida ?? i.quantidade)} {i.unidade} · {i.nome}</li>
+                          ))}
+                        </ul>
+                        <p className={`text-xs ${p.status === 'atendida' && (falta > 0 || !p.termo?.linhas) ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}>
+                          {!p.termo?.linhas ? 'Termo ainda sem colaboradores.'
+                            : `${p.termo.assinadas} de ${p.termo.linhas} assinaturas.`}
+                          {p.status !== 'atendida' && ' As assinaturas liberam quando o EPI for entregue.'}
+                        </p>
+                        <Button size="sm" className="gap-1" variant={p.status === 'atendida' && (falta > 0 || !p.termo?.linhas) ? 'default' : 'outline'}
+                          onClick={() => setTermoDe(p)}>
+                          <HardHat className="h-4 w-4" /> Abrir termo
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </TabsContent>
             </Tabs>
+            {termoDe && quem && (
+              <TermoEpiPedido quem={quem} pedidoId={termoDe.id} codigo={termoDe.codigo} posto={termoDe.posto} aberto
+                fechar={() => { setTermoDe(null); recarregar().catch(() => {}); }} />
+            )}
           </>
         )}
       </div>
