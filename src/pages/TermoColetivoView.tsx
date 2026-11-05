@@ -72,7 +72,7 @@ export default function TermoColetivoView() {
   const finalizar = async () => {
     if (!id) return;
     if (pendentes.length > 0 && !(await confirm('Ainda há assinaturas pendentes. Finalizar mesmo assim?'))) return;
-    await finalizarTermo(id);
+    try { await finalizarTermo(id); } catch (e) { return toast.error((e as Error).message); }
     toast.success('Termo finalizado');
     load();
   };

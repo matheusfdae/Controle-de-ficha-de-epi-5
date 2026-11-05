@@ -80,6 +80,7 @@ export default function TermoEpiPedido({ quem, pedidoId, codigo, posto, aberto, 
     `Olá, ${nome.split(' ')[0]}! Assine o Termo de Entrega de EPI do posto ${posto} por este link:\n${url}`;
 
   const nomeEpi = (id: string) => termo?.epis.find(e => e.item_id === id);
+  const faltando = (termo?.epis ?? []).filter(e => (soma[e.item_id] ?? 0) < e.limite);
   const colaboradores = termo?.colaboradores ?? [];
 
   return (
@@ -119,6 +120,11 @@ export default function TermoEpiPedido({ quem, pedidoId, codigo, posto, aberto, 
                 );
               })}
             </div>
+            {faltando.length > 0 && (
+              <p className="rounded-md border border-amber-500/50 bg-amber-500/10 p-2 text-xs text-amber-800 dark:text-amber-300">
+                O termo só finaliza com a quantidade do pedido inteira. Falta distribuir: {faltando.map(e => `${e.limite - (soma[e.item_id] ?? 0)} ${e.unidade} de ${e.nome}`).join(', ')}.
+              </p>
+            )}
             {!termo.liberado && (
               <p className="rounded-md bg-muted p-2 text-xs text-muted-foreground">
                 Monte o termo agora. As assinaturas abrem quando o pedido for <b>atendido</b> (EPI entregue no posto).

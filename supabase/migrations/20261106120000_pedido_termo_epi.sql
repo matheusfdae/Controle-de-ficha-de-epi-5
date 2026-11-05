@@ -177,14 +177,44 @@ BEGIN
   RETURN _l;
 END $$;
 
--- Termo todo assinado vira "finalizado".
+-- EPIs do pedido que o termo ainda não distribuiu por inteiro ("Luva (6 de 10)"); NULL = completo.
+CREATE OR REPLACE FUNCTION public._pm_termo_falta(_termo uuid)
+RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT string_agg(format('%s (%s de %s)', public._pm_nome_material(i.material_id), coalesce(s.total, 0), public._pm_termo_limite(i)), ', '
+                    ORDER BY public._pm_nome_material(i.material_id))
+  FROM termos_epi_coletivos t
+  JOIN pedidos_material_itens i ON i.pedido_id = t.pedido_id
+  JOIN materiais m ON m.id = i.material_id AND m.is_epi
+  LEFT JOIN (SELECT pedido_item_id, sum(quantidade) AS total FROM termos_epi_coletivos_itens WHERE termo_id = _termo GROUP BY 1) s ON s.pedido_item_id = i.id
+  WHERE t.id = _termo AND coalesce(s.total, 0) <> public._pm_termo_limite(i)
+$$;
+
+-- Termo todo assinado e com a quantidade inteira do pedido distribuída vira "finalizado".
 CREATE OR REPLACE FUNCTION public._pm_termo_fechar(_termo uuid)
 RETURNS void LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
   UPDATE termos_epi_coletivos t SET status = 'finalizado'
   WHERE t.id = _termo AND t.pedido_id IS NOT NULL AND t.status <> 'finalizado'
     AND EXISTS (SELECT 1 FROM termos_epi_coletivos_itens WHERE termo_id = t.id)
     AND NOT EXISTS (SELECT 1 FROM termos_epi_coletivos_itens WHERE termo_id = t.id AND data_assinatura IS NULL)
+    AND public._pm_termo_falta(t.id) IS NULL
 $$;
+
+-- Termo de pedido não finaliza (nem pelo botão Finalizar) sem a quantidade do pedido inteira.
+CREATE OR REPLACE FUNCTION public._pm_termo_trava_finalizar()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE _falta text;
+BEGIN
+  IF NEW.status = 'finalizado' AND OLD.status IS DISTINCT FROM 'finalizado' AND NEW.pedido_id IS NOT NULL THEN
+    _falta := public._pm_termo_falta(NEW.id);
+    IF _falta IS NOT NULL THEN
+      RAISE EXCEPTION 'O termo só finaliza com a quantidade do pedido inteira distribuída. Falta: %.', _falta;
+    END IF;
+  END IF;
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS trg_pm_termo_trava_finalizar ON public.termos_epi_coletivos;
+CREATE TRIGGER trg_pm_termo_trava_finalizar BEFORE UPDATE OF status ON public.termos_epi_coletivos
+  FOR EACH ROW EXECUTE FUNCTION public._pm_termo_trava_finalizar();
 
 -- Assinatura colhida no celular do encarregado.
 CREATE OR REPLACE FUNCTION public._pm_termo_assinar(_matricula integer, _cpf text, _linha_id uuid, _assinatura text)
@@ -319,7 +349,7 @@ END $$;
 
 REVOKE ALL ON FUNCTION public._pm_termo_pedido(public.colaboradores_senior, uuid), public._pm_termo_dados(public.pedidos_material),
   public._pm_termo(integer, text, uuid), public._pm_termo_salvar(integer, text, uuid, jsonb),
-  public._pm_termo_linha(public.colaboradores_senior, uuid), public._pm_termo_fechar(uuid),
+  public._pm_termo_linha(public.colaboradores_senior, uuid), public._pm_termo_fechar(uuid), public._pm_termo_falta(uuid),
   public._pm_termo_assinar(integer, text, uuid, text), public._pm_termo_link(integer, text, uuid),
   public._pm_termo_buscar(integer, text, uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pedido_material_termo(integer, text, uuid), public.pedido_material_termo_salvar(integer, text, uuid, jsonb),

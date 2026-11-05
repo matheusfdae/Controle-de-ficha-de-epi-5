@@ -135,7 +135,9 @@ export async function assinarItemColetivo(itemId: string, assinaturaDataUrl: str
 }
 
 export async function finalizarTermo(id: string): Promise<void> {
-  await supabase.from('termos_epi_coletivos').update({ status: 'finalizado' }).eq('id', id);
+  // Termo de pedido de material só finaliza com a quantidade do pedido inteira (gatilho no banco).
+  const { error } = await supabase.from('termos_epi_coletivos').update({ status: 'finalizado' }).eq('id', id);
+  if (error) throw new Error(error.message);
 }
 
 export async function deletarTermo(id: string): Promise<void> {
