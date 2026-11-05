@@ -28,7 +28,6 @@ const baseItems: Array<{ title: string; guia: string; url: string; icon: typeof 
 ];
 
 const epiItems: Array<{ title: string; guia: string; url: string; icon: typeof FilePlus2; end: boolean; module?: ModuleId; action?: ActionId }> = [
-  { title: 'Nova Ficha EPI', guia: 'menu-nova-ficha-epi', url: '/nova-ficha?tipo=epi', icon: FilePlus2, end: false, module: 'fichas_epi', action: 'create' },
   { title: 'Termo Coletivo EPI', guia: 'menu-termo-coletivo', url: '/termos-coletivos', icon: FileSignature, end: false },
   { title: 'Consultar Fichas EPI', guia: 'menu-consultar-epi', url: '/consultar?tipo=epi', icon: Search, end: false },
 ];
