@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { alertaDeHoje, aplicarAjustes, contatosDoPosto, jaPediu, mensagemAlerta, previstaNoMes, proximaPrevista } from '../../supabase/functions/_shared/alertaPedido';
+import { alertaDeHoje, aplicarAjustes, contatosDoPosto, jaPediu, mensagemAlerta, previstaNoMes, proximaPrevista, ultimoPedido } from '../../supabase/functions/_shared/alertaPedido';
 
 describe('data prevista', () => {
   it('mês mais curto usa o último dia', () => {
@@ -74,6 +74,18 @@ describe('mensagem', () => {
     const dia = mensagemAlerta({ nome: '', posto: 'CNI', data: '2026-11-25', momento: 'dia', link: null });
     expect(dia).toContain('Olá!');
     expect(dia).toContain('é *hoje (25/11/2026)*');
+  });
+  it('cita o último pedido do posto (não cancelado), se houver', () => {
+    const ultimo = ultimoPedido([
+      { codigo: 'SOL-2026-000012', data_pedido: '2026-10-03', status: 'atendida' },
+      { codigo: 'SOL-2026-000015', data_pedido: '2026-10-20', status: 'cancelada' },
+      { codigo: 'SOL-2026-000009', data_pedido: '2026-09-02', status: 'atendida' },
+    ]);
+    expect(ultimo).toEqual({ codigo: 'SOL-2026-000012', data: '2026-10-03' });
+    expect(mensagemAlerta({ nome: 'Ana', posto: 'CNI', data: '2026-11-25', momento: 'antes', link: null, ultimo }))
+      .toContain('Último pedido deste posto: *SOL-2026-000012*, feito em 03/10/2026.');
+    expect(mensagemAlerta({ nome: 'Ana', posto: 'CNI', data: '2026-11-25', momento: 'antes', link: null })).not.toContain('Último pedido');
+    expect(ultimoPedido([])).toBeNull();
   });
   it('envio pelo botão: com a próxima data, ou sem data prevista', () => {
     expect(mensagemAlerta({ nome: 'Ana', posto: 'CNI', data: '2026-11-25', momento: 'manual', link: null })).toContain('está previsto para *25/11/2026*');

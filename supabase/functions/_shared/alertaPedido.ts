@@ -107,6 +107,15 @@ export function aplicarAjustes(contatos: Contato[], ajustes: AjusteContato[]): {
   return { recebem: recebem.filter(c => !vistos.has(c.numero) && vistos.add(c.numero)), removidos };
 }
 
+export interface UltimoPedido { codigo: string; data: string }
+
+/** Pedido mais recente (não cancelado) do posto, para citar no lembrete. */
+export function ultimoPedido(pedidos: { codigo?: string | null; data_pedido: string; status: string }[]): UltimoPedido | null {
+  const p = pedidos.filter(x => x.codigo && x.status !== 'cancelada')
+    .sort((a, b) => b.data_pedido.localeCompare(a.data_pedido) || b.codigo!.localeCompare(a.codigo!))[0];
+  return p ? { codigo: p.codigo!, data: p.data_pedido } : null;
+}
+
 const dataBr = (d: string) => d.split('-').reverse().join('/');
 const primeiroNome = (n: string) => {
   const p = n.trim().split(/\s+/)[0] ?? '';
@@ -117,13 +126,16 @@ const primeiroNome = (n: string) => {
  * Texto do lembrete (WhatsApp: *negrito*). 'manual' = enviado pelo botão da tela:
  * cita a próxima data prevista, se o posto tiver uma (sem data: "precisa ser feito").
  */
-export function mensagemAlerta(a: { nome: string; posto: string; data: string | null; momento: Momento | 'manual'; link: string | null }): string {
+export function mensagemAlerta(a: {
+  nome: string; posto: string; data: string | null; momento: Momento | 'manual'; link: string | null; ultimo?: UltimoPedido | null;
+}): string {
   const ola = primeiroNome(a.nome) ? `Olá, ${primeiroNome(a.nome)}!` : 'Olá!';
   const quando = !a.data ? 'precisa ser feito'
     : a.momento === 'dia' ? `é *hoje (${dataBr(a.data)})*` : `está previsto para *${dataBr(a.data)}*`;
   const link = a.link ? `${a.link.replace(/\/+$/, '')}/pedido-material` : null;
   return `${ola} Aqui é do Grupo 5 Estrelas.\n\n`
     + `Lembrete: o pedido de material de limpeza do posto *${a.posto}* ${quando}.\n\n`
+    + (a.ultimo ? `Último pedido deste posto: *${a.ultimo.codigo}*, feito em ${dataBr(a.ultimo.data)}.\n\n` : '')
     + (link ? `Faça o pedido por este link, com a sua matrícula ou CPF:\n${link}\n\n` : 'Faça o pedido pelo link do pedido de material, com a sua matrícula ou CPF.\n\n')
     + 'Se já fez o pedido, pode desconsiderar esta mensagem.\n\n'
     + '_Salve este número nos seus contatos para o link ficar clicável._';
