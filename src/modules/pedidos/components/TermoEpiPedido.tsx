@@ -12,11 +12,8 @@ import {
   type ColaboradorBusca, type Solicitante, type TermoDoPedido,
 } from '../lib/pedidosService';
 
-const OUTRO = '__outro__';
 interface Linha {
   chave: string; id?: string; pedido_item_id: string; colaborador_senior_id: string | null; colaborador_nome: string;
-  /** Fora da lista do posto: achado na busca da Senior (com id) ou nome digitado (sem id). */
-  outro: boolean;
   quantidade: string; assinado_em: string | null;
 }
 let seq = 0;
@@ -26,12 +23,11 @@ const dataHora = (s: string) => new Date(s).toLocaleString('pt-BR', { dateStyle:
 const paraLinhas = (t: TermoDoPedido): Linha[] => t.linhas.map(l => ({
   chave: l.id, id: l.id, pedido_item_id: l.pedido_item_id ?? '', colaborador_senior_id: l.colaborador_senior_id,
   colaborador_nome: l.colaborador_nome, quantidade: String(l.quantidade), assinado_em: l.assinado_em,
-  outro: !l.colaborador_senior_id || !t.colaboradores.some(c => c.id === l.colaborador_senior_id),
 }));
 
 /**
  * Termo de EPI do pedido, pelo link do encarregado: monta quem recebe cada EPI
- * (colaboradores do posto na Senior, ou nome digitado) e, com o pedido atendido,
+ * (colaborador buscado pelo nome na Senior) e, com o pedido atendido,
  * colhe a assinatura no celular dele ou manda o link para o colaborador.
  */
 export default function TermoEpiPedido({ quem, pedidoId, codigo, posto, aberto, fechar }: {
@@ -57,16 +53,18 @@ export default function TermoEpiPedido({ quem, pedidoId, codigo, posto, aberto, 
   const mudar = (chave: string, m: Partial<Linha>) => { setLinhas(ls => ls.map(l => (l.chave === chave ? { ...l, ...m } : l))); setAlterado(true); setLink(null); };
   const adicionar = () => {
     const epi = termo?.epis.find(e => (soma[e.item_id] ?? 0) < e.limite) ?? termo?.epis[0];
-    setLinhas(ls => [...ls, { chave: novaChave(), pedido_item_id: epi?.item_id ?? '', colaborador_senior_id: null, colaborador_nome: '', outro: false, quantidade: '1', assinado_em: null }]);
+    setLinhas(ls => [...ls, { chave: novaChave(), pedido_item_id: epi?.item_id ?? '', colaborador_senior_id: null, colaborador_nome: '', quantidade: '1', assinado_em: null }]);
     setAlterado(true);
   };
 
   const salvar = async () => {
+    const sem = linhas.findIndex(l => !l.assinado_em && !l.colaborador_senior_id);
+    if (sem >= 0) return toast.error(`Busque o colaborador da linha ${sem + 1} na Senior.`);
     setSalvando(true);
     try {
       aplicar(await salvarTermo(quem, pedidoId, linhas.map(l => ({
         id: l.id, pedido_item_id: l.pedido_item_id, colaborador_senior_id: l.colaborador_senior_id,
-        colaborador_nome: l.colaborador_senior_id ? null : l.colaborador_nome, quantidade: Number(l.quantidade) || 0,
+        colaborador_nome: null, quantidade: Number(l.quantidade) || 0,
       }))));
       toast.success('Termo salvo.');
     } catch (e) { toast.error((e as Error).message); } finally { setSalvando(false); }
@@ -136,26 +134,16 @@ export default function TermoEpiPedido({ quem, pedidoId, codigo, posto, aberto, 
                 </li>
               ) : (
                 <li key={l.chave} className="rounded-md border p-2.5 space-y-2">
-                  <div className="flex gap-2">
-                    <Select value={l.outro ? OUTRO : (l.colaborador_senior_id ?? '')}
-                      onValueChange={v => mudar(l.chave, v === OUTRO
-                        ? { colaborador_senior_id: null, outro: true, colaborador_nome: '' }
-                        : { colaborador_senior_id: v, outro: false, colaborador_nome: colaboradores.find(c => c.id === v)?.nome ?? '' })}>
-                      <SelectTrigger className="flex-1 min-w-0"><SelectValue placeholder="Colaborador" /></SelectTrigger>
-                      <SelectContent className="max-h-80">
-                        {colaboradores.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
-                        <SelectItem value={OUTRO}>Outro (buscar na Senior)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="flex gap-2 items-start">
+                    <div className="flex-1 min-w-0">
+                      <BuscaSenior quem={quem} pedidoId={pedidoId} linha={l} doPosto={colaboradores}
+                        escolher={c => mudar(l.chave, { colaborador_senior_id: c.id, colaborador_nome: c.nome })}
+                        limpar={() => mudar(l.chave, { colaborador_senior_id: null, colaborador_nome: '' })} />
+                    </div>
                     <Button variant="ghost" size="icon" aria-label="Tirar do termo" onClick={() => { setLinhas(ls => ls.filter(x => x.chave !== l.chave)); setAlterado(true); }}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                  {l.outro && (
-                    <BuscaSenior quem={quem} pedidoId={pedidoId} linha={l}
-                      escolher={c => mudar(l.chave, { colaborador_senior_id: c.id, colaborador_nome: c.nome })}
-                      digitar={nome => mudar(l.chave, { colaborador_senior_id: null, colaborador_nome: nome })} />
-                  )}
                   <div className="flex gap-2">
                     <Select value={l.pedido_item_id} onValueChange={v => mudar(l.chave, { pedido_item_id: v })}>
                       <SelectTrigger className="flex-1 min-w-0"><SelectValue placeholder="EPI" /></SelectTrigger>
@@ -164,7 +152,7 @@ export default function TermoEpiPedido({ quem, pedidoId, codigo, posto, aberto, 
                     <Input className="w-20" inputMode="numeric" aria-label="Quantidade" value={l.quantidade}
                       onChange={e => mudar(l.chave, { quantidade: e.target.value.replace(/\D/g, '').slice(0, 4) })} />
                   </div>
-                  {termo.liberado && l.id && !alterado && (
+                  {termo.liberado && l.id && l.colaborador_senior_id && !alterado && (
                     <div className="flex flex-wrap gap-2">
                       <Button size="sm" className="gap-1" onClick={() => setAssinando(l)}><PenLine className="h-4 w-4" /> Assinar aqui</Button>
                       <Button size="sm" variant="outline" className="gap-1" onClick={() => gerarLink(l)}><Link2 className="h-4 w-4" /> Enviar link</Button>
@@ -207,20 +195,21 @@ export default function TermoEpiPedido({ quem, pedidoId, codigo, posto, aberto, 
   );
 }
 
-/** Busca o colaborador pelo nome na Senior inteira; sem resultado, dá para usar o nome digitado. */
-function BuscaSenior({ quem, pedidoId, linha, escolher, digitar }: {
-  quem: Solicitante; pedidoId: string; linha: Linha; escolher: (c: ColaboradorBusca) => void; digitar: (nome: string) => void;
+/** Busca o colaborador pelo nome na Senior inteira; com o campo vazio, sugere quem é do posto. */
+function BuscaSenior({ quem, pedidoId, linha, doPosto, escolher, limpar }: {
+  quem: Solicitante; pedidoId: string; linha: Linha; doPosto: { id: string; nome: string; cargo: string | null }[];
+  escolher: (c: { id: string; nome: string }) => void; limpar: () => void;
 }) {
   const [busca, setBusca] = useState('');
   const [achados, setAchados] = useState<ColaboradorBusca[] | null>(null);
   const [buscando, setBuscando] = useState(false);
+  const curta = busca.trim().replace(/\s/g, '').length < 3;
   useEffect(() => {
-    const t = busca.trim();
-    if (t.replace(/\s/g, '').length < 3) { setAchados(null); return; }
+    if (curta) { setAchados(null); setBuscando(false); return; }
     let ativo = true;
     setBuscando(true);
     const id = setTimeout(() => {
-      buscarColaboradorTermo(quem, pedidoId, t)
+      buscarColaboradorTermo(quem, pedidoId, busca.trim())
         .then(r => { if (ativo) setAchados(r); })
         .catch(e => { if (ativo) toast.error((e as Error).message); })
         .finally(() => { if (ativo) setBuscando(false); });
@@ -229,45 +218,47 @@ function BuscaSenior({ quem, pedidoId, linha, escolher, digitar }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [busca, pedidoId]);
 
-  // Já escolhido: mostra o nome (da Senior ou digitado) com opção de trocar.
-  if (linha.colaborador_nome && !busca) {
+  if (linha.colaborador_senior_id) {
     return (
       <div className="flex items-center justify-between gap-2 rounded-md border bg-muted/40 px-3 py-2">
-        <div className="min-w-0">
-          <p className="font-medium truncate">{linha.colaborador_nome}</p>
-          <p className="text-xs text-muted-foreground">{linha.colaborador_senior_id ? 'Da Senior' : 'Nome digitado (não está na Senior)'}</p>
-        </div>
-        <Button variant="ghost" size="sm" className="gap-1 shrink-0" onClick={() => { setBusca(linha.colaborador_nome); digitar(''); }}>
-          <X className="h-4 w-4" /> Trocar
-        </Button>
+        <p className="font-medium truncate min-w-0">{linha.colaborador_nome}</p>
+        <Button variant="ghost" size="sm" className="gap-1 shrink-0 h-7" onClick={limpar}><X className="h-4 w-4" /> Trocar</Button>
       </div>
     );
   }
+  const escolherELimpar = (c: { id: string; nome: string }) => { escolher(c); setBusca(''); setAchados(null); };
   return (
     <div className="space-y-1.5">
       <div className="relative">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input className="pl-8" placeholder="Digite o nome para buscar na Senior" value={busca} maxLength={150} autoFocus
+        <Input className="pl-8" placeholder="Buscar colaborador pelo nome" value={busca} maxLength={150}
           onChange={e => setBusca(e.target.value)} />
         {buscando && <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
       </div>
+      {linha.colaborador_nome && !busca && (
+        <p className="text-xs text-amber-700 dark:text-amber-400">"{linha.colaborador_nome}" foi digitado: busque o colaborador na Senior.</p>
+      )}
+      {curta && !busca && doPosto.length > 0 && (
+        <ul className="max-h-40 overflow-y-auto rounded-md border divide-y">
+          <li className="px-3 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">Do posto</li>
+          {doPosto.map(c => (
+            <li key={c.id}>
+              <button type="button" className="w-full text-left px-3 py-2 hover:bg-muted" onClick={() => escolherELimpar(c)}>{c.nome}</button>
+            </li>
+          ))}
+        </ul>
+      )}
       {achados && (
         <ul className="max-h-56 overflow-y-auto rounded-md border divide-y">
           {achados.map(c => (
             <li key={c.id}>
-              <button type="button" className="w-full text-left px-3 py-2 hover:bg-muted" onClick={() => { escolher(c); setBusca(''); setAchados(null); }}>
+              <button type="button" className="w-full text-left px-3 py-2 hover:bg-muted" onClick={() => escolherELimpar(c)}>
                 <span className="font-medium">{c.nome}</span>
                 <span className="block text-xs text-muted-foreground">{[c.cargo, c.matricula && `matrícula ${c.matricula}`].filter(Boolean).join(' · ')}</span>
               </button>
             </li>
           ))}
-          {achados.length === 0 && <li className="px-3 py-2 text-xs text-muted-foreground">Ninguém ativo na Senior com esse nome.</li>}
-          <li>
-            <button type="button" className="w-full text-left px-3 py-2 text-xs text-muted-foreground hover:bg-muted"
-              onClick={() => { digitar(busca.trim().replace(/\s+/g, ' ')); setBusca(''); setAchados(null); }}>
-              Não está na Senior: usar "<b>{busca.trim()}</b>" como digitado
-            </button>
-          </li>
+          {achados.length === 0 && <li className="px-3 py-2 text-xs text-muted-foreground">Ninguém ativo na Senior com esse nome. Confira a grafia.</li>}
         </ul>
       )}
     </div>

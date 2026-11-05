@@ -1,7 +1,7 @@
 -- Termo de EPI do pedido de material (modelo "TERMO DE ENTREGA DE EPI - Rev 00").
 -- Pedido com item de EPI ganha um termo coletivo (termos_epi_coletivos) ligado a ele:
 --   * o encarregado, pelo link do pedido (matrícula/CPF), monta quem recebe o quê
---     (colaboradores ativos do posto na Senior, ou nome digitado);
+--     (colaborador buscado pelo nome na Senior);
 --   * a soma por item não passa da quantidade do pedido (atendida, depois da entrega);
 --   * as assinaturas só abrem quando o pedido está atendido (EPI chegou): o
 --     colaborador assina no celular do encarregado ou pelo link
@@ -74,7 +74,7 @@ BEGIN
 END $$;
 
 -- Salva as linhas do termo (as já assinadas não mudam).
--- _linhas: [{id?, pedido_item_id, colaborador_senior_id?, colaborador_nome?, quantidade}]
+-- _linhas: [{id?, pedido_item_id, colaborador_senior_id, quantidade}]
 CREATE OR REPLACE FUNCTION public._pm_termo_salvar(_matricula integer, _cpf text, _pedido_id uuid, _linhas jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
@@ -115,8 +115,9 @@ BEGIN
       SELECT * INTO _c FROM colaboradores_senior WHERE id = (_l->>'colaborador_senior_id')::uuid;
       IF NOT FOUND THEN RAISE EXCEPTION 'Colaborador da linha % não encontrado.', _ordem; END IF;
     END IF;
-    _nome := coalesce(_c.nome, nullif(left(regexp_replace(trim(coalesce(_l->>'colaborador_nome', '')), '\s+', ' ', 'g'), 150), ''));
-    IF _nome IS NULL THEN RAISE EXCEPTION 'Informe o colaborador da linha %.', _ordem; END IF;
+    -- Só colaborador da Senior (buscado pelo nome): nada de nome digitado.
+    IF _c.id IS NULL THEN RAISE EXCEPTION 'Busque o colaborador da linha % na Senior.', _ordem; END IF;
+    _nome := _c.nome;
 
     _id := nullif(_l->>'id', '')::uuid;
     IF _id IS NOT NULL AND EXISTS (SELECT 1 FROM termos_epi_coletivos_itens WHERE id = _id AND termo_id = _termo AND data_assinatura IS NOT NULL) THEN
