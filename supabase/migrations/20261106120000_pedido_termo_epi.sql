@@ -278,11 +278,43 @@ RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
     ORDER BY p.created_at DESC LIMIT 50) x
 $$;
 
+-- Busca de colaborador na Senior inteira, pelo nome (para quem não está na lista do posto).
+-- Só ativos, no máximo 15, sem CPF; cada palavra digitada precisa aparecer no nome (sem acento).
+CREATE OR REPLACE FUNCTION public._pm_sem_acento(_t text)
+RETURNS text LANGUAGE sql IMMUTABLE AS $$
+  SELECT lower(translate(coalesce(_t, ''), 'ÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇáàâãäéèêëíìîïóòôõöúùûüç', 'AAAAAEEEEIIIIOOOOOUUUUCaaaaaeeeeiiiiooooouuuuc'))
+$$;
+
+CREATE OR REPLACE FUNCTION public._pm_termo_buscar(_matricula integer, _cpf text, _pedido_id uuid, _busca text)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE _p public.pedidos_material; _palavras text[];
+BEGIN
+  _p := public._pm_termo_pedido(public._cracha_solicitante(_matricula, _cpf), _pedido_id);
+  _palavras := array_remove(regexp_split_to_array(public._pm_sem_acento(trim(_busca)), '\s+'), '');
+  IF length(array_to_string(_palavras, '')) < 3 THEN RETURN '[]'::jsonb; END IF;
+  RETURN (SELECT coalesce(jsonb_agg(jsonb_build_object('id', x.id, 'nome', x.nome, 'cargo', x.cargo, 'matricula', x.num_cad) ORDER BY x.nome), '[]')
+          FROM (SELECT c.id, c.nome, c.cargo, c.num_cad FROM colaboradores_senior c
+                WHERE c.ativo
+                  AND (SELECT bool_and(public._pm_sem_acento(c.nome) LIKE '%' || w || '%') FROM unnest(_palavras) w)
+                ORDER BY c.nome LIMIT 15) x);
+END $$;
+
+CREATE OR REPLACE FUNCTION public.pedido_material_termo_buscar(_matricula integer, _cpf text, _pedido_id uuid, _busca text)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  RETURN public._pm_termo_buscar(_matricula, _cpf, _pedido_id, _busca);
+EXCEPTION WHEN SQLSTATE 'P0401' OR raise_exception THEN
+  RETURN public._cracha_erro(SQLSTATE, SQLERRM, public._cracha_chave(_matricula, _cpf));
+END $$;
+
 REVOKE ALL ON FUNCTION public._pm_termo_pedido(public.colaboradores_senior, uuid), public._pm_termo_dados(public.pedidos_material),
   public._pm_termo(integer, text, uuid), public._pm_termo_salvar(integer, text, uuid, jsonb),
   public._pm_termo_linha(public.colaboradores_senior, uuid), public._pm_termo_fechar(uuid),
-  public._pm_termo_assinar(integer, text, uuid, text), public._pm_termo_link(integer, text, uuid) FROM PUBLIC, anon, authenticated;
+  public._pm_termo_assinar(integer, text, uuid, text), public._pm_termo_link(integer, text, uuid),
+  public._pm_termo_buscar(integer, text, uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pedido_material_termo(integer, text, uuid), public.pedido_material_termo_salvar(integer, text, uuid, jsonb),
-  public.pedido_material_termo_assinar(integer, text, uuid, text), public.pedido_material_termo_link(integer, text, uuid) TO anon, authenticated;
+  public.pedido_material_termo_assinar(integer, text, uuid, text), public.pedido_material_termo_link(integer, text, uuid),
+  public.pedido_material_termo_buscar(integer, text, uuid, text) TO anon, authenticated;
 
 NOTIFY pgrst, 'reload schema';

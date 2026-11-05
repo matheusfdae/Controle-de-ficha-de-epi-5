@@ -116,7 +116,7 @@ export const catalogoDoPosto = (materiais: MaterialPublico[], posto: PostoPublic
   posto?.itens == null ? materiais : materiais.filter(m => posto.itens!.includes(m.id));
 
 type FuncaoPublica = 'pedido_material_identificar' | 'pedido_material_enviar' | 'pedido_material_cancelar' | 'pedido_material_reenviar'
-  | 'pedido_material_termo' | 'pedido_material_termo_salvar' | 'pedido_material_termo_assinar' | 'pedido_material_termo_link';
+  | 'pedido_material_termo' | 'pedido_material_termo_salvar' | 'pedido_material_termo_assinar' | 'pedido_material_termo_link' | 'pedido_material_termo_buscar';
 async function chamarPublica<T>(fn: FuncaoPublica, args: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.rpc(fn, args as never);
   if (error) throw new Error(error.message?.includes('Failed to fetch') ? 'Sem conexão com o servidor. Verifique a internet.' : error.message);
@@ -170,6 +170,10 @@ export const assinarLinhaTermo = (s: Solicitante, linhaId: string, assinatura: s
   chamarPublica<TermoDoPedido>('pedido_material_termo_assinar', { ...solicitanteArgs(s), _linha_id: linhaId, _assinatura: assinatura });
 export const linkLinhaTermo = (s: Solicitante, linhaId: string) =>
   chamarPublica<{ token: string; colaborador: string }>('pedido_material_termo_link', { ...solicitanteArgs(s), _linha_id: linhaId });
+export interface ColaboradorBusca { id: string; nome: string; cargo: string | null; matricula: number | null }
+/** Colaboradores ativos da Senior pelo nome (mínimo 3 letras; até 15). */
+export const buscarColaboradorTermo = (s: Solicitante, pedidoId: string, busca: string) =>
+  chamarPublica<ColaboradorBusca[]>('pedido_material_termo_buscar', { ...solicitanteArgs(s), _pedido_id: pedidoId, _busca: busca });
 
 /** Quanto de cada EPI o termo já distribui (pedido_item_id -> soma). */
 export function distribuidoPorEpi(linhas: { pedido_item_id: string | null; quantidade: number }[]): Record<string, number> {

@@ -2476,6 +2476,7 @@ export type Database = {
       pedido_material_termo_salvar: { Args: { _matricula: number | null; _cpf: string | null; _pedido_id: string; _linhas: Json }; Returns: Json }
       pedido_material_termo_assinar: { Args: { _matricula: number | null; _cpf: string | null; _linha_id: string; _assinatura: string }; Returns: Json }
       pedido_material_termo_link: { Args: { _matricula: number | null; _cpf: string | null; _linha_id: string }; Returns: Json }
+      pedido_material_termo_buscar: { Args: { _matricula: number | null; _cpf: string | null; _pedido_id: string; _busca: string }; Returns: Json }
       sou_master: { Args: Record<PropertyKey, never>; Returns: boolean }
       master_tabelas: { Args: Record<PropertyKey, never>; Returns: Json }
       master_buscar: { Args: { _tabela: string; _busca: string; _limite?: number }; Returns: Json }
