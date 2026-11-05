@@ -20,13 +20,13 @@
 import { verifyCaller, serviceClient, json, corsHeaders } from '../_shared/clerk.ts';
 import { agendarEnvios, ErroWhatsApp, novoLote, type ContaWhatsApp, type EnvioWhatsApp } from '../_shared/whatsapp.ts';
 import {
-  DIAS_CONTATOS, JANELA_JA_PEDIU, alertaDeHoje, aplicarAjustes, contatosDoPosto, jaPediu, mensagemAlerta, proximaPrevista,
+  DIAS_CONTATOS, JANELA_JA_PEDIU, alertaDeHoje, aplicarAjustes, contatosDoPosto, jaPediu, mensagemAlerta, proximaPrevista, ultimoPedido,
   type AjusteContato, type Momento, type PedidoContato,
 } from '../_shared/alertaPedido.ts';
 
-const CAMPOS_PEDIDO = 'posto_id, solicitante_nome, solicitante_telefone, solicitante_senior_id, data_pedido, status, colaboradores_senior(telefone)';
+const CAMPOS_PEDIDO = 'posto_id, codigo, solicitante_nome, solicitante_telefone, solicitante_senior_id, data_pedido, status, colaboradores_senior(telefone)';
 /** Linha do banco -> pedido com o celular da Senior de quem pediu. */
-const comSenior = (x: any): PedidoContato & { posto_id: string; status: string } => ({ ...x, senior_telefone: x.colaboradores_senior?.telefone ?? null });
+const comSenior = (x: any): PedidoContato & { posto_id: string; status: string; codigo: string } => ({ ...x, senior_telefone: x.colaboradores_senior?.telefone ?? null });
 
 /** Quem recebe o alerta do posto: pedidos pelo link + ajustes da tela. */
 function destinatarios(pedidos: PedidoContato[], ajustes: AjusteContato[], hoje: string) {
@@ -85,7 +85,7 @@ async function alertar(admin: any, modo: 'automatico' | 'agora' | 'simular') {
     }
     alertas.push({
       posto_id: p.id, posto: p.nome, data: a.data, momento: a.momento,
-      envios: contatos.map(c => ({ nome: c.nome || p.nome, numero: c.numero, texto: mensagemAlerta({ nome: c.nome, posto: p.nome, data: a.data, momento: a.momento, link: cfg?.link_sistema ?? null }) })),
+      envios: contatos.map(c => ({ nome: c.nome || p.nome, numero: c.numero, texto: mensagemAlerta({ nome: c.nome, posto: p.nome, data: a.data, momento: a.momento, link: cfg?.link_sistema ?? null, ultimo: ultimoPedido(doPosto) }) })),
     });
   }
 
@@ -118,11 +118,13 @@ async function alertarPosto(admin: any, postoId: string) {
   ]);
   if (ePed) throw new Error(ePed.message);
   if (eAj) throw new Error(eAj.message);
-  const contatos = destinatarios((brutos ?? []).map(comSenior), ajustes ?? [], hoje);
+  const pedidos = (brutos ?? []).map(comSenior);
+  const contatos = destinatarios(pedidos, ajustes ?? [], hoje);
+  const ultimo = ultimoPedido(pedidos);
   if (!contatos.length) return { enviado: false, motivo: `ninguém para receber: ninguém pediu por este posto pelo link nos últimos ${DIAS_CONTATOS} dias nem foi adicionado` };
   const data = posto.pedido_dia ? proximaPrevista(posto.pedido_dia, hoje) : null;
   const envios = contatos.map(c => ({ nome: c.nome || posto.nome, numero: c.numero,
-    texto: mensagemAlerta({ nome: c.nome, posto: posto.nome, data, momento: data === hoje ? 'dia' : 'manual', link: cfg?.link_sistema ?? null }) }));
+    texto: mensagemAlerta({ nome: c.nome, posto: posto.nome, data, momento: data === hoje ? 'dia' : 'manual', link: cfg?.link_sistema ?? null, ultimo }) }));
   const r = await agendarEnvios(await conta(admin), envios, 60, novoLote(new Date(), 'alerta-pedido'));
   return { enviado: r.agendados > 0, lote: r.lote, agendados: r.agendados, sem_whatsapp: r.semWhatsApp, termina: r.termina,
     alertas: [{ posto: posto.nome, data: data ?? hoje, momento: 'manual', pessoas: envios.filter(e => !r.semWhatsApp.includes(e.nome)).map(e => `${e.nome} (${e.numero})`) }] };
