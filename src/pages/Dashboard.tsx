@@ -14,7 +14,6 @@ import { getFichas, seedDemoData } from '@/services/fichaService';
 import { getConfig } from '@/services/configService';
 import { getItemValidade } from '@/lib/validade';
 import { useAuth } from '@/contexts/AuthContext';
-import CartaoTetoDashboard from '@/modules/pedidos/components/CartaoTetoDashboard';
 
 interface VencimentoItem {
   fichaId: string;
@@ -149,7 +148,6 @@ export default function Dashboard() {
         </div>
 
         {/* Teto de gasto dos postos (pedidos de material) */}
-        {can('pedidos_material', 'view') && <CartaoTetoDashboard />}
 
         {/* Charts */}
         <div className="grid gap-4 lg:grid-cols-3">
