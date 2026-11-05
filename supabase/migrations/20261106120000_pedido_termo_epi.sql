@@ -53,8 +53,16 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
                FROM termos_epi_coletivos_itens l WHERE l.termo_id = t.id),
     'colaboradores', (SELECT coalesce(jsonb_agg(jsonb_build_object('id', c.id, 'nome', c.nome, 'cargo', c.cargo) ORDER BY c.nome), '[]')
                       FROM colaboradores_senior c
+                      -- Mesma regra de _pm_posto_do_colaborador, mas calculando as chaves do posto
+                      -- uma vez só (chamar a função por colaborador estourava o tempo do banco).
                       WHERE c.ativo
-                        AND public._pm_posto_do_colaborador(c) = _p.posto_id))
+                        AND EXISTS (
+                          SELECT 1 FROM (SELECT po.nome_chave AS k FROM postos po WHERE po.id = _p.posto_id
+                                         UNION SELECT lower(regexp_replace(trim(a), '\s+', ' ', 'g'))
+                                         FROM postos po, unnest(po.apelidos) a WHERE po.id = _p.posto_id) ch
+                          WHERE ch.k IN (
+                            lower(regexp_replace(trim(regexp_replace(coalesce(c.posto_descricao, ''), '^\s*\d{3,4}\s*-\s*\d{3,4}\s*-\s*', '')), '\s+', ' ', 'g')),
+                            lower(regexp_replace(trim(coalesce(c.nome_local, '')), '\s+', ' ', 'g'))))))
   FROM (SELECT NULL) x LEFT JOIN termos_epi_coletivos t ON t.pedido_id = _p.id
 $$;
 
