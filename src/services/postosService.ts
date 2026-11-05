@@ -14,6 +14,8 @@ export interface Posto {
   troca_uniforme_obrigatoria: boolean;
   /** Teto mensal de material do posto (pedidos de material); null = sem teto. */
   teto_material: number | null;
+  /** Dia do mês previsto para o posto pedir material (alerta por WhatsApp); null = sem data. */
+  pedido_dia: number | null;
 }
 
 /** Mesma normalização da coluna gerada postos.nome_chave. */
@@ -23,7 +25,7 @@ export const chavePosto = (nome: string | null | undefined) =>
 export async function listPostos(): Promise<Posto[]> {
   const { data, error } = await supabase
     .from('postos')
-    .select('id, nome, uf, latitude, longitude, apelidos, endereco, ativo, troca_uniforme_meses, troca_uniforme_obrigatoria, teto_material')
+    .select('id, nome, uf, latitude, longitude, apelidos, endereco, ativo, troca_uniforme_meses, troca_uniforme_obrigatoria, teto_material, pedido_dia')
     .order('nome');
   if (error) throw error;
   return (data ?? []).map(p => ({ ...p, teto_material: p.teto_material == null ? null : Number(p.teto_material) }));

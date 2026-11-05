@@ -1082,9 +1082,15 @@ export type Database = {
         Relationships: []
       }
       pedido_config: {
-        Row: { id: number; avisar_email: boolean; link_sistema: string | null; emails_epi: string[]; dias_cobertura: number; updated_at: string }
-        Insert: { id?: number; avisar_email?: boolean; link_sistema?: string | null; emails_epi?: string[]; dias_cobertura?: number }
-        Update: { avisar_email?: boolean; link_sistema?: string | null; emails_epi?: string[]; dias_cobertura?: number }
+        Row: { id: number; avisar_email: boolean; alerta_whatsapp: boolean; link_sistema: string | null; emails_epi: string[]; dias_cobertura: number; updated_at: string }
+        Insert: { id?: number; avisar_email?: boolean; alerta_whatsapp?: boolean; link_sistema?: string | null; emails_epi?: string[]; dias_cobertura?: number }
+        Update: { avisar_email?: boolean; alerta_whatsapp?: boolean; link_sistema?: string | null; emails_epi?: string[]; dias_cobertura?: number }
+        Relationships: []
+      }
+      pedido_alertas_whatsapp: {
+        Row: { id: string; posto_id: string; data_prevista: string; momento: string; numero: string; nome: string | null; lote: string | null; criado_em: string }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
         Relationships: []
       }
       pedido_aprovadores: {
@@ -2001,6 +2007,7 @@ export type Database = {
           apelidos: string[]
           ativo: boolean
           teto_material: number | null
+          pedido_dia: number | null
           created_at: string
           endereco: string | null
           id: string
@@ -2017,6 +2024,7 @@ export type Database = {
           apelidos?: string[]
           ativo?: boolean
           teto_material?: number | null
+          pedido_dia?: number | null
           created_at?: string
           endereco?: string | null
           id?: string
@@ -2032,6 +2040,7 @@ export type Database = {
           apelidos?: string[]
           ativo?: boolean
           teto_material?: number | null
+          pedido_dia?: number | null
           created_at?: string
           endereco?: string | null
           id?: string
@@ -2496,6 +2505,10 @@ export type Database = {
       pedidos_importar_precos: {
         Args: { _itens: Json }
         Returns: Json
+      }
+      pedidos_definir_dia_pedido: {
+        Args: { _posto_id: string; _dia: number | null }
+        Returns: undefined
       }
       pedidos_definir_teto: {
         Args: { _posto_id: string; _teto: number | null }

@@ -395,23 +395,59 @@ export async function listUsuarios(): Promise<{ id: string; nome: string; email:
 
 // ---------- Avisos ----------
 
-export interface ConfigAvisos { avisar_email: boolean; link_sistema: string | null; emails_epi: string[]; dias_cobertura: number }
+export interface ConfigAvisos { avisar_email: boolean; alerta_whatsapp: boolean; link_sistema: string | null; emails_epi: string[]; dias_cobertura: number }
 
 export async function lerConfigAvisos(): Promise<ConfigAvisos> {
-  const { data, error } = await supabase.from('pedido_config').select('avisar_email, link_sistema, emails_epi, dias_cobertura').eq('id', 1).maybeSingle();
+  const { data, error } = await supabase.from('pedido_config').select('avisar_email, alerta_whatsapp, link_sistema, emails_epi, dias_cobertura').eq('id', 1).maybeSingle();
   if (error) throw error;
-  return data ?? { avisar_email: true, link_sistema: null, emails_epi: [], dias_cobertura: 30 };
+  return data ?? { avisar_email: true, alerta_whatsapp: true, link_sistema: null, emails_epi: [], dias_cobertura: 30 };
 }
 
 export async function salvarConfigAvisos(c: ConfigAvisos) {
   const { data, error } = await supabase.from('pedido_config')
-    .update({ avisar_email: c.avisar_email, link_sistema: c.link_sistema?.trim().replace(/\/+$/, '') || null, emails_epi: c.emails_epi, dias_cobertura: c.dias_cobertura })
+    .update({ avisar_email: c.avisar_email, alerta_whatsapp: c.alerta_whatsapp, link_sistema: c.link_sistema?.trim().replace(/\/+$/, '') || null, emails_epi: c.emails_epi, dias_cobertura: c.dias_cobertura })
     .eq('id', 1).select('id');
   if (error) throw new Error(error.message);
   if (!data?.length) throw new Error('Sem permissão para alterar os avisos.');
 }
 
 /** Roda o aviso agora (o agendador roda a cada 5 min). */
+/** Dia do mês previsto para o posto pedir (null = sem data). */
+export async function definirDiaPedido(postoId: string, dia: number | null) {
+  const { error } = await supabase.rpc('pedidos_definir_dia_pedido', { _posto_id: postoId, _dia: dia });
+  if (error) throw new Error(error.message);
+}
+
+/** Quem pediu por este posto pelo link (nome e telefone digitados), do mais recente ao mais antigo. */
+export async function quemPediuPeloLink(postoId: string, desde: string) {
+  const { data, error } = await supabase.from('pedidos_material').select('solicitante_nome, solicitante_telefone, data_pedido')
+    .eq('posto_id', postoId).gte('data_pedido', desde).not('solicitante_telefone', 'is', null).order('data_pedido', { ascending: false }).limit(500);
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export interface ResultadoAlerta {
+  enviado: boolean; motivo?: string; simulacao?: boolean; hoje?: string; lote?: string; agendados?: number; termina?: string | null;
+  sem_whatsapp?: string[]; alertas?: { posto: string; data: string; momento: 'antes' | 'dia' | 'manual'; pessoas: string[] }[];
+  pulados?: { posto: string; motivo: string }[];
+}
+
+/**
+ * Alerta de pedido por WhatsApp: 'simular' só mostra quem receberia hoje; 'agora' envia os de hoje;
+ * 'posto' manda na hora o lembrete daquele posto (botão de Itens por posto).
+ */
+export async function alertarPedidosWhatsApp(modo: 'simular' | 'agora' | 'posto', postoId?: string): Promise<ResultadoAlerta> {
+  const { data, error } = await supabase.functions.invoke('alertar-pedidos-whatsapp', { body: { modo, posto_id: postoId } });
+  if (error) {
+    let msg = '';
+    if ('context' in error) {
+      try { msg = (await (error.context as Response).json()).error; } catch { /* corpo não é JSON */ }
+    }
+    throw new Error(msg || error.message);
+  }
+  return data;
+}
+
 export async function avisarAgora(): Promise<{ enviado: boolean; motivo?: string; emails?: number; pedidos?: number; sem_destinatario?: string[]; falhas?: string[] }> {
   const { data, error } = await supabase.functions.invoke('avisar-pedidos-material', { body: { modo: 'manual' } });
   if (error) {

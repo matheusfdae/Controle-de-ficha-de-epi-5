@@ -14,6 +14,7 @@ FUNCAO_URL="http://localhost:8000/functions/v1/enviar-convocacao-uniforme"
 FUNCAO_ESTOQUE="http://localhost:8000/functions/v1/enviar-relatorio-estoque"
 FUNCAO_PENDENTES="http://localhost:8000/functions/v1/enviar-relatorio-pendentes"
 FUNCAO_PEDIDOS="http://localhost:8000/functions/v1/avisar-pedidos-material"
+FUNCAO_ALERTA="http://localhost:8000/functions/v1/alertar-pedidos-whatsapp"
 
 # Segredo do agendador: gerado aqui, guardado no banco e num arquivo só deste usuário.
 CRON_SECRET="$(openssl rand -hex 32)"
@@ -33,7 +34,11 @@ LINHA_PENDENTES="0 $HORA * * * curl -s -m 120 -X POST $FUNCAO_PENDENTES -H 'Cont
 LINHA_REPOSICAO="*/15 * * * * r=\$(curl -s -m 120 -X POST $FUNCAO_ESTOQUE -H 'Content-Type: application/json' -H \"x-cron-secret: \$(cat \$HOME/.email-cron-secret)\" -d '{\"modo\":\"reposicao\"}' 2>&1); case \"\$r\" in *'\"enviado\":false'*) ;; *) echo \"\$(date '+\%F \%T') \$r\" >> \$HOME/reposicao-estoque.log;; esac # reposicao-estoque"
 # Aviso aos aprovadores de pedidos de material: a cada 5 min (só envia se algum pedido chegou a um nível novo).
 LINHA_PEDIDOS="*/5 * * * * r=\$(curl -s -m 120 -X POST $FUNCAO_PEDIDOS -H 'Content-Type: application/json' -H \"x-cron-secret: \$(cat \$HOME/.email-cron-secret)\" -d '{\"modo\":\"automatico\"}' 2>&1); case \"\$r\" in *'\"enviado\":false'*) ;; *) echo \"\$(date '+\%F \%T') \$r\" >> \$HOME/avisos-pedidos.log;; esac # avisos-pedidos"
-( crontab -l 2>/dev/null | grep -v -e '# convocacao-uniforme' -e '# relatorio-estoque' -e '# reposicao-estoque' -e '# relatorio-pendentes' -e '# avisos-pedidos' || true; echo "$LINHA"; echo "$LINHA_ESTOQUE"; echo "$LINHA_PENDENTES"; echo "$LINHA_REPOSICAO"; echo "$LINHA_PEDIDOS" ) | crontab -
-echo ">>> Agendamento: todo dia às ${HORA}h desta VM (= 7h de Brasília) + pedido de reposição a cada 15 min + aviso de pedidos de material a cada 5 min."
-echo "    Logs em ~/convocacao-uniforme.log, ~/relatorio-estoque.log, ~/relatorio-pendentes.log, ~/reposicao-estoque.log e ~/avisos-pedidos.log"
+# Alerta de pedido por WhatsApp (dia previsto de cada posto): todo dia às 8h de Brasília.
+HORA_ALERTA=$(( (8 + 3 + OFF_H + 24) % 24 ))
+LINHA_ALERTA="0 $HORA_ALERTA * * * curl -s -m 300 -X POST $FUNCAO_ALERTA -H 'Content-Type: application/json' -H \"x-cron-secret: \$(cat \$HOME/.email-cron-secret)\" -d '{\"modo\":\"automatico\"}' >> \$HOME/alerta-pedido-whatsapp.log 2>&1; echo >> \$HOME/alerta-pedido-whatsapp.log # alerta-pedido-whatsapp"
+( crontab -l 2>/dev/null | grep -v -e '# convocacao-uniforme' -e '# relatorio-estoque' -e '# reposicao-estoque' -e '# relatorio-pendentes' -e '# avisos-pedidos' -e '# alerta-pedido-whatsapp' || true; echo "$LINHA"; echo "$LINHA_ESTOQUE"; echo "$LINHA_PENDENTES"; echo "$LINHA_REPOSICAO"; echo "$LINHA_PEDIDOS"; echo "$LINHA_ALERTA" ) | crontab -
+echo ">>> Agendamento: todo dia às ${HORA}h desta VM (= 7h de Brasília) + pedido de reposição a cada 15 min + aviso de pedidos de material a cada 5 min"
+echo "    + alerta de pedido por WhatsApp todo dia às ${HORA_ALERTA}h desta VM (= 8h de Brasília)."
+echo "    Logs em ~/convocacao-uniforme.log, ~/relatorio-estoque.log, ~/relatorio-pendentes.log, ~/reposicao-estoque.log, ~/avisos-pedidos.log e ~/alerta-pedido-whatsapp.log"
 echo "    Na tela: Configurações > E-mail > conecte a conta e, em cada cartão (convocação, estoque e fichas pendentes), escolha o dia, os destinatários e ligue o envio automático."

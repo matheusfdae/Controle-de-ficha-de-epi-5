@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { FileSpreadsheet, HardHat, Loader2, Mail, Pencil, Plus, Save, Search, Trash2 } from 'lucide-react';
+import { BellRing, FileSpreadsheet, HardHat, Loader2, Mail, MessageCircle, Pencil, Plus, Save, Search, Send, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import BackButton from '@/components/BackButton';
 import PageHeader from '@/components/PageHeader';
@@ -18,12 +18,13 @@ import EstadoSelect from '@/components/EstadoSelect';
 import { useAuth } from '@/contexts/AuthContext';
 import { listPostos, type Posto } from '@/services/postosService';
 import {
-  PAPEIS, avisarAgora, definirTeto, excluirAprovador, lerConfigAvisos, listAprovadores, listItensPorPosto, listMateriais, listUsuarios,
+  PAPEIS, alertarPedidosWhatsApp, avisarAgora, definirDiaPedido, definirTeto, excluirAprovador, hojeBr, quemPediuPeloLink, lerConfigAvisos, listAprovadores, listItensPorPosto, listMateriais, listUsuarios,
   materiaisPediveis, nomeMaterial, reais, rotuloPapel, salvarAprovador, salvarConfigAvisos, salvarListaDoPosto, salvarMaterial,
-  type Aprovador, type Material, type Papel,
+  type Aprovador, type Material, type Papel, type ResultadoAlerta,
 } from '../lib/pedidosService';
 import ImportarPlanilha from '../components/ImportarPlanilha';
 import ImportarPrecos from '../components/ImportarPrecos';
+import { DIAS_CONTATOS, contatosDoPosto, proximaPrevista, type Contato } from '../../../../supabase/functions/_shared/alertaPedido';
 
 /** "12,90" / "1.234,5" -> 12.9; vazio -> null; inválido -> NaN. */
 const lerValor = (t: string) => {
@@ -197,6 +198,10 @@ function ListaDoPosto({ podeEditar }: { podeEditar: boolean }) {
   const [busca, setBusca] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [teto, setTeto] = useState('');
+  const [diaPedido, setDiaPedido] = useState('');
+  const [salvandoDia, setSalvandoDia] = useState(false);
+  const [contatos, setContatos] = useState<Contato[] | null>(null);
+  const [alertandoPosto, setAlertandoPosto] = useState(false);
   const [salvandoTeto, setSalvandoTeto] = useState(false);
   const carregar = useCallback(() => Promise.all([listPostos(), listMateriais(), listItensPorPosto()])
     .then(([p, m, l]) => { setPostos(p.filter(x => x.ativo)); setMateriais(m); setListas(l); }).catch(e => toast.error(e.message)), []);
@@ -205,6 +210,34 @@ function ListaDoPosto({ podeEditar }: { podeEditar: boolean }) {
   const escolher = (id: string) => {
     setPostoId(id); setItens(listas.filter(l => l.posto_id === id).map(l => l.material_id));
     setTeto(valorTexto(postos.find(p => p.id === id)?.teto_material ?? null));
+    setDiaPedido(String(postos.find(p => p.id === id)?.pedido_dia ?? ''));
+    setContatos(null);
+    const hoje = hojeBr();
+    const desde = new Date(Date.parse(`${hoje}T12:00:00Z`) - DIAS_CONTATOS * 864e5).toISOString().slice(0, 10);
+    quemPediuPeloLink(id, desde).then(l => setContatos(contatosDoPosto(l, hoje))).catch(() => setContatos([]));
+  };
+  const salvarDia = async () => {
+    const t = diaPedido.trim();
+    const v = t === '' ? null : Number(t);
+    if (v != null && (!Number.isInteger(v) || v < 1 || v > 31)) return toast.error('Dia do pedido: de 1 a 31 (ou em branco para sem data).');
+    setSalvandoDia(true);
+    try {
+      await definirDiaPedido(postoId, v);
+      toast.success(v == null ? 'Posto sem data prevista de pedido.' : `Pedido previsto todo dia ${v}. Próximo: ${proximaPrevista(v, hojeBr()).split('-').reverse().join('/')}.`);
+      await carregar();
+    } catch (e) { toast.error((e as Error).message); } finally { setSalvandoDia(false); }
+  };
+  const alertarAgora = async () => {
+    const posto = postos.find(p => p.id === postoId);
+    if (!contatos?.length || !posto) return;
+    if (!confirm(`Enviar agora pelo WhatsApp o lembrete do pedido de ${posto.nome} para ${contatos.length} pessoa(s)?`)) return;
+    setAlertandoPosto(true);
+    try {
+      const r = await alertarPedidosWhatsApp('posto', postoId);
+      if (r.enviado) toast.success(`${r.agendados} lembrete(s) agendado(s) no WhatsApp. O primeiro sai em cerca de 1 minuto.`);
+      else toast.info(r.motivo ?? 'Nenhuma mensagem enviada.');
+      if (r.sem_whatsapp?.length) toast.warning(`Sem WhatsApp: ${r.sem_whatsapp.join(', ')}`);
+    } catch (e) { toast.error((e as Error).message); } finally { setAlertandoPosto(false); }
   };
   const salvarTeto = async () => {
     const v = lerValor(teto);
@@ -257,7 +290,41 @@ function ListaDoPosto({ podeEditar }: { podeEditar: boolean }) {
             )}
           </div>
         )}
+        {postoId && (
+          <div className="flex items-end gap-2">
+            <div className="w-36">
+              <Label htmlFor="dia-pedido">Dia do pedido (1–31)</Label>
+              <Input id="dia-pedido" inputMode="numeric" value={diaPedido} disabled={!podeEditar} placeholder="sem data"
+                onChange={e => setDiaPedido(e.target.value.replace(/\D/g, '').slice(0, 2))} />
+            </div>
+            {podeEditar && (
+              <Button variant="outline" className="gap-2" disabled={salvandoDia} onClick={salvarDia}>
+                {salvandoDia ? <Loader2 className="h-4 w-4 animate-spin" /> : <BellRing className="h-4 w-4" />} Salvar dia
+              </Button>
+            )}
+          </div>
+        )}
         </div>
+        {postoId && (
+          <div className="rounded-md border p-3 text-sm space-y-1">
+            <p className="font-medium flex items-center gap-2"><MessageCircle className="h-4 w-4 text-emerald-600" /> Alerta de pedido por WhatsApp</p>
+            <p className="text-xs text-muted-foreground">
+              {diaPedido ? <>Sai 2 dias antes e no dia {diaPedido} de cada mês, às 8h, com o link do pedido (não sai se o posto já pediu perto da data).</>
+                : <>Defina o dia do pedido para o posto receber o lembrete.</>}
+              {' '}Vai para quem pediu por este posto pelo link nos últimos {DIAS_CONTATOS} dias (o telefone que a pessoa digitou):
+            </p>
+            {contatos === null ? <Loader2 className="h-4 w-4 animate-spin" />
+              : contatos.length === 0 ? <p className="text-xs text-amber-600">Ninguém pediu por este posto pelo link nos últimos {DIAS_CONTATOS} dias: o alerta ainda não tem para quem ir.</p>
+                : <ul className="text-xs flex flex-wrap gap-x-4 gap-y-1">{contatos.map(c => (
+                  <li key={c.numero}>{c.nome || 'Sem nome'} · ({c.numero.slice(2, 4)}) {c.numero.slice(4, 9)}-{c.numero.slice(9)} <span className="text-muted-foreground">· pediu em {c.ultimo.split('-').reverse().join('/')}</span></li>
+                ))}</ul>}
+            {podeEditar && !!contatos?.length && (
+              <Button size="sm" variant="outline" className="gap-2 mt-1 border-emerald-600/40 text-emerald-700 dark:text-emerald-400" disabled={alertandoPosto} onClick={alertarAgora}>
+                {alertandoPosto ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Enviar alerta agora
+              </Button>
+            )}
+          </div>
+        )}
         {postoId && (
           <>
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
@@ -399,6 +466,9 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function Avisos({ podeEditar }: { podeEditar: boolean }) {
   const [ligado, setLigado] = useState(true);
+  const [whats, setWhats] = useState(true);
+  const [alerta, setAlerta] = useState<ResultadoAlerta | null>(null);
+  const [alertando, setAlertando] = useState<'simular' | 'agora' | null>(null);
   const [link, setLink] = useState('');
   const [emailsEpi, setEmailsEpi] = useState('');
   const [diasCobertura, setDiasCobertura] = useState('30');
@@ -408,6 +478,7 @@ function Avisos({ podeEditar }: { podeEditar: boolean }) {
   useEffect(() => {
     lerConfigAvisos().then(c => {
       setLigado(c.avisar_email);
+      setWhats(c.alerta_whatsapp);
       setLink(c.link_sistema ?? '');
       setEmailsEpi((c.emails_epi ?? []).join('\n'));
       setDiasCobertura(String(c.dias_cobertura ?? 30));
@@ -424,7 +495,7 @@ function Avisos({ podeEditar }: { podeEditar: boolean }) {
     if (!Number.isInteger(dias) || dias < 1 || dias > 365) return toast.error('Dias de cobertura: de 1 a 365.');
     setSalvando(true);
     try {
-      await salvarConfigAvisos({ avisar_email: ligado, link_sistema: link, emails_epi: [...new Set(lista)], dias_cobertura: dias });
+      await salvarConfigAvisos({ avisar_email: ligado, alerta_whatsapp: whats, link_sistema: link, emails_epi: [...new Set(lista)], dias_cobertura: dias });
       toast.success('Avisos salvos.');
     } catch (e) { toast.error((e as Error).message); } finally { setSalvando(false); }
   };
@@ -440,7 +511,22 @@ function Avisos({ podeEditar }: { podeEditar: boolean }) {
     } catch (e) { toast.error((e as Error).message); } finally { setEnviando(false); }
   };
 
+  const rodarAlerta = async (modo: 'simular' | 'agora') => {
+    if (modo === 'agora' && !confirm('Enviar agora pelo WhatsApp os alertas de pedido de hoje?')) return;
+    setAlertando(modo);
+    try {
+      const r = await alertarPedidosWhatsApp(modo);
+      setAlerta(r);
+      if (modo === 'agora') {
+        if (r.enviado) toast.success(`${r.agendados} mensagem(ns) agendada(s) no WhatsApp.`);
+        else toast.info(r.motivo ?? 'Nenhum alerta para enviar hoje.');
+        if (r.sem_whatsapp?.length) toast.warning(`Sem WhatsApp: ${r.sem_whatsapp.join(', ')}`);
+      }
+    } catch (e) { toast.error((e as Error).message); } finally { setAlertando(null); }
+  };
+
   return (
+    <div className="space-y-4">
     <Card>
       <CardHeader>
         <CardTitle className="text-lg">Avisos por e-mail</CardTitle>
@@ -488,5 +574,58 @@ function Avisos({ podeEditar }: { podeEditar: boolean }) {
         </>}
       </CardContent>
     </Card>
+
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2"><MessageCircle className="h-5 w-5 text-emerald-600" /> Alerta de pedido por WhatsApp</CardTitle>
+        <CardDescription>
+          Cada posto tem um dia do mês para pedir (Itens por posto → Dia do pedido). 2 dias antes e no dia, às 8h, quem pediu por aquele posto
+          pelo link nos últimos {DIAS_CONTATOS} dias recebe um lembrete no WhatsApp com o link do pedido (o endereço do sistema acima).
+          Não sai se o posto já pediu perto da data, nem duas vezes para o mesmo número. Sai pelo WhatsApp da empresa (WA-AKG da VM),
+          uma mensagem por minuto.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {carregado && <>
+          <div className="flex items-center gap-2">
+            <Switch id="alerta-whats" checked={whats} disabled={!podeEditar} onCheckedChange={setWhats} />
+            <Label htmlFor="alerta-whats">Enviar o alerta automático (clique em Salvar, acima, para gravar)</Label>
+          </div>
+          {podeEditar && (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" className="gap-2" disabled={!!alertando} onClick={() => rodarAlerta('simular')}>
+                {alertando === 'simular' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Ver quem recebe hoje
+              </Button>
+              <Button variant="outline" className="gap-2" disabled={!!alertando} onClick={() => rodarAlerta('agora')}>
+                {alertando === 'agora' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Enviar os alertas de hoje agora
+              </Button>
+            </div>
+          )}
+          {alerta && (
+            <div className="rounded-md border p-3 text-sm space-y-2">
+              {alerta.motivo && <p className="text-muted-foreground">{alerta.motivo}.</p>}
+              {(alerta.alertas ?? []).length > 0 && (
+                <div>
+                  <p className="font-medium">{alerta.simulacao ? 'Receberiam hoje' : 'Enviado'}:</p>
+                  <ul className="list-disc pl-5 text-xs space-y-0.5">
+                    {alerta.alertas!.map(a => (
+                      <li key={a.posto + a.momento}><b>{a.posto}</b> · pedido em {a.data.split('-').reverse().join('/')} ({a.momento === 'dia' ? 'hoje' : 'daqui a 2 dias'}): {a.pessoas.join(', ')}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {(alerta.pulados ?? []).length > 0 && (
+                <div>
+                  <p className="font-medium text-muted-foreground">Sem envio hoje:</p>
+                  <ul className="list-disc pl-5 text-xs text-muted-foreground">{alerta.pulados!.map(x => <li key={x.posto}>{x.posto}: {x.motivo}</li>)}</ul>
+                </div>
+              )}
+              {alerta.simulacao && !(alerta.alertas ?? []).length && !(alerta.pulados ?? []).length && !alerta.motivo && <p className="text-muted-foreground">Nenhum alerta hoje.</p>}
+            </div>
+          )}
+        </>}
+      </CardContent>
+    </Card>
+    </div>
   );
 }

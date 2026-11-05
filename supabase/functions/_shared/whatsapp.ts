@@ -141,12 +141,12 @@ async function conferirNumeros(conta: ContaWhatsApp, numeros: string[]): Promise
   return jids;
 }
 
-/** Código do lote: "convocacao-2026-10-26-1413-x7k2" (data/hora de Brasília). */
-export function novoLote(agora = new Date()): string {
+/** Código do lote: "convocacao-2026-10-26-1413-x7k2" (data/hora de Brasília); `prefixo` diz de que envio é. */
+export function novoLote(agora = new Date(), prefixo = 'convocacao'): string {
   const p = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
   }).formatToParts(agora).reduce((a, x) => ({ ...a, [x.type]: x.value }), {} as Record<string, string>);
-  return `convocacao-${p.year}-${p.month}-${p.day}-${p.hour}${p.minute}-${Math.random().toString(36).slice(2, 6)}`;
+  return `${prefixo}-${p.year}-${p.month}-${p.day}-${p.hour}${p.minute}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
 /**
