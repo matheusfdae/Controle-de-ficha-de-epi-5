@@ -4,11 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Tablet, Link2, CheckCircle2 } from 'lucide-react';
+import { Tablet, Link2, CheckCircle2, FileDown } from 'lucide-react';
 import { toast } from 'sonner';
 import SignaturePad from '@/components/SignaturePad';
 import BackButton from '@/components/BackButton';
 import { useConfirm } from '@/hooks/use-confirm';
+import { pdfTermoEntregaEpi } from '@/lib/termoEpiPdf';
 import { assinarItemColetivo, finalizarTermo, getTermoColetivoFull, gerarTokenTermoItem, TermoColetivoFull } from '@/services/termoColetivoService';
 
 export default function TermoColetivoView() {
@@ -83,7 +84,12 @@ export default function TermoColetivoView() {
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <BackButton />
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => pdfTermoEntregaEpi({
+              posto: termo.posto, mes_referencia: termo.mes_referencia, lider: termo.lider ?? null,
+              linhas: itens.map(i => ({ colaborador_nome: i.colaborador_nome, material: i.material, ca: i.ca ?? null, quantidade: i.quantidade,
+                assinatura_url: i.assinatura_url ?? null, data_assinatura: i.data_assinatura ?? null })),
+            }).catch(e => toast.error((e as Error).message))}><FileDown className="h-4 w-4 mr-1" /> Baixar PDF</Button>
             <Button variant="outline" onClick={startTablet} disabled={pendentes.length === 0}><Tablet className="h-4 w-4 mr-1" /> Assinar no tablet ({pendentes.length})</Button>
             <Button variant="default" onClick={finalizar} disabled={termo.status === 'finalizado'}>Finalizar</Button>
           </div>

@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle2, ClipboardList, Loader2, LogOut, Pencil, Plus, Repeat, Search, Send, ShoppingCart, Trash2, UserCheck, X } from 'lucide-react';
+import { CheckCircle2, ClipboardList, HardHat, Loader2, LogOut, Pencil, Plus, Repeat, Search, Send, ShoppingCart, Trash2, UserCheck, X } from 'lucide-react';
+import TermoEpiPedido from '../components/TermoEpiPedido';
 import { toast } from 'sonner';
 import { cpfValido, formatarCpf, formatarTelefone, matriculaValida, soDigitos } from '@/modules/crachas/lib/solicitacaoService';
 import {
@@ -468,7 +469,7 @@ const PedidoMaterialPublico = () => {
                   <p className="text-center text-sm text-muted-foreground py-8">Você ainda não fez nenhum pedido.</p>
                 )}
                 {dados.pedidos.map(p => (
-                  <CartaoPedido key={p.id} p={p} carregando={carregando}
+                  <CartaoPedido key={p.id} p={p} carregando={carregando} quem={quem!} onTermoFechado={() => { recarregar().catch(() => {}); }}
                     catalogo={catalogoDoPosto(dados.materiais, dados.postos.find(x => x.id === p.posto_id))}
                     onCancelar={() => cancelar({ pedidoId: p.id }, `Cancelar o pedido ${p.codigo}?`)}
                     onReenviar={(ls, obs) => reenviar(p, ls, obs)} />
@@ -482,11 +483,13 @@ const PedidoMaterialPublico = () => {
   );
 };
 
-function CartaoPedido({ p, carregando, catalogo, onCancelar, onReenviar }: {
-  p: PedidoDoSolicitante; carregando: boolean; catalogo: MaterialPublico[];
+function CartaoPedido({ p, carregando, catalogo, quem, onTermoFechado, onCancelar, onReenviar }: {
+  p: PedidoDoSolicitante; carregando: boolean; catalogo: MaterialPublico[]; quem: Solicitante; onTermoFechado: () => void;
   onCancelar: () => void; onReenviar: (linhas: Linha[], observacao: string) => boolean;
 }) {
   const [editando, setEditando] = useState(false);
+  const [termoAberto, setTermoAberto] = useState(false);
+  const pendentes = p.termo ? p.termo.linhas - p.termo.assinadas : 0;
   const [linhas, setLinhas] = useState<Linha[]>([]);
   const [obs, setObs] = useState('');
   const motivo = [...(p.historico ?? [])].reverse().find(h => h.comentario && ['devolvida', 'cancelada', 'atendida'].includes(h.status));
@@ -512,6 +515,7 @@ function CartaoPedido({ p, carregando, catalogo, onCancelar, onReenviar }: {
             {(p.itens ?? []).map(i => (
               <li key={i.material_id}>
                 {formatarNumero(i.quantidade)} {i.unidade} · {i.nome}
+                {i.is_epi && <HardHat className="ml-1 inline h-3.5 w-3.5 text-amber-600" aria-label="EPI" />}
                 {i.quantidade !== i.quantidade_pedida && <span className="text-xs"> (pedido: {formatarNumero(i.quantidade_pedida)})</span>}
                 {i.quantidade_atendida != null && i.quantidade_atendida !== i.quantidade && (
                   <span className="text-xs text-amber-700 dark:text-amber-400"> · entregue: {formatarNumero(i.quantidade_atendida)}</span>
@@ -538,6 +542,13 @@ function CartaoPedido({ p, carregando, catalogo, onCancelar, onReenviar }: {
           </div>
         ) : (
           <div className="flex flex-wrap gap-2">
+            {p.tem_epi && p.status !== 'cancelada' && (
+              <Button size="sm" variant={p.status === 'atendida' && (pendentes > 0 || !p.termo?.linhas) ? 'default' : 'outline'} className="gap-1"
+                onClick={() => setTermoAberto(true)}>
+                <HardHat className="h-4 w-4" /> Termo de EPI
+                {p.termo?.linhas ? <span className="text-xs opacity-80">({p.termo.assinadas}/{p.termo.linhas} assinadas)</span> : null}
+              </Button>
+            )}
             {p.status === 'devolvida' && (
               <Button size="sm" className="gap-1" disabled={carregando} onClick={corrigir}><Pencil className="h-4 w-4" /> Corrigir e reenviar</Button>
             )}
@@ -548,7 +559,14 @@ function CartaoPedido({ p, carregando, catalogo, onCancelar, onReenviar }: {
             )}
           </div>
         )}
+        {p.tem_epi && p.status === 'atendida' && pendentes > 0 && (
+          <p className="text-xs text-amber-700 dark:text-amber-400">EPI entregue: colete as assinaturas do Termo de EPI ({pendentes} faltando).</p>
+        )}
       </CardContent>
+      {termoAberto && (
+        <TermoEpiPedido quem={quem} pedidoId={p.id} codigo={p.codigo} posto={p.posto} aberto
+          fechar={() => { setTermoAberto(false); onTermoFechado(); }} />
+      )}
     </Card>
   );
 }

@@ -1046,9 +1046,9 @@ export type Database = {
         ]
       }
       materiais: {
-        Row: { id: string; nome: string; item_pai_id: string | null; unidade: string; categoria: string | null; is_epi: boolean; ativo: boolean; preco: number | null; preco_atualizado_em: string | null; created_at: string; updated_at: string }
-        Insert: { id?: string; nome: string; item_pai_id?: string | null; unidade?: string; categoria?: string | null; is_epi?: boolean; ativo?: boolean; preco?: number | null; preco_atualizado_em?: string | null }
-        Update: { id?: string; nome?: string; item_pai_id?: string | null; unidade?: string; categoria?: string | null; is_epi?: boolean; ativo?: boolean; preco?: number | null; preco_atualizado_em?: string | null }
+        Row: { id: string; nome: string; item_pai_id: string | null; unidade: string; categoria: string | null; is_epi: boolean; ativo: boolean; preco: number | null; preco_atualizado_em: string | null; ca: string | null; created_at: string; updated_at: string }
+        Insert: { id?: string; nome: string; item_pai_id?: string | null; unidade?: string; categoria?: string | null; is_epi?: boolean; ativo?: boolean; preco?: number | null; preco_atualizado_em?: string | null; ca?: string | null }
+        Update: { id?: string; nome?: string; item_pai_id?: string | null; unidade?: string; categoria?: string | null; is_epi?: boolean; ativo?: boolean; preco?: number | null; preco_atualizado_em?: string | null; ca?: string | null }
         Relationships: []
       }
       posto_materiais: {
@@ -2472,6 +2472,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      pedido_material_termo: { Args: { _matricula: number | null; _cpf: string | null; _pedido_id: string }; Returns: Json }
+      pedido_material_termo_salvar: { Args: { _matricula: number | null; _cpf: string | null; _pedido_id: string; _linhas: Json }; Returns: Json }
+      pedido_material_termo_assinar: { Args: { _matricula: number | null; _cpf: string | null; _linha_id: string; _assinatura: string }; Returns: Json }
+      pedido_material_termo_link: { Args: { _matricula: number | null; _cpf: string | null; _linha_id: string }; Returns: Json }
       sou_master: { Args: Record<PropertyKey, never>; Returns: boolean }
       master_tabelas: { Args: Record<PropertyKey, never>; Returns: Json }
       master_buscar: { Args: { _tabela: string; _busca: string; _limite?: number }; Returns: Json }

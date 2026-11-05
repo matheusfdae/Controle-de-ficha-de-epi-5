@@ -77,7 +77,7 @@ export default function ConfigPedidos() {
 function Itens({ podeEditar }: { podeEditar: boolean }) {
   const [lista, setLista] = useState<Material[]>([]);
   const [busca, setBusca] = useState('');
-  const [edit, setEdit] = useState<{ id?: string; nome: string; item_pai_id: string; unidade: string; categoria: string; is_epi: boolean; ativo: boolean; preco: string } | null>(null);
+  const [edit, setEdit] = useState<{ id?: string; nome: string; item_pai_id: string; unidade: string; categoria: string; is_epi: boolean; ca: string; ativo: boolean; preco: string } | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [importandoPrecos, setImportandoPrecos] = useState(false);
   const carregar = useCallback(() => listMateriais().then(setLista).catch(e => toast.error(e.message)), []);
@@ -126,7 +126,7 @@ function Itens({ podeEditar }: { podeEditar: boolean }) {
           {podeEditar && (
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" className="gap-2" onClick={() => setImportandoPrecos(true)}><FileSpreadsheet className="h-4 w-4" /> Importar preços</Button>
-              <Button className="gap-2" onClick={() => setEdit({ nome: '', item_pai_id: '', unidade: 'un', categoria: '', is_epi: false, ativo: true, preco: '' })}><Plus className="h-4 w-4" /> Novo item</Button>
+              <Button className="gap-2" onClick={() => setEdit({ nome: '', item_pai_id: '', unidade: 'un', categoria: '', is_epi: false, ca: '', ativo: true, preco: '' })}><Plus className="h-4 w-4" /> Novo item</Button>
             </div>
           )}
         </div>
@@ -148,6 +148,7 @@ function Itens({ podeEditar }: { podeEditar: boolean }) {
             <div><Label>Categoria</Label><Input value={edit.categoria} onChange={e => setEdit({ ...edit, categoria: e.target.value })} placeholder="Limpeza" /></div>
             <div><Label>Preço (R$)</Label><Input inputMode="decimal" value={edit.preco} onChange={e => setEdit({ ...edit, preco: e.target.value })} placeholder="12,90" /></div>
             <div className="flex items-center gap-2 pb-2"><Switch checked={edit.is_epi} onCheckedChange={v => setEdit({ ...edit, is_epi: v })} id="epi" /><Label htmlFor="epi">É EPI</Label></div>
+            {edit.is_epi && <div><Label htmlFor="ca">CA (sai no Termo de EPI)</Label><Input id="ca" value={edit.ca} maxLength={30} onChange={e => setEdit({ ...edit, ca: e.target.value })} placeholder="Ex.: 10.695 ou isento" /></div>}
             <div className="flex items-center gap-2 pb-2"><Switch checked={edit.ativo} onCheckedChange={v => setEdit({ ...edit, ativo: v })} id="ativo" /><Label htmlFor="ativo">Ativo</Label></div>
             <div className="sm:col-span-4 flex gap-2 justify-end">
               <Button variant="outline" onClick={() => setEdit(null)}>Cancelar</Button>
@@ -165,7 +166,7 @@ function Itens({ podeEditar }: { podeEditar: boolean }) {
               <TableRow key={m.id} className={m.ativo ? '' : 'opacity-60'}>
                 <TableCell className={m.item_pai_id ? 'pl-8' : 'font-medium'}>
                   {m.item_pai_id ? `↳ ${m.nome}` : m.nome}
-                  {m.is_epi && <Badge variant="outline" className="ml-2 gap-1"><HardHat className="h-3 w-3" /> EPI</Badge>}
+                  {m.is_epi && <Badge variant="outline" className="ml-2 gap-1"><HardHat className="h-3 w-3" /> EPI{m.ca ? ` · CA ${m.ca}` : ''}</Badge>}
                   {temFilhos(m.id) && <span className="ml-2 text-xs text-muted-foreground">(agrupa variações)</span>}
                 </TableCell>
                 <TableCell>{m.unidade}</TableCell>
@@ -174,7 +175,7 @@ function Itens({ podeEditar }: { podeEditar: boolean }) {
                 <TableCell>{m.ativo ? 'Ativo' : 'Inativo'}</TableCell>
                 <TableCell>
                   {podeEditar && <Button variant="ghost" size="icon" aria-label={`Editar ${m.nome}`} onClick={() => setEdit({
-                    id: m.id, nome: m.nome, item_pai_id: m.item_pai_id ?? '', unidade: m.unidade, categoria: m.categoria ?? '', is_epi: m.is_epi, ativo: m.ativo,
+                    id: m.id, nome: m.nome, item_pai_id: m.item_pai_id ?? '', unidade: m.unidade, categoria: m.categoria ?? '', is_epi: m.is_epi, ca: m.ca ?? '', ativo: m.ativo,
                     preco: valorTexto(m.preco),
                   })}><Pencil className="h-4 w-4" /></Button>}
                 </TableCell>

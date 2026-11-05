@@ -23,6 +23,7 @@ import {
   type Aprovador, type Material, type Papel, type PedidoCompleto, type Recorrencia, type StatusPedido,
 } from '../lib/pedidosService';
 import { ListaRepeticoes, RepetirPedido } from '../components/Repeticoes';
+import SeloTermoEpi from '../components/SeloTermoEpi';
 import AnaliseEstoque from '../components/AnaliseEstoque';
 
 /**
@@ -336,6 +337,7 @@ function DetalhePedido({ pedido: p, posto, teto, materiais, minhaVez, podeCancel
             <ClipboardList className="h-5 w-5 text-primary" /> {p.codigo}
             <Badge className={`${COR_STATUS[p.status]} border-0`}>{STATUS_PEDIDO[p.status]}</Badge>
             {p.tem_epi && <Badge variant="outline" className="gap-1"><HardHat className="h-3 w-3" /> Tem item de EPI</Badge>}
+            {p.tem_epi && <SeloTermoEpi pedidoId={p.id} />}
           </DialogTitle>
           <DialogDescription>
             {posto} ({p.uf}) · pedido em {dataBr(p.data_pedido)} por {p.solicitante_nome}
