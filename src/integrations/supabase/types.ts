@@ -2472,6 +2472,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      sou_master: { Args: Record<PropertyKey, never>; Returns: boolean }
+      master_tabelas: { Args: Record<PropertyKey, never>; Returns: Json }
+      master_buscar: { Args: { _tabela: string; _busca: string; _limite?: number }; Returns: Json }
+      master_previa: { Args: { _tabela: string; _ids: string[] }; Returns: Json }
+      master_apagar: { Args: { _tabela: string; _ids: string[]; _motivo?: string | null }; Returns: Json }
+      master_lixeira: { Args: Record<PropertyKey, never>; Returns: Json }
+      master_restaurar: { Args: { _lote: string }; Returns: Json }
       pedido_material_identificar: {
         Args: { _matricula: number | null; _cpf: string | null }
         Returns: Json
