@@ -209,3 +209,15 @@ export async function lerLote(conta: ContaWhatsApp, lote: string): Promise<Mensa
 export async function cancelarLote(conta: ContaWhatsApp, lote: string): Promise<{ cancelled: number }> {
   return chamar(conta, `${lotes(conta)}?batchId=${encodeURIComponent(lote)}`, undefined, 'DELETE');
 }
+
+/** Endereço, sessão e chave do WA-AKG (config_segredos waakg_*, gravados pelo configurar-whatsapp.sh). */
+export async function contaWhatsApp(admin: any): Promise<ContaWhatsApp> {
+  const { data, error } = await admin.from('config_segredos').select('chave, valor')
+    .in('chave', ['waakg_url', 'waakg_sessao', 'waakg_api_key']);
+  if (error) throw new Error(error.message);
+  const s = Object.fromEntries((data ?? []).map((r: any) => [r.chave, r.valor]));
+  if (!s.waakg_url || !s.waakg_sessao || !s.waakg_api_key) {
+    throw new ErroWhatsApp('WhatsApp ainda não configurado no servidor (rode deploy/producao/configurar-whatsapp.sh na VM)');
+  }
+  return { url: s.waakg_url, sessao: s.waakg_sessao, apiKey: s.waakg_api_key };
+}

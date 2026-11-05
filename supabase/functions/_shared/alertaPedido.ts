@@ -140,3 +140,16 @@ export function mensagemAlerta(a: {
     + 'Se já fez o pedido, pode desconsiderar esta mensagem.\n\n'
     + '_Salve este número nos seus contatos para o link ficar clicável._';
 }
+
+/** Aviso ao líder: pedido com EPI atendido, o Termo de EPI está pronto para as assinaturas. */
+export function mensagemTermoEpi(a: { nome: string; codigo: string; posto: string; epis: string[]; link: string | null }): string {
+  const ola = primeiroNome(a.nome) ? `Olá, ${primeiroNome(a.nome)}!` : 'Olá!';
+  const link = a.link ? `${a.link.replace(/\/+$/, '')}/pedido-material` : null;
+  return `${ola} Aqui é do Grupo 5 Estrelas.\n\n`
+    + `O pedido *${a.codigo}* do posto *${a.posto}* foi atendido e tem EPI`
+    + (a.epis.length ? ` (${a.epis.join(', ')})` : '') + '.\n\n'
+    + 'O *Termo de EPI* já está disponível: entregue o EPI e colha a assinatura de cada colaborador.\n\n'
+    + (link ? `Abra por este link, com a sua matrícula ou CPF, na aba *Termo de EPI*:\n${link}\n\n`
+      : 'Abra o link do pedido de material, com a sua matrícula ou CPF, na aba *Termo de EPI*.\n\n')
+    + '_Salve este número nos seus contatos para o link ficar clicável._';
+}

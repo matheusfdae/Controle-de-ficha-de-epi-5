@@ -11,6 +11,16 @@
 -- Depende de 20261030120000_pedidos_material.sql. Re-executável.
 
 ALTER TABLE public.materiais ADD COLUMN IF NOT EXISTS ca text;
+-- Aviso por WhatsApp ao líder quando o termo fica disponível (pedido com EPI atendido).
+-- Os pedidos já atendidos antes desta mudança contam como avisados (não dispara nada antigo).
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'pedidos_material' AND column_name = 'termo_whatsapp_avisado') THEN
+    ALTER TABLE public.pedidos_material ADD COLUMN termo_whatsapp_avisado boolean NOT NULL DEFAULT false;
+    UPDATE public.pedidos_material SET termo_whatsapp_avisado = true WHERE status = 'atendida';
+  END IF;
+END $$;
 ALTER TABLE public.termos_epi_coletivos ADD COLUMN IF NOT EXISTS pedido_id uuid REFERENCES public.pedidos_material(id) ON DELETE SET NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_termos_epi_coletivos_pedido ON public.termos_epi_coletivos (pedido_id) WHERE pedido_id IS NOT NULL;
 ALTER TABLE public.termos_epi_coletivos_itens ADD COLUMN IF NOT EXISTS pedido_item_id uuid REFERENCES public.pedidos_material_itens(id) ON DELETE SET NULL;
