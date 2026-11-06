@@ -1,3 +1,6 @@
+# Duas cópias do mesmo app (mesma imagem). O Caddy da VM reparte o acesso entre
+# as duas e, se uma cair, manda tudo para a outra; o deploy troca uma de cada vez,
+# então o site não sai do ar. Bloco do Caddyfile: deploy/producao/Caddyfile.app.
 services:
   app:
     build:
@@ -12,3 +15,11 @@ services:
     restart: unless-stopped
     ports:
       - "${APP_PORT:-3000}:80"
+
+  # Segunda cópia: usa a imagem que o serviço "app" gerou (não builda nem baixa).
+  app2:
+    image: controle-epi-app:latest
+    pull_policy: never
+    restart: unless-stopped
+    ports:
+      - "${APP2_PORT:-8081}:80"
