@@ -26,6 +26,7 @@ import ImportarPlanilha from '../components/ImportarPlanilha';
 import ImportarPrecos from '../components/ImportarPrecos';
 import ContatosAlerta from '../components/ContatosAlerta';
 import AvisoTermoEpi from '../components/AvisoTermoEpi';
+import NotasSefaz from '../components/NotasSefaz';
 import { DIAS_CONTATOS, proximaPrevista } from '../../../../supabase/functions/_shared/alertaPedido';
 
 /** "12,90" / "1.234,5" -> 12.9; vazio -> null; inválido -> NaN. */
@@ -61,12 +62,14 @@ export default function ConfigPedidos() {
             <TabsTrigger value="papeis">Papéis</TabsTrigger>
             <TabsTrigger value="avisos">Avisos por e-mail</TabsTrigger>
             <TabsTrigger value="importar">Importar planilha</TabsTrigger>
+            <TabsTrigger value="sefaz">Notas da SEFAZ</TabsTrigger>
           </TabsList>
           <TabsContent value="itens" className="mt-4"><Itens podeEditar={gestor} /></TabsContent>
           <TabsContent value="demanda" className="mt-4"><ListaDoPosto podeEditar={gestor} /></TabsContent>
           <TabsContent value="papeis" className="mt-4"><Papeis podeEditar={podeEditar} /></TabsContent>
           <TabsContent value="avisos" className="mt-4"><Avisos podeEditar={podeEditar} /></TabsContent>
           <TabsContent value="importar" className="mt-4"><ImportarPlanilha podeEditar={gestor} /></TabsContent>
+          <TabsContent value="sefaz" className="mt-4"><NotasSefaz podeEditar={gestor} /></TabsContent>
         </Tabs>
       </div>
     </div>
