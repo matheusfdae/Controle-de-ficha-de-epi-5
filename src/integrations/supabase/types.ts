@@ -1093,6 +1093,30 @@ export type Database = {
         Update: { [_ in never]: never }
         Relationships: []
       }
+      sefaz_empresas: {
+        Row: { cnpj: string; nome: string | null; uf: string | null; ult_nsu: string; max_nsu: string | null; proxima_consulta_em: string | null; ultima_consulta_em: string | null; ultimo_status: string | null; ultimo_erro: string | null; updated_at: string }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
+      notas_sefaz: {
+        Row: { chave: string; cnpj_destinatario: string; emitente_cnpj: string | null; emitente_nome: string | null; numero: string | null; emissao: string | null; valor_total: number | null; situacao: string; ciencia_em: string | null; ciencia_erro: string | null; created_at: string; updated_at: string }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
+      notas_sefaz_itens: {
+        Row: { id: string; chave: string; n_item: number; codigo: string | null; ean: string | null; descricao: string; ncm: string | null; unidade: string | null; quantidade: number | null; valor_unit: number | null; valor_total: number | null; material_id: string | null }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: [{ foreignKeyName: "notas_sefaz_itens_chave_fkey"; columns: ["chave"]; isOneToOne: false; referencedRelation: "notas_sefaz"; referencedColumns: ["chave"] }]
+      }
+      material_codigos_fornecedor: {
+        Row: { fornecedor_cnpj: string; codigo: string; material_id: string; fator: number; criado_por: string | null; created_at: string }
+        Insert: { [_ in never]: never }
+        Update: { [_ in never]: never }
+        Relationships: []
+      }
       pedido_alerta_contatos: {
         Row: { id: string; posto_id: string; acao: string; chave: string | null; nome: string | null; numero: string | null; criado_por: string | null; criado_em: string }
         Insert: { [_ in never]: never }
@@ -2481,6 +2505,7 @@ export type Database = {
       master_tabelas: { Args: Record<PropertyKey, never>; Returns: Json }
       master_buscar: { Args: { _tabela: string; _busca: string; _limite?: number }; Returns: Json }
       master_previa: { Args: { _tabela: string; _ids: string[] }; Returns: Json }
+      sefaz_vincular_item: { Args: { _item_id: string; _material_id: string | null; _fator?: number }; Returns: Json }
       master_apagar: { Args: { _tabela: string; _ids: string[]; _motivo?: string | null }; Returns: Json }
       master_lixeira: { Args: Record<PropertyKey, never>; Returns: Json }
       master_restaurar: { Args: { _lote: string }; Returns: Json }
