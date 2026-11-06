@@ -37,6 +37,8 @@ const { fontFamily: FONT, corPrimaria: BLUE, corTextoNome: WHITE, corBorda: GRAY
  * Posições medidas no crachá preenchido do mesmo PDF. font_size ≈ pt no PDF.
  * Vigilância e Brigadista usam a mesma arte e os mesmos campos; só muda o
  * terceiro campo da frente: CNV no vigilante, RE (matrícula) no brigadista.
+ * Portaria usa a mesma arte e o mesmo verso, mas a frente tem só nome, cargo
+ * e RE (sem tipo sanguíneo): foto e faixas descem uma posição.
  */
 const NAVY = '#0f243e';
 const NAVY_PILL = '#1d2647';
@@ -60,10 +62,45 @@ const pill = (overrides: Partial<Omit<CanvasElement, 'id'>>): Omit<CanvasElement
   ...overrides,
 });
 
+const foto5Estrelas = (y: number): Omit<CanvasElement, 'id'> => ({
+  type: 'image',
+  x: 12.87, y,
+  width: 38.35, height: 45.2,
+  fieldBinding: 'photo_url',
+  borderRadius: 0,
+  zIndex: 10, side: 'front', opacity: 1,
+});
+
+const nome5Estrelas = (y: number) => pill({
+  x: 4.91, y,
+  fieldBinding: 'full_name',
+  nameDisplayMode: 'short',
+  fontColor: WHITE,
+  backgroundColor: NAVY_PILL,
+  borderColor: undefined,
+  borderWidth: 0,
+});
+
+// ══════════ COLUNA ESQUERDA (frente) ══════════
+const frenteCompleta = (terceiroCampo: Partial<Omit<CanvasElement, 'id'>>): Omit<CanvasElement, 'id'>[] => [
+  foto5Estrelas(18.9),
+  nome5Estrelas(65.2),
+  pill({ y: 71.61, fieldBinding: 'role' }),
+  pill({ y: 78.0, ...terceiroCampo }),
+  pill({ y: 84.29, fieldBinding: 'blood_type', staticValue: 'TIPO SANGUÍNEO: ' }),
+];
+
+const frentePortaria: Omit<CanvasElement, 'id'>[] = [
+  foto5Estrelas(24.6),
+  nome5Estrelas(71.61),
+  pill({ y: 78.0, fieldBinding: 'role' }),
+  pill({ y: 84.29, fieldBinding: 'employee_id', staticValue: 'RE: ' }),
+];
+
 const template5Estrelas = (
   name: string,
   description: string,
-  terceiroCampo: Partial<Omit<CanvasElement, 'id'>>,
+  frente: Omit<CanvasElement, 'id'>[],
 ): DefaultTemplate => ({
   name,
   description,
@@ -73,27 +110,7 @@ const template5Estrelas = (
   backgroundImageUrl: '/crachas/templates/5estrelas-vigilancia.png',
   hasBackSide: false,
   elements: [
-    // ══════════ COLUNA ESQUERDA (frente) ══════════
-    {
-      type: 'image',
-      x: 12.87, y: 18.9,
-      width: 38.35, height: 45.2,
-      fieldBinding: 'photo_url',
-      borderRadius: 0,
-      zIndex: 10, side: 'front', opacity: 1,
-    },
-    pill({
-      x: 4.91, y: 65.2,
-      fieldBinding: 'full_name',
-      nameDisplayMode: 'short',
-      fontColor: WHITE,
-      backgroundColor: NAVY_PILL,
-      borderColor: undefined,
-      borderWidth: 0,
-    }),
-    pill({ y: 71.61, fieldBinding: 'role' }),
-    pill({ y: 78.0, ...terceiroCampo }),
-    pill({ y: 84.29, fieldBinding: 'blood_type', staticValue: 'TIPO SANGUÍNEO: ' }),
+    ...frente,
 
     // ══════════ COLUNA DIREITA (verso) ══════════
     pill({ x: 61.55, y: 9.7, width: 52.14, fieldBinding: 'full_name', nameDisplayMode: 'full', fontSize: 8 }),
@@ -125,13 +142,19 @@ const template5Estrelas = (
 export const template5EstrelasImg = template5Estrelas(
   '5 Estrelas - Vigilância',
   'Arte oficial do Canva em alta definição (frente e verso lado a lado), com a CNV',
-  { fieldBinding: 'cnv', staticValue: 'CNV: ' },
+  frenteCompleta({ fieldBinding: 'cnv', staticValue: 'CNV: ' }),
 );
 
 export const template5EstrelasBrigadistaImg = template5Estrelas(
   '5 Estrelas - Brigadista',
   'Mesma arte da Vigilância, com o RE (matrícula) no lugar da CNV',
-  { fieldBinding: 'employee_id', staticValue: 'RE: ' },
+  frenteCompleta({ fieldBinding: 'employee_id', staticValue: 'RE: ' }),
+);
+
+export const template5EstrelasPortariaImg = template5Estrelas(
+  '5 Estrelas - Portaria',
+  'Mesma arte da Vigilância; frente com nome, cargo e RE (sem tipo sanguíneo)',
+  frentePortaria,
 );
 
 /**
@@ -436,7 +459,24 @@ export const templateBaluarteImg: DefaultTemplate = {
 export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
   template5EstrelasImg,
   template5EstrelasBrigadistaImg,
+  template5EstrelasPortariaImg,
   templateBaluarteImg,
   templateSsServicosImg,
   templateHcnImg,
 ];
+
+const semAcento = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/** Cargo (como vem da Senior) → trecho do nome do modelo próprio desse cargo. */
+const MODELO_POR_CARGO: [cargo: string, modelo: string][] = [
+  ['portaria', 'portaria'],
+  ['brigad', 'brigadista'],
+  ['vigil', 'vigilancia'],
+];
+
+/** Modelo cadastrado que é o do cargo (ex.: Agente de Portaria → "5 Estrelas - Portaria"), se houver. */
+export function modeloDoCargo<T extends { name: string }>(cargo: string, modelos: T[]): T | undefined {
+  const c = semAcento(cargo);
+  const par = MODELO_POR_CARGO.find(([trecho]) => c.includes(trecho));
+  return par ? modelos.find(m => semAcento(m.name).includes(par[1])) : undefined;
+}

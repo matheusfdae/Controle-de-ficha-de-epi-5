@@ -36,6 +36,7 @@ import { Slider } from '@/components/ui/slider';
 import { useAuth } from '@/modules/crachas/hooks/useAuth';
 import { validateBadgeGenerationInput } from '@/modules/crachas/lib/badgeGenerationValidation';
 import { normalizeTemplateForRender } from '@/modules/crachas/lib/badgeTemplateNormalizer';
+import { modeloDoCargo } from '@/modules/crachas/lib/defaultTemplates';
 import { PhotoAdjustment, DEFAULT_PHOTO_ADJUSTMENT, isAdjustmentDefault } from '@/modules/crachas/lib/photoAdjustments';
 import { Crop, ZoomIn, RotateCcw } from 'lucide-react';
 
@@ -114,6 +115,14 @@ const GerarCrachas = () => {
   if (templates.length > 0 && !selectedTemplate) {
     setSelectedTemplate(templates[0].id);
   }
+
+  // Filtrar um cargo que tem modelo próprio (ex.: Agente de Portaria) já escolhe esse modelo.
+  const escolherCargo = (cargo: string) => {
+    setRoleFilter(cargo);
+    setPage(1);
+    const modelo = cargo !== 'todos' ? modeloDoCargo(cargo, templates) : undefined;
+    if (modelo) setSelectedTemplate(modelo.id);
+  };
 
   // Extract unique roles for filter
   const uniqueRoles = useMemo(() => {
@@ -531,7 +540,7 @@ const GerarCrachas = () => {
                 </SelectContent>
               </Select>
               {uniqueRoles.length > 0 && (
-                <Select value={roleFilter} onValueChange={(v) => { setRoleFilter(v); setPage(1); }}>
+                <Select value={roleFilter} onValueChange={escolherCargo}>
                   <SelectTrigger className="w-[160px] h-9">
                     <SelectValue placeholder="Função" />
                   </SelectTrigger>
