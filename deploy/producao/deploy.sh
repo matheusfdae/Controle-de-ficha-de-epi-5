@@ -10,7 +10,7 @@
 #  2. Backup do schema public do banco em ~/backups.
 #  3. Gera a imagem nova do app ENQUANTO a antiga continua no ar.
 #  4. Aplica as migrations que faltam numa transação só (erro = nada gravado).
-#  5. Troca o container do app e atualiza as Edge Functions.
+#  5. Troca as duas cópias do app (uma de cada vez) e atualiza as Edge Functions.
 #  6. Confere se o site público está servindo a build nova.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -104,8 +104,18 @@ if [ ${#PENDENTES[@]} -gt 0 ]; then
 fi
 
 # ---------- 5. Troca do app + Edge Functions ----------
-echo ">>> Subindo o app novo..."
-docker compose up -d app
+# Duas cópias atrás do Caddy (deploy/producao/Caddyfile.app): troca uma, espera
+# ela responder e só então troca a outra. Assim sempre há uma no ar.
+porta() { local v; v="$(grep -E "^$1=" .env 2>/dev/null | tail -1 | cut -d= -f2- | tr -d "\"' ")"; echo "${v:-$2}"; }
+esperar() {
+  for _ in $(seq 1 30); do curl -sf -o /dev/null "http://localhost:$1/" && return 0; sleep 2; done
+  echo "    ERRO: a cópia na porta $1 não respondeu em 60 s"; return 1
+}
+echo ">>> Subindo o app novo (uma cópia de cada vez)..."
+docker compose up -d --no-deps app
+esperar "$(porta APP_PORT 3000)"
+docker compose up -d --no-deps app2
+esperar "$(porta APP2_PORT 8081)"
 echo ">>> Atualizando as Edge Functions..."
 for f in supabase/functions/*/; do
   nome="$(basename "$f")"
