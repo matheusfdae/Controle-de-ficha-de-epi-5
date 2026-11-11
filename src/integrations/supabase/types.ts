@@ -1820,6 +1820,59 @@ export type Database = {
           },
         ]
       }
+      gasto_mensal: {
+        Row: {
+          id: string
+          ano: number
+          aba: string
+          ordem: number
+          posto_id: string | null
+          posto_nome: string
+          uf: string
+          custo_texto: string | null
+          custo_valor: number | null
+          dados: Json
+          atualizado_em: string
+          atualizado_por: string | null
+        }
+        Insert: {
+          id?: string
+          ano: number
+          aba: string
+          ordem?: number
+          posto_id?: string | null
+          posto_nome: string
+          uf: string
+          custo_texto?: string | null
+          custo_valor?: number | null
+          dados?: Json
+          atualizado_em?: string
+          atualizado_por?: string | null
+        }
+        Update: {
+          id?: string
+          ano?: number
+          aba?: string
+          ordem?: number
+          posto_id?: string | null
+          posto_nome?: string
+          uf?: string
+          custo_texto?: string | null
+          custo_valor?: number | null
+          dados?: Json
+          atualizado_em?: string
+          atualizado_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gasto_mensal_posto_id_fkey"
+            columns: ["posto_id"]
+            isOneToOne: false
+            referencedRelation: "postos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fornecedores: {
         Row: {
           ativo: boolean

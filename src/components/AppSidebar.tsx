@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FilePlus2, Search, CalendarClock, Settings, ShieldCheck, LogOut, Users, Package, Briefcase, UserPlus, ClipboardSignature, HardHat, Shirt, FileSignature, MapPin, FileStack,
-  IdCard, Palette, Printer, History, BarChart3, Inbox, PenTool, ShoppingCart, ClipboardList, Gauge, Warehouse, ShieldAlert,
-} from 'lucide-react';
+  IdCard, Palette, Printer, History, BarChart3, Inbox, PenTool, ShoppingCart, ClipboardList, Gauge, Warehouse, ShieldAlert, Wallet } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter,
@@ -55,6 +54,7 @@ const pedidoItems: Array<{ title: string; guia: string; url: string; icon: typeo
   { title: 'Pedidos', guia: 'menu-pedidos', url: '/pedidos', icon: ClipboardList, end: true },
   { title: 'Estoque do Posto', guia: 'menu-pedidos-estoque', url: '/pedidos/estoque', icon: Warehouse, end: false },
   { title: 'Painel Gerencial', guia: 'menu-pedidos-gerencial', url: '/pedidos/gerencial', icon: Gauge, end: false, action: 'view' },
+  { title: 'Gasto Mensal', guia: 'menu-pedidos-gasto', url: '/pedidos/gasto-mensal', icon: Wallet, end: false, action: 'view' },
   { title: 'Config. de Pedidos', guia: 'menu-pedidos-config', url: '/pedidos/configuracoes', icon: Settings, end: false, action: 'view' },
 ];
 
@@ -71,7 +71,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const { pathname, search } = useLocation();
-  const { user, logout, isAdmin, can } = useAuth();
+  const { user, logout, isAdmin, can, veTela } = useAuth();
   const [assinaturaAberta, setAssinaturaAberta] = useState(false);
   const [master, setMaster] = useState(false);
   useEffect(() => { if (isAdmin) souMaster().then(setMaster); }, [isAdmin]);
@@ -86,11 +86,12 @@ export function AppSidebar() {
     return isActive(path, end) && (!tipo || tipo === tipoAberto);
   };
 
-  const visibleBaseItems = baseItems.filter(i => can(i.module, 'view'));
-  const visibleEpiItems = epiItems.filter(i => !i.module || can(i.module, i.action ?? 'view'));
-  const visibleUniformeItems = uniformeItems.filter(i => !i.module || can(i.module, i.action ?? 'view'));
-  const visibleCrachaItems = crachaItems.filter(i => can('crachas', i.action ?? 'view'));
-  const visibleAdminItems = adminItems.filter(i => can(i.module, 'view'));
+  // Cada item: a tela marcada para o usuário (Usuários → Telas) E o módulo permitir.
+  const visibleBaseItems = baseItems.filter(i => veTela(i.guia) && can(i.module, 'view'));
+  const visibleEpiItems = epiItems.filter(i => veTela(i.guia) && (!i.module || can(i.module, i.action ?? 'view')));
+  const visibleUniformeItems = uniformeItems.filter(i => veTela(i.guia) && (!i.module || can(i.module, i.action ?? 'view')));
+  const visibleCrachaItems = crachaItems.filter(i => veTela(i.guia) && can('crachas', i.action ?? 'view'));
+  const visibleAdminItems = adminItems.filter(i => veTela(i.guia) && can(i.module, 'view'));
   const [aprovador, setAprovador] = useState(false);
   const [pendencias, setPendencias] = useState(0);
   useEffect(() => {
@@ -108,7 +109,7 @@ export function AppSidebar() {
     window.addEventListener('pedidos-pendencias', doSino);
     return () => { vivo = false; clearInterval(t); window.removeEventListener('pedidos-pendencias', doSino); };
   }, [user, pathname]);
-  const visiblePedidoItems = pedidoItems.filter(i => (i.action ? can('pedidos_material', i.action) : can('pedidos_material', 'view') || aprovador));
+  const visiblePedidoItems = pedidoItems.filter(i => veTela(i.guia) && (i.action ? can('pedidos_material', i.action) : can('pedidos_material', 'view') || aprovador));
   const showAdminSection = isAdmin || visibleAdminItems.length > 0;
 
   return (

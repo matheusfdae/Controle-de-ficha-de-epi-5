@@ -19,6 +19,8 @@ import { ShieldAlert, ShieldCheck, UserPlus, Pencil, Trash2, RefreshCw, KeyRound
 import { toast } from 'sonner';
 import BackButton from '@/components/BackButton';
 import { PermissionsMatrix } from '@/components/PermissionsMatrix';
+import { TelasCheckboxes } from '@/components/TelasCheckboxes';
+import { linhasDasTelas, telasDasLinhas, type TelasMap } from '@/lib/telas';
 import {
   MODULES, ROLE_PRESETS, ROLE_LABELS, ROLE_BADGE_CLASS, RolePreset,
   PermissionMap, emptyPermissions, fullAccessPermissions, permissionsToRows, rowsToPermissions,
@@ -68,6 +70,8 @@ const emptyForm = {
   // 2026-09-14) — usa o preset de admin só pra marcar tudo na matriz, sem
   // que o papel em si vire admin (continua sem acesso a /usuarios).
   permissions: ROLE_PRESETS.admin,
+  // Telas do menu: sem marcação = todas aparecem.
+  telas: {} as TelasMap,
   ufs: [] as string[],
 };
 
@@ -84,6 +88,7 @@ export default function Usuarios() {
   const [editing, setEditing] = useState<Row | null>(null);
   const [editForm, setEditForm] = useState({
     nome: '', email: '', role: 'colaborador' as ManageableRole, permissions: emptyPermissions(),
+    telas: {} as TelasMap,
     ufs: [] as string[],
   });
   const [estados, setEstados] = useState<Estado[]>([]);
@@ -167,7 +172,7 @@ export default function Usuarios() {
         role: form.role,
         send_invite: form.sendInvite,
         redirect_to: `${window.location.origin}/reset-password`,
-        permissions: permissionsToRows(form.permissions),
+        permissions: [...permissionsToRows(form.permissions), ...linhasDasTelas(form.telas)],
       },
     });
     setSaving(false);
@@ -199,14 +204,16 @@ export default function Usuarios() {
     // Conta sem linhas customizadas (legada, anterior ao acesso total por
     // padrão) -> mostra a matriz toda marcada, mesma regra do login
     // (AuthContext#fetchUserData) e do formulário de "Novo Usuário".
-    const permMap = perms && perms.length > 0
-      ? rowsToPermissions(perms as any)
+    const soModulos = (perms ?? []).filter(r => !String(r.module).startsWith('tela:'));
+    const permMap = soModulos.length > 0
+      ? rowsToPermissions(soModulos as any)
       : fullAccessPermissions();
     setEditForm({
       nome: row.nome,
       email: row.email || '',
       role: (ROLE_OPTIONS.includes(row.role as ManageableRole) ? row.role : 'colaborador') as ManageableRole,
       permissions: permMap,
+      telas: telasDasLinhas(perms ?? []),
       ufs: await listUfsDoUsuario(row.id).catch(() => []),
     });
   };
@@ -254,7 +261,7 @@ export default function Usuarios() {
 
       // Substitui todas as permissões
       await supabase.from('user_permissions').delete().eq('user_id', editing.id);
-      const rows = permissionsToRows(editForm.permissions).map(r => ({ ...r, user_id: editing.id }));
+      const rows = [...permissionsToRows(editForm.permissions), ...linhasDasTelas(editForm.telas)].map(r => ({ ...r, user_id: editing.id }));
       if (rows.length > 0) {
         const { error } = await supabase.from('user_permissions').insert(rows);
         if (error) throw error;
@@ -327,9 +334,10 @@ export default function Usuarios() {
                 </DialogDescription>
               </DialogHeader>
               <Tabs defaultValue="dados">
-                <TabsList className="grid grid-cols-2">
+                <TabsList className="grid grid-cols-3">
                   <TabsTrigger value="dados">Dados</TabsTrigger>
-                  <TabsTrigger value="permissoes">Permissões</TabsTrigger>
+                  <TabsTrigger value="telas">Telas</TabsTrigger>
+                  <TabsTrigger value="permissoes">Ações (avançado)</TabsTrigger>
                 </TabsList>
                 <TabsContent value="dados" className="space-y-3 pt-3">
                   <div>
@@ -389,6 +397,10 @@ export default function Usuarios() {
                       </div>
                     )}
                   </div>
+                </TabsContent>
+                <TabsContent value="telas" className="pt-3">
+                  <TelasCheckboxes telas={form.telas} permissions={form.permissions}
+                    onChange={(telas, permissions) => setForm({ ...form, telas, permissions })} />
                 </TabsContent>
                 <TabsContent value="permissoes" className="pt-3">
                   <PermissionsMatrix value={form.permissions} onChange={(p) => setForm({ ...form, permissions: p })} />
@@ -494,9 +506,10 @@ export default function Usuarios() {
               <DialogDescription>{editing?.email}</DialogDescription>
             </DialogHeader>
             <Tabs defaultValue="dados">
-              <TabsList className="grid grid-cols-2">
+              <TabsList className="grid grid-cols-3">
                 <TabsTrigger value="dados">Dados</TabsTrigger>
-                <TabsTrigger value="permissoes">Permissões</TabsTrigger>
+                <TabsTrigger value="telas">Telas</TabsTrigger>
+                <TabsTrigger value="permissoes">Ações (avançado)</TabsTrigger>
               </TabsList>
               <TabsContent value="dados" className="space-y-3 pt-3">
                 <div>
@@ -528,6 +541,10 @@ export default function Usuarios() {
                   </p>
                 </div>
                 <EstadosCheckboxes todos={estados} value={editForm.ufs} onChange={ufs => setEditForm({ ...editForm, ufs })} />
+              </TabsContent>
+              <TabsContent value="telas" className="pt-3">
+                <TelasCheckboxes telas={editForm.telas} permissions={editForm.permissions}
+                  onChange={(telas, permissions) => setEditForm({ ...editForm, telas, permissions })} />
               </TabsContent>
               <TabsContent value="permissoes" className="pt-3">
                 <PermissionsMatrix
