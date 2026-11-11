@@ -6,6 +6,7 @@ import {
   emptyPermissions, fullAccessPermissions, rowsToPermissions,
 } from '@/lib/permissions';
 import { listUfsDoUsuario } from '@/services/estadosService';
+import { telaVisivel, telasDasLinhas, type TelasMap } from '@/lib/telas';
 
 export type UserRole = 'admin' | 'rh' | 'supervisor' | 'almoxarife' | 'colaborador' | 'operador';
 
@@ -26,6 +27,8 @@ interface AuthContextType {
   isAdmin: boolean; // admin OR rh (mantém gating atual)
   permissions: PermissionMap;
   can: (module: ModuleId, action?: ActionId) => boolean;
+  /** Tela do menu marcada para o usuário (Usuários → Telas); admin vê todas. */
+  veTela: (id: string) => boolean;
   /** Estados (UF) marcados para o usuário em Usuários (vale também para admin). */
   estados: string[];
   refreshUser: () => Promise<void>;
@@ -48,7 +51,7 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 async function fetchUserData(
   clerkUserId: string, fallbackEmail: string,
-): Promise<{ user: User; permissions: PermissionMap; estados: string[] } | null> {
+): Promise<{ user: User; permissions: PermissionMap; telas: TelasMap; estados: string[] } | null> {
   const { data: profile } = await supabase
     .from('profiles')
     .select('id, nome_completo, email, must_change_password')
@@ -68,9 +71,11 @@ async function fetchUserData(
   // acesso total às telas de negócio por padrão (pedido do Matheus em
   // 2026-09-14), mesma regra de Usuarios.tsx#startEdit e de
   // fullAccessPermissionRows() nas Edge Functions.
-  const permissions = permRows && permRows.length > 0
-    ? rowsToPermissions(permRows as any)
+  const soModulos = (permRows ?? []).filter(r => !String(r.module).startsWith('tela:'));
+  const permissions = soModulos.length > 0
+    ? rowsToPermissions(soModulos as any)
     : fullAccessPermissions();
+  const telas = telasDasLinhas(permRows ?? []);
 
   // Mesma regra de public.pode_acessar_uf(): só os estados marcados, inclusive para admin.
   const estados = await listUfsDoUsuario(profile.id).catch(() => []);
@@ -86,6 +91,7 @@ async function fetchUserData(
       mustChangePassword: (profile as any).must_change_password === true,
     },
     permissions,
+    telas,
   };
 }
 
@@ -96,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [permissions, setPermissions] = useState<PermissionMap>(emptyPermissions());
   const [estados, setEstados] = useState<string[]>([]);
+  const [telas, setTelas] = useState<TelasMap>({});
   const [profileLoading, setProfileLoading] = useState(true);
 
   const refreshUser = useCallback(async () => {
@@ -103,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setPermissions(emptyPermissions());
       setEstados([]);
+      setTelas({});
       setProfileLoading(false);
       return;
     }
@@ -110,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await fetchUserData(clerkUser.id, clerkUser.primaryEmailAddress?.emailAddress ?? '');
     setUser(data?.user ?? null);
     setPermissions(data?.permissions ?? emptyPermissions());
+    setTelas(data?.telas ?? {});
     setEstados(data?.estados ?? []);
     setProfileLoading(false);
   }, [clerkUser]);
@@ -129,6 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user?.role === 'admin') return true;
     return !!permissions[module]?.[action];
   }, [user?.role, permissions]);
+  const veTela = useCallback((id: string) => user?.role === 'admin' || telaVisivel(telas, id), [user?.role, telas]);
 
   return (
     <AuthContext.Provider value={{
@@ -139,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin: user ? ADMIN_ROLES.includes(user.role) : false,
       permissions,
       can,
+      veTela,
       estados,
       refreshUser,
     }}>

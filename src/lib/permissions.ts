@@ -117,7 +117,8 @@ export function permissionsToRows(perms: PermissionMap): PermissionRow[] {
 export function rowsToPermissions(rows: Array<Partial<PermissionRow>>): PermissionMap {
   const map = emptyPermissions();
   for (const r of rows) {
-    if (!r.module) continue;
+    // "tela:..." é a marcação das telas do menu (src/lib/telas.ts), não módulo.
+    if (!r.module || String(r.module).startsWith('tela:')) continue;
     map[r.module as ModuleId] = {
       view: !!r.can_view,
       create: !!r.can_create,

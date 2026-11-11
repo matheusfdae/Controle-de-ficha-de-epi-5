@@ -56,6 +56,7 @@ const PedidosEstoque      = lazy(() => import('./modules/pedidos/pages/EstoquePo
 const PedidosDoPosto      = lazy(() => import('./modules/pedidos/pages/PedidosDoPosto'));
 const Master              = lazy(() => import('./modules/master/pages/Master'));
 const PedidosConfig       = lazy(() => import('./modules/pedidos/pages/ConfigPedidos'));
+const PedidosGastoMensal  = lazy(() => import('./modules/pedidos/pages/GastoMensal'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -169,6 +170,7 @@ function AppRoutes() {
           <Route path="/pedidos/posto/:postoId" element={<PedidosDoPosto />} />
           <Route path="/pedidos/gerencial"     element={<RequireModule module="pedidos_material"><PedidosGerencial /></RequireModule>} />
           <Route path="/pedidos/configuracoes" element={<RequireModule module="pedidos_material"><PedidosConfig /></RequireModule>} />
+          <Route path="/pedidos/gasto-mensal"  element={<RequireModule module="pedidos_material"><PedidosGastoMensal /></RequireModule>} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

@@ -1,4 +1,7 @@
-import { Outlet, useLocation } from 'react-router-dom';
+import { Link, Outlet, useLocation } from 'react-router-dom';
+import { Lock } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { telaDaRota } from '@/lib/telas';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { Separator } from '@/components/ui/separator';
@@ -23,6 +26,9 @@ const titles: Record<string, string> = {
 
 export default function AppLayout() {
   const { pathname } = useLocation();
+  const { veTela } = useAuth();
+  const tela = telaDaRota(pathname);
+  const telaBloqueada = tela && !veTela(tela.id) ? tela : null;
   const title =
     titles[pathname] ||
     (pathname.startsWith('/ficha/') ? 'Detalhes da Ficha' : 'EPI Manager');
@@ -43,7 +49,14 @@ export default function AppLayout() {
             </div>
           </header>
           <main className="flex-1">
-            <Outlet />
+            {telaBloqueada ? (
+              <div className="p-8 max-w-md mx-auto text-center space-y-3">
+                <Lock className="h-10 w-10 mx-auto text-muted-foreground" />
+                <h2 className="text-lg font-semibold">Tela não liberada</h2>
+                <p className="text-sm text-muted-foreground">"{telaBloqueada.label}" não está marcada para o seu usuário. Peça ao administrador para liberar em Usuários → Telas.</p>
+                <Link to="/" className="text-sm text-primary underline">Voltar ao início</Link>
+              </div>
+            ) : <Outlet />}
           </main>
           {/* Chat "Dúvidas?": só no localhost até a produção ter a chave nova do
               Gemini (deploy/producao/configurar-assistente.sh). */}
