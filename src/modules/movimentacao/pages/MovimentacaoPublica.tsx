@@ -6,15 +6,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardCheck, Loader2, LogOut, Moon, Send, UserCheck } from 'lucide-react';
+import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardCheck, FileDown, Loader2, LogOut, Moon, Send, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { cpfValido, formatarCpf, matriculaValida, soDigitos, type Solicitante } from '@/modules/crachas/lib/solicitacaoService';
 import {
-  EMPRESAS, HORARIOS, MOTIVOS, TURNOS, dataBr, enviarLancamento, horaBr, identificarFiscal, turnoDoHorario,
+  EMPRESAS, HORARIOS, MOTIVOS, TURNOS, dataBr, enviarLancamento, horaBr, identificarFiscal, relatorioDoDia, turnoDoHorario,
   type ColaboradorSenior, type DadosLancamento, type FiscalIdentificado, type StatusMov,
 } from '../lib/movimentacaoService';
-import EscolherColaborador from '../components/EscolherColaborador';
+import EscolherColaborador, { SeloReserva } from '../components/EscolherColaborador';
+import { pdfRelatorioDia } from '../lib/relatorioDiaPdf';
 
 /**
  * Link público do Controle de Movimentação Diária (substitui o Microsoft Forms).
@@ -86,6 +87,8 @@ const MovimentacaoPublica = () => {
   const [f, setF] = useState<Form>(vazio());
   const [resultado, setResultado] = useState<{ codigo: string; status: StatusMov; data: string; data_lancamento: string; ok_pelo_plantao?: boolean } | null>(null);
   const [carregando, setCarregando] = useState(false);
+  const [diaRelatorio, setDiaRelatorio] = useState('');
+  const [gerandoPdf, setGerandoPdf] = useState(false);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF(x => ({ ...x, [k]: v }));
 
@@ -104,8 +107,19 @@ const MovimentacaoPublica = () => {
     try {
       const r = await identificarFiscal(s);
       setQuem(s); setFiscal(r);
+      setDiaRelatorio(r.plantao?.data_plantao ?? r.hoje);
       if (s.matricula) lembrar(String(s.matricula));
     } catch (err) { toast.error((err as Error).message); } finally { setCarregando(false); }
+  };
+
+  const baixarRelatorio = async (dia: string) => {
+    if (!quem || !dia) return toast.error('Escolha o dia do relatório.');
+    setGerandoPdf(true);
+    try {
+      const r = await relatorioDoDia(quem, dia);
+      await pdfRelatorioDia(r);
+      if (!r.lancamentos.length) toast.info(`Nenhum lançamento seu em ${dataBr(dia)}: o PDF saiu vazio.`);
+    } catch (err) { toast.error((err as Error).message); } finally { setGerandoPdf(false); }
   };
 
   const sair = () => { setQuem(null); setFiscal(null); setSolCpf(''); setF(vazio()); setResultado(null); setAba('novo'); };
@@ -238,9 +252,10 @@ const MovimentacaoPublica = () => {
             )}
 
             <Tabs value={aba} onValueChange={setAba}>
-              <TabsList className="grid grid-cols-2 w-full">
-                <TabsTrigger value="novo">Novo lançamento</TabsTrigger>
-                <TabsTrigger value="meus">Meus lançamentos ({fiscal.lancamentos.length})</TabsTrigger>
+              <TabsList className="grid grid-cols-3 w-full h-auto">
+                <TabsTrigger value="novo" className="whitespace-normal">Novo</TabsTrigger>
+                <TabsTrigger value="meus" className="whitespace-normal">Meus ({fiscal.lancamentos.length})</TabsTrigger>
+                <TabsTrigger value="relatorio" className="whitespace-normal gap-1"><FileDown className="h-3.5 w-3.5" /> Relatório</TabsTrigger>
               </TabsList>
 
               <TabsContent value="novo">
@@ -370,11 +385,48 @@ const MovimentacaoPublica = () => {
                         </div>
                         <p className="text-muted-foreground">
                           {l.motivo}: <span className="text-foreground">{l.falta_nome}</span>
+                          {l.falta_reserva && <SeloReserva className="ml-1 align-middle" />}
                           {' → '}{l.cobertura_nome ? <span className="text-foreground">{l.cobertura_nome}</span> : 'ninguém cobriu'}
+                          {l.cobertura_reserva && <SeloReserva className="ml-1 align-middle" />}
                         </p>
                         <p className="text-xs text-muted-foreground">{l.horario} · {l.turno} · lançado em {horaBr(l.criado_em)} · {l.codigo}</p>
                       </div>
                     ))}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="relatorio">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Relatório do dia (PDF)</CardTitle>
+                    <CardDescription>
+                      Os seus lançamentos do dia escolhido: os com essa data e os feitos nesse dia com outra data.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      {[...new Set([fiscal.hoje, dataPlantao])].filter(Boolean).map(d => (
+                        <Button key={d} type="button" variant="outline" size="sm" className="gap-1.5" disabled={gerandoPdf}
+                          onClick={() => { setDiaRelatorio(d); baixarRelatorio(d); }}>
+                          <FileDown className="h-4 w-4" /> {d === fiscal.hoje ? 'Hoje' : 'Plantão'} ({dataBr(d)})
+                        </Button>
+                      ))}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="mov-dia-rel" className="text-sm">Outro dia</Label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <CalendarDays className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                          <Input id="mov-dia-rel" type="date" className="pl-8" max={fiscal.hoje} value={diaRelatorio}
+                            onChange={e => setDiaRelatorio(e.target.value)} />
+                        </div>
+                        <Button type="button" className="gap-1.5 shrink-0" disabled={gerandoPdf || !diaRelatorio} onClick={() => baixarRelatorio(diaRelatorio)}>
+                          {gerandoPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />} Baixar PDF
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Quem está na reserva da Senior sai marcado como RESERVA no relatório.</p>
                   </CardContent>
                 </Card>
               </TabsContent>

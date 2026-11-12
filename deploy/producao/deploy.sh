@@ -70,6 +70,7 @@ MIGRACOES=(
   "20261111120000_gasto_mensal.sql|SELECT to_regclass('public.gasto_mensal') IS NOT NULL"
   "20261112120000_pedido_ultimos_do_posto.sql|SELECT to_regprocedure('public.pedido_material_ultimos_do_posto(integer,text,uuid)') IS NOT NULL"
   "20261112130000_movimentacao_diaria.sql|SELECT to_regclass('public.movimentacoes_diarias') IS NOT NULL"
+  "20261113120000_movimentacao_reserva_relatorio.sql|SELECT to_regprocedure('public.movimentacao_relatorio_dia(integer,text,date)') IS NOT NULL"
 )
 # A ordem acima é a ordem em que as pendentes são aplicadas: sempre da mais antiga para a mais nova.
 PENDENTES=()
