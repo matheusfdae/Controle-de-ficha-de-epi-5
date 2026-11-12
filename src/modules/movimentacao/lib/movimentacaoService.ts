@@ -58,7 +58,7 @@ export interface DadosLancamento {
 const args = (s: Solicitante) => ({ _matricula: s.matricula ?? null, _cpf: s.cpf ?? null });
 const argsSol = (s: Solicitante) => ({ _sol_matricula: s.matricula ?? null, _sol_cpf: s.cpf ?? null });
 
-async function chamar<T>(fn: 'movimentacao_identificar' | 'movimentacao_buscar_colaborador' | 'movimentacao_enviar' | 'movimentacao_relatorio_dia', a: Record<string, unknown>): Promise<T> {
+async function chamar<T>(fn: 'movimentacao_identificar' | 'movimentacao_buscar_colaborador' | 'movimentacao_enviar' | 'movimentacao_relatorio_dia' | 'movimentacao_passar_plantao', a: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.rpc(fn as never, a as never);
   if (error) throw new Error(error.message?.includes('Failed to fetch') ? 'Sem conexão com o servidor. Verifique a internet.' : error.message);
   const r = data as { erro?: string } | null;
@@ -90,6 +90,14 @@ export interface RelatorioDia {
 }
 export const relatorioDoDia = (s: Solicitante, data: string) =>
   chamar<RelatorioDia>('movimentacao_relatorio_dia', { ...argsSol(s), _data: data });
+
+/**
+ * Passagem de plantão: registra e a função avisar-movimentacao manda o e-mail
+ * com o relatório do dia em PDF (na produção, em até 5 minutos).
+ */
+export interface DadosPassagem { data: string; recebe_senior_id: string | null; observacao: string }
+export const passarPlantao = (s: Solicitante, d: DadosPassagem) =>
+  chamar<{ ok: true; codigo: string; data: string; lancamentos: number }>('movimentacao_passar_plantao', { ...argsSol(s), _dados: d });
 
 // ---------- Tela interna ----------
 export interface Movimentacao extends LancamentoAviso {
@@ -134,17 +142,56 @@ export async function salvarEmailsAviso(emails: string[]) {
   if (error) throw new Error(error.message);
 }
 
+/** E-mails da passagem de plantão (vazio = usa os do aviso de divergência). null = coluna ainda não existe. */
+export async function lerEmailsPassagem(): Promise<string[] | null> {
+  const { data, error } = await tabela('movimentacao_config').select('emails_passagem').eq('id', 1).maybeSingle();
+  if (error) return null;
+  return data?.emails_passagem ?? [];
+}
+
+export async function salvarEmailsPassagem(emails: string[]) {
+  const { error } = await tabela('movimentacao_config').update({ emails_passagem: emails, updated_at: new Date().toISOString() }).eq('id', 1);
+  if (error) throw new Error(error.message);
+}
+
+/** Localhost: manda daqui as passagens pendentes (PDF gerado no navegador, e-mail pelo vite). */
+async function enviarPassagensLocal(): Promise<number> {
+  const { data: ids, error } = await supabase.rpc('movimentacao_passagens_pendentes' as never);
+  if (error) return 0; // migration da passagem ainda não aplicada
+  const { data: cfg } = await tabela('movimentacao_config').select('emails_passagem, emails_divergencia').eq('id', 1).maybeSingle();
+  const { pdfRelatorioDia } = await import('./relatorioDiaPdf');
+  let n = 0;
+  for (const id of (ids as string[] | null) ?? []) {
+    const { data: r, error: e1 } = await supabase.rpc('movimentacao_passagem_dados' as never, { _id: id } as never);
+    if (e1 || !r) throw new Error(e1?.message ?? 'Passagem não encontrada.');
+    const rel = r as RelatorioDia & { emails_senior: (string | null)[] };
+    const doc = await pdfRelatorioDia(rel, false);
+    const pdf = doc.output('datauristring').split(',')[1];
+    const res = await fetch('/__email/passagem-plantao', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cfg, relatorio: rel, pdf, link: `${window.location.origin}/movimentacao` }),
+    });
+    const corpo = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(corpo.error || `Falha ao enviar a passagem (${res.status})`);
+    const { error: e2 } = await supabase.rpc('movimentacao_passagem_marcar' as never, { _id: id, _erro: null } as never);
+    if (e2) throw new Error(e2.message);
+    n++;
+  }
+  return n;
+}
+
 /**
  * Manda agora os avisos dos divergentes pendentes. Na produção, a função
  * avisar-movimentacao (que também roda a cada 5 min); no `npm run dev`, o
  * vite.config.ts envia daqui do PC e a tela marca como avisado.
  */
-export async function enviarAvisosAgora(): Promise<{ enviados: number; motivo?: string }> {
+export async function enviarAvisosAgora(): Promise<{ enviados: number; passagens: number; motivo?: string }> {
   if (import.meta.env.DEV) {
+    const passagens = await enviarPassagensLocal();
     const { data: pend, error } = await tabela('movimentacoes_diarias').select('*')
       .eq('status', 'divergente').is('email_avisado_em', null).order('created_at').limit(50);
     if (error) throw new Error(error.message);
-    if (!pend?.length) return { enviados: 0, motivo: 'Nenhum lançamento divergente esperando aviso.' };
+    if (!pend?.length) return { enviados: 0, passagens, motivo: 'Nenhum lançamento divergente esperando aviso.' };
     const destinatarios = await lerEmailsAviso();
     const res = await fetch('/__email/avisar-movimentacao', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -157,12 +204,14 @@ export async function enviarAvisosAgora(): Promise<{ enviados: number; motivo?: 
       const { error: e2 } = await supabase.rpc('movimentacao_marcar_avisado' as never, { _ids: ids } as never);
       if (e2) throw new Error(e2.message);
     }
-    return { enviados: ids.length };
+    return { enviados: ids.length, passagens };
   }
   const { data, error } = await supabase.functions.invoke('avisar-movimentacao', { body: { modo: 'manual' } });
   if (error) throw new Error((await error.context?.json?.().catch(() => null))?.error ?? error.message);
   if (data?.error) throw new Error(data.error);
-  return { enviados: data?.lancamentos?.length ?? 0, motivo: data?.enviado ? undefined : data?.motivo };
+  const erros: string[] = data?.passagens?.erros ?? [];
+  if (erros.length) throw new Error(`Passagem de plantão não enviada: ${erros.join('; ')}`);
+  return { enviados: data?.lancamentos?.length ?? 0, passagens: data?.passagens?.enviadas?.length ?? 0, motivo: data?.enviado ? undefined : data?.motivo };
 }
 
 // ---------- Plantão noturno (12 h) ----------

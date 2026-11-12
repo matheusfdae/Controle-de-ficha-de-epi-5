@@ -11,6 +11,8 @@ import { base64 } from "./supabase/functions/_shared/xlsx";
 import { initWasm, Resvg } from "@resvg/resvg-wasm";
 import { montarEmailIntegracao, normalizarPessoas } from "./supabase/functions/_shared/emailIntegracao";
 import { limparEmails, montarEmailDivergencia } from "./supabase/functions/_shared/avisoMovimentacao";
+import { destinatariosPassagem, montarEmailPassagem } from "./supabase/functions/_shared/passagemPlantao";
+import { nomeArquivoRelatorio } from "./supabase/functions/_shared/relatorioMovimentacaoPdf";
 import { ErroAssistente, normalizarConversa, perguntarAssistente } from "./supabase/functions/_shared/assistente";
 import {
   agendarEnvios, cancelarLote, ErroWhatsApp, lerLote, listarLotes, numeroWhatsApp, validarEnvios,
@@ -123,6 +125,27 @@ function emailLocal(env: Record<string, string>): Plugin {
             enviados.push(l.id);
           }
           responder(res, 200, { enviado: enviados.length > 0, ids: enviados, destinatarios: para.length });
+        } catch (err) {
+          responder(res, 502, { error: err instanceof Error ? err.message : String(err) });
+        }
+      });
+      // Passagem de plantão: a tela manda o relatório (do banco) e o PDF já gerado no navegador.
+      server.middlewares.use("/__email/passagem-plantao", async (req, res) => {
+        try {
+          const { cfg = null, relatorio, pdf, link = null } = await lerCorpo(req);
+          if (!relatorio || !pdf) return responder(res, 400, { error: "Faltou o relatório da passagem" });
+          const { para, copia } = destinatariosPassagem(cfg, relatorio.emails_senior ?? []);
+          if (!para.length) return responder(res, 400, { error: "Cadastre ao menos um e-mail para a passagem de plantão (ou para o aviso de divergência)" });
+          const e = ler();
+          if (!e.refreshToken) return responder(res, 503, { error: 'Nenhuma conta do Microsoft 365 conectada. Em Configurações > E-mail, clique em "Conectar conta".' });
+          const acesso = await renovarAcesso(app(e), e.refreshToken);
+          gravar({ ...e, refreshToken: acesso.refreshToken });
+          const m = montarEmailPassagem(relatorio, link);
+          await enviarComo(acesso.accessToken, {
+            para, copia, assunto: m.assunto, html: m.html,
+            anexos: [{ nome: nomeArquivoRelatorio(relatorio), tipo: "application/pdf", base64: String(pdf) }],
+          }, e.caixa || null);
+          responder(res, 200, { enviado: true, destinatarios: para.length, copia: copia.length });
         } catch (err) {
           responder(res, 502, { error: err instanceof Error ? err.message : String(err) });
         }
