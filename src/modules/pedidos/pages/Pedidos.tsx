@@ -20,11 +20,12 @@ import {
   ETAPAS, FILAS, RESPONSAVEIS, STATUS_PEDIDO, atenderPedido, cancelarPedido, conferirPedido, dataBr, formatarNumero, gastoDoMesNoBanco, hojeBr,
   listAprovadores, listMateriais, listPedidos, listRecorrencias, listUsuarios, nomeMaterial, precosAnteriores, reais, rotuloPapel, variacaoPreco,
   type PrecoAnterior,
-  type Aprovador, type Material, type Papel, type PedidoCompleto, type Recorrencia, type StatusPedido,
+  type Aprovador, type Material, type Papel, type PedidoCompleto, type Recorrencia, type StatusPedido, ultimosPedidosDoPosto,
 } from '../lib/pedidosService';
 import { ListaRepeticoes, RepetirPedido } from '../components/Repeticoes';
 import SeloTermoEpi from '../components/SeloTermoEpi';
 import AnaliseEstoque from '../components/AnaliseEstoque';
+import { acimaDaMedia, compararComAnterior, mediaUltimos, type Comparacao, type MediaUltimos } from '../lib/mediaPedidos';
 
 /**
  * Pedidos de material (só quantidade): filas por etapa (conferência do
@@ -277,6 +278,15 @@ function DetalhePedido({ pedido: p, posto, teto, materiais, minhaVez, podeCancel
   const [anteriores, setAnteriores] = useState<PrecoAnterior[]>([]);
   useEffect(() => { if (comPreco) precosAnteriores(p.id).then(setAnteriores).catch(() => setAnteriores([])); }, [comPreco, p.id]);
   const anterior = (materialId: string) => anteriores.find(a => a.material_id === materialId);
+  // Média dos últimos 3 pedidos do posto (antes deste), para ver se o pedido foge do normal.
+  const [media3, setMedia3] = useState<MediaUltimos | null>(null);
+  // E a comparação item a item com o pedido anterior do posto (o mais recente dos 3).
+  const [comp, setComp] = useState<Comparacao | null>(null);
+  useEffect(() => {
+    ultimosPedidosDoPosto(p.posto_id, p.created_at)
+      .then(l => { setMedia3(mediaUltimos(l)); setComp(compararComAnterior(p.itens, l[0])); })
+      .catch(() => { setMedia3(null); setComp(null); });
+  }, [p.posto_id, p.created_at, p.itens]);
   const variacoes = p.itens.map(i => variacaoPreco(anterior(i.material_id)?.preco_anterior ?? null, i.preco_unit)).filter((v): v is number => v != null);
   const subiram = variacoes.filter(v => v > 0);
   const cairam = variacoes.filter(v => v < 0);
@@ -380,12 +390,44 @@ function DetalhePedido({ pedido: p, posto, teto, materiais, minhaVez, podeCancel
             {subiram.length === 0 && cairam.length === 0 && <span className="text-muted-foreground">Preços iguais aos da última compra de cada item.</span>}
           </div>
         )}
+        {media3 && media3.pedidos > 0 && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+            <span className="font-medium">Média dos últimos {media3.pedidos} pedido(s) do posto:</span>
+            {media3.valorMedio != null && comPreco && (() => {
+              const dif = media3.valorMedio ? Math.round(((totalAgora - media3.valorMedio) / media3.valorMedio) * 1000) / 10 : null;
+              return (
+                <span>
+                  valor médio <strong className="tabular-nums">{reais(media3.valorMedio)}</strong> · este pedido <strong className="tabular-nums">{reais(totalAgora)}</strong>
+                  {dif != null && dif !== 0 && (
+                    <span className={`ml-1 font-semibold ${dif > 50 ? 'text-destructive' : dif > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                      ({dif > 0 ? '+' : ''}{dif.toLocaleString('pt-BR')}%)
+                    </span>
+                  )}
+                </span>
+              );
+            })()}
+            <span className="text-xs text-muted-foreground">Coluna "Média últ. 3": quantidade média de cada item por pedido (pedido sem o item conta 0).</span>
+          </div>
+        )}
+        {comp && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+            <span className="font-medium">Comparado ao pedido anterior {comp.anterior.codigo} ({dataBr(comp.anterior.data)}):</span>
+            {comp.iguais > 0 && <span>{comp.iguais} igual(is)</span>}
+            {comp.aumentaram > 0 && <span className="text-amber-700 dark:text-amber-400 font-medium">{comp.aumentaram} aumentou(aram)</span>}
+            {comp.diminuiram > 0 && <span className="text-emerald-700 dark:text-emerald-400 font-medium">{comp.diminuiram} diminuiu(íram)</span>}
+            {comp.novos > 0 && <span className="text-primary font-medium">{comp.novos} novo(s)</span>}
+            {comp.sairam.length > 0 && <span className="text-muted-foreground">{comp.sairam.length} saiu(íram)</span>}
+            <span className="text-muted-foreground">· quantidade total {formatarNumero(comp.totalAntes)} → <strong className="text-foreground">{formatarNumero(comp.totalAgora)}</strong></span>
+          </div>
+        )}
         <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Item</TableHead>
               <TableHead className="text-right">Pedido</TableHead>
+              <TableHead className="text-right">Média últ. 3<span className="block text-[10px] font-normal">pedidos do posto</span></TableHead>
+              <TableHead className="text-right">Pedido anterior<span className="block text-[10px] font-normal">{comp ? comp.anterior.codigo : 'do posto'}</span></TableHead>
               <TableHead className="text-right w-28">Conferido</TableHead>
               <TableHead className="text-right w-28">Entregue</TableHead>
               {comPreco && <TableHead className="text-right">Preço anterior<span className="block text-[10px] font-normal">última compra</span></TableHead>}
@@ -411,6 +453,37 @@ function DetalhePedido({ pedido: p, posto, teto, materiais, minhaVez, podeCancel
                     {m?.is_epi && <HardHat className="inline h-3.5 w-3.5 ml-1 text-amber-600" aria-label="EPI" />}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{formatarNumero(i.quantidade_pedida)}</TableCell>
+                  {(() => {
+                    const md = media3?.porItem.get(i.material_id);
+                    const media = media3 && media3.pedidos > 0 ? (md?.media ?? 0) : undefined;
+                    const acima = acimaDaMedia(i.quantidade_pedida, media);
+                    return (
+                      <TableCell className="text-right tabular-nums whitespace-nowrap"
+                        title={md ? md.valores.map(v => `${v.codigo} (${dataBr(v.data)}): ${formatarNumero(v.quantidade)}`).join('\n') : media3?.pedidos ? 'Não veio nos últimos pedidos' : undefined}>
+                        {media == null ? <span className="text-xs text-muted-foreground">sem pedido antes</span> : (
+                          <span className={acima ? 'inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 bg-amber-500/15 text-amber-800 dark:text-amber-300 font-semibold' : 'text-muted-foreground'}>
+                            {acima && <TrendingUp className="h-3 w-3" />}{formatarNumero(media)}
+                          </span>
+                        )}
+                      </TableCell>
+                    );
+                  })()}
+                  {(() => {
+                    const c = comp?.porItem.get(i.material_id);
+                    if (!comp || !c) return <TableCell className="text-right"><span className="text-xs text-muted-foreground">sem pedido antes</span></TableCell>;
+                    return (
+                      <TableCell className="text-right tabular-nums whitespace-nowrap">
+                        {c.novo ? <span className="rounded px-1.5 py-0.5 bg-primary/10 text-primary text-xs font-semibold">novo</span> : (
+                          <>
+                            <span className="text-muted-foreground">{formatarNumero(c.antes)}</span>
+                            <span className={`ml-1.5 text-xs font-semibold ${c.dif > 0 ? 'text-amber-700 dark:text-amber-400' : c.dif < 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                              {c.dif > 0 ? `+${formatarNumero(c.dif)}` : c.dif < 0 ? `−${formatarNumero(-c.dif)}` : '='}
+                            </span>
+                          </>
+                        )}
+                      </TableCell>
+                    );
+                  })()}
                   <TableCell className="text-right tabular-nums">{conferindo ? (fora ? <span className="text-xs text-destructive">excluído</span> : campo) : p.status === 'enviada' || p.status === 'devolvida' ? '—' : formatarNumero(i.quantidade)}</TableCell>
                   <TableCell className="text-right tabular-nums">
                     {atendendo ? campo : entregue == null ? '—' : (
@@ -460,7 +533,7 @@ function DetalhePedido({ pedido: p, posto, teto, materiais, minhaVez, podeCancel
             })}
             {comPreco && (
               <TableRow className="bg-muted/40 hover:bg-muted/40">
-                <TableCell colSpan={7} className="text-right text-xs font-semibold uppercase text-muted-foreground">Total do pedido</TableCell>
+                <TableCell colSpan={9} className="text-right text-xs font-semibold uppercase text-muted-foreground">Total do pedido</TableCell>
                 <TableCell className="text-right tabular-nums font-bold whitespace-nowrap">{reais(totalAgora)}</TableCell>
                 {conferindo && <TableCell />}
               </TableRow>
@@ -468,6 +541,16 @@ function DetalhePedido({ pedido: p, posto, teto, materiais, minhaVez, podeCancel
           </TableBody>
         </Table>
         </div>
+        {comp && comp.sairam.length > 0 && (
+          <div className="rounded-md border border-dashed px-3 py-2 text-sm">
+            <span className="font-medium">Estavam no pedido anterior ({comp.anterior.codigo}) e não estão neste:</span>{' '}
+            {comp.sairam.map((x, k) => (
+              <span key={x.material_id} className="text-muted-foreground">
+                {k > 0 && ' · '}{nome(x.material_id)} ({formatarNumero(x.antes)} {mat(x.material_id)?.unidade ?? ''})
+              </span>
+            ))}
+          </div>
+        )}
         {comPreco && <p className="text-xs text-muted-foreground">Preço anterior = preço do mesmo item na última compra (último pedido atendido antes deste, de qualquer posto). Preço atual = o deste pedido.</p>}
         {p.sem_preco && comPreco && <p className="text-xs text-amber-600">Há item sem preço: ele fica fora do total. Cadastre o preço em Configurações de Pedidos → Itens.</p>}
         {teto != null && gastoComEste != null && (() => {

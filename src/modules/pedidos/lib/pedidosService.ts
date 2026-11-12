@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { PedidoAnterior } from './mediaPedidos';
 import type { Json } from '@/integrations/supabase/types';
 
 /**
@@ -116,7 +117,7 @@ export const catalogoDoPosto = (materiais: MaterialPublico[], posto: PostoPublic
   posto?.itens == null ? materiais : materiais.filter(m => posto.itens!.includes(m.id));
 
 type FuncaoPublica = 'pedido_material_identificar' | 'pedido_material_enviar' | 'pedido_material_cancelar' | 'pedido_material_reenviar'
-  | 'pedido_material_termo' | 'pedido_material_termo_salvar' | 'pedido_material_termo_assinar' | 'pedido_material_termo_link' | 'pedido_material_termo_buscar';
+  | 'pedido_material_ultimos_do_posto' | 'pedido_material_termo' | 'pedido_material_termo_salvar' | 'pedido_material_termo_assinar' | 'pedido_material_termo_link' | 'pedido_material_termo_buscar';
 async function chamarPublica<T>(fn: FuncaoPublica, args: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.rpc(fn, args as never);
   if (error) throw new Error(error.message?.includes('Failed to fetch') ? 'Sem conexão com o servidor. Verifique a internet.' : error.message);
@@ -126,6 +127,15 @@ async function chamarPublica<T>(fn: FuncaoPublica, args: Record<string, unknown>
 }
 
 export const identificar = (s: Solicitante) => chamarPublica<Identificado>('pedido_material_identificar', solicitanteArgs(s));
+
+/** Pedido anterior do posto como o link público vê: só quantidades, sem valores. */
+export interface PedidoAnteriorPublico {
+  id: string; codigo: string; status: StatusPedido; data_pedido: string; criado_em: string;
+  itens: { material_id: string; nome: string; unidade: string; quantidade: number; quantidade_pedida: number; quantidade_atendida: number | null }[];
+}
+/** Os 3 últimos pedidos do posto (de qualquer encarregado, sem os cancelados), do mais novo ao mais antigo. */
+export const ultimosDoPosto = async (s: Solicitante, postoId: string) =>
+  (await chamarPublica<{ pedidos: PedidoAnteriorPublico[] }>('pedido_material_ultimos_do_posto', { ...solicitanteArgs(s), _posto_id: postoId })).pedidos;
 
 export const enviarPedido = (s: Solicitante, dados: {
   telefone: string; postoId: string; itens: { material_id: string; quantidade: number }[];
@@ -236,6 +246,27 @@ export async function listPedidos(desde: string): Promise<PedidoCompleto[]> {
     eventos.push(...(ev.data ?? []) as unknown as EventoPedido[]);
   }
   return pedidos.map(p => ({ ...p, itens: itens.filter(i => i.pedido_id === p.id), eventos: eventos.filter(e => e.pedido_id === p.id) }));
+}
+
+/** Os últimos `n` pedidos do posto feitos antes de `antesDe` (created_at), sem os cancelados, com os itens. */
+export async function ultimosPedidosDoPosto(postoId: string, antesDe: string, n = 3): Promise<PedidoAnterior[]> {
+  const { data, error } = await supabase.from('pedidos_material')
+    .select('id, codigo, data_pedido, status, valor_total')
+    .eq('posto_id', postoId).neq('status', 'cancelada').lt('created_at', antesDe)
+    .order('created_at', { ascending: false }).limit(n);
+  if (error) throw error;
+  const pedidos = data ?? [];
+  if (!pedidos.length) return [];
+  const { data: itens, error: e } = await supabase.from('pedidos_material_itens')
+    .select('pedido_id, material_id, quantidade, quantidade_atendida, quantidade_pedida').in('pedido_id', pedidos.map(p => p.id));
+  if (e) throw e;
+  return pedidos.map(p => ({
+    ...p, valor_total: Number(p.valor_total ?? 0),
+    itens: (itens ?? []).filter(i => i.pedido_id === p.id).map(i => ({
+      material_id: i.material_id, quantidade: Number(i.quantidade), quantidade_atendida: i.quantidade_atendida == null ? null : Number(i.quantidade_atendida),
+      quantidade_pedida: Number(i.quantidade_pedida ?? i.quantidade),
+    })),
+  })) as PedidoAnterior[];
 }
 
 // ---------- Repetições (pedidos recorrentes) ----------

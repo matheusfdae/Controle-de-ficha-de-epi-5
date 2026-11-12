@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,12 +9,14 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CheckCircle2, ClipboardList, HardHat, Loader2, LogOut, Pencil, Plus, Repeat, Search, Send, ShoppingCart, Trash2, UserCheck, X } from 'lucide-react';
 import TermoEpiPedido from '../components/TermoEpiPedido';
+import UltimosPedidosPosto from '../components/UltimosPedidosPosto';
+import { historicoPorItem, type LinhaHistorico } from '../lib/mediaPedidos';
 import { toast } from 'sonner';
 import { cpfValido, formatarCpf, formatarTelefone, matriculaValida, soDigitos } from '@/modules/crachas/lib/solicitacaoService';
 import {
-  FREQUENCIAS, STATUS_PEDIDO, cancelarPedidoPublico, catalogoDoPosto, dataBr, enviarPedido, formatarNumero, identificar,
-  nomePublico, reenviarPedido, rotuloFrequencia,
-  type Frequencia, type Identificado, type MaterialPublico, type PedidoDoSolicitante, type PostoPublico, type Solicitante,
+  STATUS_PEDIDO, cancelarPedidoPublico, catalogoDoPosto, dataBr, enviarPedido, formatarNumero, identificar,
+  nomePublico, reenviarPedido, rotuloFrequencia, ultimosDoPosto,
+  type Identificado, type MaterialPublico, type PedidoAnteriorPublico, type PedidoDoSolicitante, type PostoPublico, type Solicitante,
 } from '../lib/pedidosService';
 
 /**
@@ -119,8 +121,10 @@ const chaveBusca = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toL
  * Lista do posto (já vem com todos os itens dele): nome inteiro, quantidade à
  * direita e busca no topo. Feita para o celular.
  */
-function ListaDoPosto({ linhas, setLinhas, catalogo }: {
+function ListaDoPosto({ linhas, setLinhas, catalogo, historico }: {
   linhas: Linha[]; setLinhas: (f: (ls: Linha[]) => Linha[]) => void; catalogo: MaterialPublico[];
+  /** Últimos pedidos do posto por item: aparece embaixo do nome ("últimos: 5 · 4 · 6"). */
+  historico?: Map<string, LinhaHistorico>;
 }) {
   const [busca, setBusca] = useState('');
   const mudar = (id: string, valor: string) =>
@@ -143,7 +147,15 @@ function ListaDoPosto({ linhas, setLinhas, catalogo }: {
           const m = catalogo.find(x => x.id === l.material_id)!;
           return (
             <label key={l.material_id} className={`flex items-center gap-3 px-3 py-2 ${l.quantidade ? 'bg-primary/10' : ''}`}>
-              <span className="flex-1 min-w-0 text-sm leading-snug break-words">{nomePublico(m)}</span>
+              <span className="flex-1 min-w-0 text-sm leading-snug break-words">
+                {nomePublico(m)}
+                {historico?.get(m.id) && (
+                  <span className="block text-[11px] text-muted-foreground">
+                    últimos: {historico.get(m.id)!.valores.map(v => formatarNumero(v.recebeu ?? v.pedida)).join(' · ')}
+                    {' '}(média {formatarNumero(historico.get(m.id)!.media)})
+                  </span>
+                )}
+              </span>
               <span className="w-20 shrink-0 text-center">
                 <Input inputMode="decimal" placeholder="Qtd." className="h-9 text-center" aria-label={`Quantidade de ${nomePublico(m)}`}
                   value={l.quantidade} onChange={e => mudar(l.material_id, e.target.value)} />
@@ -186,12 +198,24 @@ const PedidoMaterialPublico = () => {
   const [aba, setAba] = useState('novo');
   const [postoId, setPostoId] = useState('');
   const [linhas, setLinhas] = useState<Linha[]>([linhaVazia()]);
-  const [frequencia, setFrequencia] = useState<Frequencia>('unica');
   const [observacao, setObservacao] = useState('');
   const [telefone, setTelefone] = useState(lembrado().telefone ?? '');
   const [enviado, setEnviado] = useState<{ codigo: string; recorrente: boolean } | null>(null);
   const [termoDe, setTermoDe] = useState<PedidoDoSolicitante | null>(null);
   const [carregando, setCarregando] = useState(false);
+  // Últimos 3 pedidos do posto escolhido (de qualquer encarregado).
+  const [ultimos, setUltimos] = useState<{ postoId: string; pedidos: PedidoAnteriorPublico[] | null; erro: string | null } | null>(null);
+  const [versaoUltimos, setVersaoUltimos] = useState(0);
+  useEffect(() => {
+    if (!quem || !postoId) { setUltimos(null); return; }
+    let vivo = true;
+    setUltimos({ postoId, pedidos: null, erro: null });
+    ultimosDoPosto(quem, postoId)
+      .then(pedidos => { if (vivo) setUltimos({ postoId, pedidos, erro: null }); })
+      .catch(e => { if (vivo) setUltimos({ postoId, pedidos: null, erro: (e as Error).message }); });
+    return () => { vivo = false; };
+  }, [quem, postoId, versaoUltimos]);
+  const historico = useMemo(() => new Map((ultimos?.pedidos ? historicoPorItem(ultimos.pedidos) : []).map(l => [l.material_id, l])), [ultimos]);
 
   const tentar = async (acao: () => Promise<void>) => {
     setCarregando(true);
@@ -235,7 +259,7 @@ const PedidoMaterialPublico = () => {
 
   const sair = () => {
     setQuem(null); setDados(null); setSolCpf(''); setEnviado(null);
-    setLinhas([linhaVazia()]); setFrequencia('unica'); setObservacao(''); setAba('novo');
+    setLinhas([linhaVazia()]); setObservacao(''); setAba('novo');
   };
 
   const trocarPosto = (id: string) => {
@@ -256,10 +280,11 @@ const PedidoMaterialPublico = () => {
     const tel = soDigitos(telefone);
     if (tel.length < 10) return toast.error('Informe o seu telefone com DDD.');
     tentar(async () => {
-      const r = await enviarPedido(quem, { telefone, postoId, itens, observacao, frequencia });
+      const r = await enviarPedido(quem, { telefone, postoId, itens, observacao, frequencia: 'unica' });
       lembrar({ telefone: tel });
       setEnviado({ codigo: r.codigo, recorrente: r.recorrente });
-      setLinhas(linhasDoPosto(dados?.postos.find(p => p.id === postoId), catalogo)); setFrequencia('unica'); setObservacao('');
+      setLinhas(linhasDoPosto(dados?.postos.find(p => p.id === postoId), catalogo)); setObservacao('');
+      setVersaoUltimos(v => v + 1);
       await recarregar();
     });
   };
@@ -399,35 +424,23 @@ const PedidoMaterialPublico = () => {
                           )}
                         </div>
 
+                        {postoId && ultimos?.postoId === postoId && (
+                          <UltimosPedidosPosto pedidos={ultimos.pedidos} erro={ultimos.erro} />
+                        )}
+
                         {postoId && (
                           <div>
                             <Label>Itens *</Label>
                             {comLista ? (
                               <>
                                 <p className="text-xs text-muted-foreground mb-1">Preencha a quantidade só do que precisa. Item sem quantidade não entra no pedido.</p>
-                                <ListaDoPosto linhas={linhas} setLinhas={setLinhas} catalogo={catalogo} />
+                                <ListaDoPosto linhas={linhas} setLinhas={setLinhas} catalogo={catalogo} historico={historico} />
                               </>
                             ) : (
                               <ListaItens linhas={linhas} setLinhas={setLinhas} catalogo={catalogo} />
                             )}
                           </div>
                         )}
-
-                        <div>
-                          <Label>Com que frequência?</Label>
-                          <Select value={frequencia} onValueChange={v => setFrequencia(v as Frequencia)}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {FREQUENCIAS.map(f => <SelectItem key={f.valor} value={f.valor}>{f.rotulo}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                          {frequencia !== 'unica' && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Este pedido é feito hoje e repetido {rotuloFrequencia(frequencia).toLowerCase()}, sempre passando pela conferência.
-                              Você pode encerrar a repetição em "Meus pedidos".
-                            </p>
-                          )}
-                        </div>
 
                         <div>
                           <Label htmlFor="obs">Observação / justificativa</Label>
