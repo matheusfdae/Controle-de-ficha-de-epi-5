@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardCheck, FileDown, Loader2, LogOut, Moon, Send, UserCheck } from 'lucide-react';
+import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardCheck, FileDown, Handshake, Loader2, LogOut, Moon, Send, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { cpfValido, formatarCpf, matriculaValida, soDigitos, type Solicitante } from '@/modules/crachas/lib/solicitacaoService';
@@ -16,6 +16,7 @@ import {
 } from '../lib/movimentacaoService';
 import EscolherColaborador, { SeloReserva } from '../components/EscolherColaborador';
 import { pdfRelatorioDia } from '../lib/relatorioDiaPdf';
+import PassagemPlantaoCard from '../components/PassagemPlantaoCard';
 
 /**
  * Link público do Controle de Movimentação Diária (substitui o Microsoft Forms).
@@ -229,7 +230,10 @@ const MovimentacaoPublica = () => {
                   <p className="font-semibold truncate">{fiscal.nome}</p>
                   <p className="text-xs text-muted-foreground truncate">Matrícula {fiscal.matricula}{fiscal.cargo ? ` · ${fiscal.cargo}` : ''}</p>
                 </div>
-                <Button variant="ghost" size="sm" className="gap-1 shrink-0" onClick={sair}><LogOut className="h-4 w-4" /> Sair</Button>
+                <div className="flex flex-col sm:flex-row gap-1 shrink-0">
+                  <Button variant="outline" size="sm" className="gap-1" onClick={() => setAba('relatorio')}><Handshake className="h-4 w-4" /> Passar plantão</Button>
+                  <Button variant="ghost" size="sm" className="gap-1" onClick={sair}><LogOut className="h-4 w-4" /> Sair</Button>
+                </div>
               </CardContent>
             </Card>
 
@@ -255,7 +259,7 @@ const MovimentacaoPublica = () => {
               <TabsList className="grid grid-cols-3 w-full h-auto">
                 <TabsTrigger value="novo" className="whitespace-normal">Novo</TabsTrigger>
                 <TabsTrigger value="meus" className="whitespace-normal">Meus ({fiscal.lancamentos.length})</TabsTrigger>
-                <TabsTrigger value="relatorio" className="whitespace-normal gap-1"><FileDown className="h-3.5 w-3.5" /> Relatório</TabsTrigger>
+                <TabsTrigger value="relatorio" className="whitespace-normal gap-1"><FileDown className="h-3.5 w-3.5" /> Relatório / plantão</TabsTrigger>
               </TabsList>
 
               <TabsContent value="novo">
@@ -396,7 +400,8 @@ const MovimentacaoPublica = () => {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="relatorio">
+              <TabsContent value="relatorio" className="space-y-4">
+                <PassagemPlantaoCard quem={quem} fiscal={fiscal} dataPlantao={dataPlantao} />
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">Relatório do dia (PDF)</CardTitle>
