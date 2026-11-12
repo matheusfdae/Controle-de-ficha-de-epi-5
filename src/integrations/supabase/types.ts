@@ -2537,6 +2537,10 @@ export type Database = {
       master_apagar: { Args: { _tabela: string; _ids: string[]; _motivo?: string | null }; Returns: Json }
       master_lixeira: { Args: Record<PropertyKey, never>; Returns: Json }
       master_restaurar: { Args: { _lote: string }; Returns: Json }
+      pedido_material_ultimos_do_posto: {
+        Args: { _matricula: number | null; _cpf: string | null; _posto_id: string }
+        Returns: Json
+      }
       pedido_material_identificar: {
         Args: { _matricula: number | null; _cpf: string | null }
         Returns: Json

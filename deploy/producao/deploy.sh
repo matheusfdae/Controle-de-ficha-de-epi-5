@@ -68,6 +68,7 @@ MIGRACOES=(
   "20261106120000_pedido_termo_epi.sql|SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'termos_epi_coletivos' AND column_name = 'pedido_id')"
   "20261107120000_termo_epi_lembrete.sql|SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'pedidos_material' AND column_name = 'termo_whatsapp_lembretes')"
   "20261111120000_gasto_mensal.sql|SELECT to_regclass('public.gasto_mensal') IS NOT NULL"
+  "20261112120000_pedido_ultimos_do_posto.sql|SELECT to_regprocedure('public.pedido_material_ultimos_do_posto(integer,text,uuid)') IS NOT NULL"
 )
 # A ordem acima é a ordem em que as pendentes são aplicadas: sempre da mais antiga para a mais nova.
 PENDENTES=()
