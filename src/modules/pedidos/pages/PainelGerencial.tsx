@@ -16,6 +16,7 @@ import { listPostos, type Posto } from '@/services/postosService';
 import { formatarNumero, hojeBr, listMateriais, listPedidos, reais, type Material, type PedidoCompleto } from '../lib/pedidosService';
 import { gastoTeto, indicadores, mesesAte, pedidosPorMes, porEtapa, porPosto, rotuloMes, tempoPorEtapa, topItens } from '../lib/gerencial';
 import BarrasPostos3D from '../components/BarrasPostos3D';
+import RelatorioTetoPosto, { type PostoTeto } from '../components/RelatorioTetoPosto';
 import { pdfPedidosDoMes, pdfPedidosDoPosto, pdfTetoPorPosto } from '../lib/relatoriosPdf';
 
 /**
@@ -118,6 +119,12 @@ export default function PainelGerencial() {
   const delta = k.pedidosAnterior ? Math.round(((k.pedidos - k.pedidosAnterior) / k.pedidosAnterior) * 1000) / 10 : null;
   const DeltaIcone = delta != null && delta > 0 ? ArrowUpRight : ArrowDownRight;
   const abrirPosto = (id: string) => navigate(`/pedidos/posto/${id}?mes=${mes}`);
+  // Clique no quadro de teto: relatório do ano no modelo da planilha.
+  const [relTeto, setRelTeto] = useState<PostoTeto | null>(null);
+  const abrirTeto = (id: string) => {
+    const po = postos.find(x => x.id === id);
+    if (po) setRelTeto({ id: po.id, nome: po.nome, uf: po.uf, teto_material: po.teto_material });
+  };
 
   return (
     <div className="p-4 lg:p-8 pb-20 [--g-s1:#2a78d6] [--g-s2:#eb6834] dark:[--g-s1:#3987e5] dark:[--g-s2:#d95926]">
@@ -176,7 +183,7 @@ export default function PainelGerencial() {
             <CardTitle className="text-base">Teto de gasto por posto — {rotuloMes(mes)}</CardTitle>
             <CardDescription>
               Gasto = soma do valor dos pedidos feitos no mês{mesAtual ? ` até hoje (${hojeBr().split('-').reverse().join('/')})` : ''}, sem os cancelados.
-              O teto de cada posto fica em Configurações de Pedidos → Itens por posto. Clique num posto para ver os pedidos dele.
+              O teto de cada posto fica em Configurações de Pedidos → Itens por posto. Clique num posto para ver o relatório do ano (previsto, realizado e variação por mês).
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -197,7 +204,7 @@ export default function PainelGerencial() {
                   </TableRow></TableHeader>
                   <TableBody>
                     {tetos.map(l => (
-                      <TableRow key={l.id} className="cursor-pointer" onClick={() => abrirPosto(l.id)}>
+                      <TableRow key={l.id} className="cursor-pointer" onClick={() => abrirTeto(l.id)}>
                         <TableCell className="font-medium">{l.nome} <span className="text-xs text-muted-foreground">{l.uf}</span>
                           {l.semPreco > 0 && <span className="block text-[11px] text-amber-600">{l.semPreco} pedido(s) com item sem preço</span>}
                         </TableCell>
@@ -361,6 +368,8 @@ export default function PainelGerencial() {
           </CardContent>
         </Card>
       </div>
+      <RelatorioTetoPosto posto={relTeto} ano={Number(mes.slice(0, 4))} onFechar={() => setRelTeto(null)}
+        onVerPedidos={id => { setRelTeto(null); abrirPosto(id); }} />
     </div>
   );
 }
