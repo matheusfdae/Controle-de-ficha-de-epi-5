@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Search, UserCheck, X } from 'lucide-react';
+import { Loader2, Search, Shuffle, UserCheck, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { cpfValido, formatarCpf, soDigitos, type Solicitante } from '@/modules/crachas/lib/solicitacaoService';
 import { buscarColaborador, type ColaboradorSenior, type ModoBusca } from '../lib/movimentacaoService';
@@ -11,6 +11,16 @@ const MODOS: { v: ModoBusca; t: string; dica: string }[] = [
   { v: 'matricula', t: 'Matrícula', dica: 'Digite a matrícula' },
   { v: 'cpf', t: 'CPF', dica: '000.000.000-00' },
 ];
+
+/** Selo do colaborador que na Senior está num posto/local de RESERVA. */
+export const SeloReserva = ({ className }: { className?: string }) => (
+  <span className={cn('inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-900 dark:bg-blue-900/40 dark:text-blue-100', className)}>
+    <Shuffle className="h-3 w-3" aria-hidden /> RESERVA
+  </span>
+);
+
+/** Posto/local da Senior (o posto, se tiver; senão o local). */
+const ondeEsta = (c: ColaboradorSenior) => c.posto || c.local || '';
 
 /**
  * Escolhe um colaborador ativo da Senior buscando por nome, matrícula ou CPF.
@@ -47,16 +57,25 @@ export default function EscolherColaborador({ quem, valor, mudar, rotulo, exclui
 
   if (valor) {
     return (
-      <div className="flex items-center gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2">
-        <UserCheck className="h-5 w-5 text-primary shrink-0" />
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold text-sm leading-tight break-words">{valor.nome}</p>
-          <p className="text-xs text-muted-foreground">Matrícula {valor.matricula}{valor.cargo ? ` · ${valor.cargo}` : ''}</p>
-          {valor.local && <p className="text-[11px] text-muted-foreground truncate">{valor.local}</p>}
+      <div className="space-y-2">
+        <div className={cn('flex items-center gap-3 rounded-md border px-3 py-2',
+          valor.reserva ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40' : 'border-primary/40 bg-primary/5')}>
+          <UserCheck className={cn('h-5 w-5 shrink-0', valor.reserva ? 'text-blue-700 dark:text-blue-300' : 'text-primary')} />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-sm leading-tight break-words">{valor.nome}</p>
+            <p className="text-xs text-muted-foreground">Matrícula {valor.matricula}{valor.cargo ? ` · ${valor.cargo}` : ''}</p>
+            {ondeEsta(valor) && <p className="text-[11px] text-muted-foreground truncate">{ondeEsta(valor)}</p>}
+          </div>
+          <Button type="button" variant="ghost" size="sm" className="gap-1 shrink-0" onClick={() => { mudar(null); setTexto(''); }}>
+            <X className="h-4 w-4" /> Trocar
+          </Button>
         </div>
-        <Button type="button" variant="ghost" size="sm" className="gap-1 shrink-0" onClick={() => { mudar(null); setTexto(''); }}>
-          <X className="h-4 w-4" /> Trocar
-        </Button>
+        {valor.reserva && (
+          <div role="note" className="flex items-start gap-2 rounded-md border border-blue-300 bg-blue-100/70 px-3 py-2 text-xs text-blue-950 dark:border-blue-800 dark:bg-blue-900/40 dark:text-blue-50">
+            <Shuffle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
+            <p><strong>Colaborador da RESERVA.</strong> Na Senior ele está no posto {ondeEsta(valor) ? <strong>{ondeEsta(valor)}</strong> : 'de reserva'}.</p>
+          </div>
+        )}
       </div>
     );
   }
@@ -87,9 +106,13 @@ export default function EscolherColaborador({ quem, valor, mudar, rotulo, exclui
         <div className="rounded-md border divide-y max-h-64 overflow-y-auto">
           {lista.filter(c => c.id !== excluirId).map(c => (
             <button key={c.id} type="button" onClick={() => mudar(c)}
-              className="w-full text-left px-3 py-2 hover:bg-muted focus:bg-muted focus:outline-none">
-              <p className="text-sm font-medium break-words">{c.nome}</p>
-              <p className="text-xs text-muted-foreground">Matrícula {c.matricula}{c.cargo ? ` · ${c.cargo}` : ''}{c.local ? ` · ${c.local}` : ''}</p>
+              className={cn('w-full text-left px-3 py-2 hover:bg-muted focus:bg-muted focus:outline-none',
+                c.reserva && 'border-l-4 border-l-blue-500 bg-blue-50/60 dark:bg-blue-950/30')}>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-medium break-words">{c.nome}</p>
+                {c.reserva && <SeloReserva className="shrink-0" />}
+              </div>
+              <p className="text-xs text-muted-foreground">Matrícula {c.matricula}{c.cargo ? ` · ${c.cargo}` : ''}{ondeEsta(c) ? ` · ${ondeEsta(c)}` : ''}</p>
             </button>
           ))}
           {lista.filter(c => c.id !== excluirId).length === 0 && (

@@ -29,6 +29,11 @@ export interface LancamentoDoFiscal {
   id: string; codigo: string; criado_em: string; data: string; status: StatusMov;
   posto: string; motivo: string; falta_nome: string; cobertura_nome: string | null; horario: string; turno: string;
   ok_pelo_plantao?: boolean;
+  // Campos novos (migration 20261113120000); opcionais até ela ser aplicada.
+  data_lancamento?: string; empresa?: string; justificativa?: string | null;
+  falta_matricula?: string; cobertura_matricula?: string | null;
+  falta_reserva?: boolean; cobertura_reserva?: boolean;
+  cobertura_por_extra?: boolean; ocorrencias?: number | null;
 }
 /** Plantão do fiscal agora. Noturno depois da meia-noite: data_plantao = ontem (também fica OK). */
 export interface PlantaoFiscal {
@@ -53,7 +58,7 @@ export interface DadosLancamento {
 const args = (s: Solicitante) => ({ _matricula: s.matricula ?? null, _cpf: s.cpf ?? null });
 const argsSol = (s: Solicitante) => ({ _sol_matricula: s.matricula ?? null, _sol_cpf: s.cpf ?? null });
 
-async function chamar<T>(fn: 'movimentacao_identificar' | 'movimentacao_buscar_colaborador' | 'movimentacao_enviar', a: Record<string, unknown>): Promise<T> {
+async function chamar<T>(fn: 'movimentacao_identificar' | 'movimentacao_buscar_colaborador' | 'movimentacao_enviar' | 'movimentacao_relatorio_dia', a: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.rpc(fn as never, a as never);
   if (error) throw new Error(error.message?.includes('Failed to fetch') ? 'Sem conexão com o servidor. Verifique a internet.' : error.message);
   const r = data as { erro?: string } | null;
@@ -63,8 +68,11 @@ async function chamar<T>(fn: 'movimentacao_identificar' | 'movimentacao_buscar_c
 
 export const identificarFiscal = (s: Solicitante) => chamar<FiscalIdentificado>('movimentacao_identificar', args(s));
 
-/** Colaborador ativo da Senior (sem CPF). */
-export interface ColaboradorSenior { id: string; nome: string; matricula: number; cargo: string | null; local: string | null }
+/** Colaborador ativo da Senior (sem CPF). reserva = posto/local de RESERVA na Senior. */
+export interface ColaboradorSenior {
+  id: string; nome: string; matricula: number; cargo: string | null; local: string | null;
+  posto?: string | null; reserva?: boolean;
+}
 export type ModoBusca = 'nome' | 'matricula' | 'cpf';
 
 export const buscarColaborador = (s: Solicitante, modo: ModoBusca, busca: string) =>
@@ -73,6 +81,15 @@ export const buscarColaborador = (s: Solicitante, modo: ModoBusca, busca: string
 export const enviarLancamento = (s: Solicitante, d: DadosLancamento) =>
   chamar<{ ok: true; codigo: string; status: StatusMov; data: string; data_lancamento: string; ok_pelo_plantao?: boolean; lancamentos: LancamentoDoFiscal[] }>(
     'movimentacao_enviar', { ...argsSol(s), _dados: d });
+
+/** Relatório do dia do fiscal: lançamentos com a data informada OU feitos nesse dia. */
+export interface RelatorioDia {
+  fiscal: { nome: string; matricula: number; cargo: string | null };
+  data: string; gerado_em: string;
+  lancamentos: LancamentoDoFiscal[];
+}
+export const relatorioDoDia = (s: Solicitante, data: string) =>
+  chamar<RelatorioDia>('movimentacao_relatorio_dia', { ...argsSol(s), _data: data });
 
 // ---------- Tela interna ----------
 export interface Movimentacao extends LancamentoAviso {
