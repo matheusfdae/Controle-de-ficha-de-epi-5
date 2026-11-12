@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FilePlus2, Search, CalendarClock, Settings, ShieldCheck, LogOut, Users, Package, Briefcase, UserPlus, ClipboardSignature, HardHat, Shirt, FileSignature, MapPin, FileStack,
-  IdCard, Palette, Printer, History, BarChart3, Inbox, PenTool, ShoppingCart, ClipboardList, Gauge, Warehouse, ShieldAlert, Wallet } from 'lucide-react';
+  IdCard, Palette, Printer, History, BarChart3, Inbox, PenTool, ShoppingCart, ClipboardList, Gauge, Warehouse, ShieldAlert, Wallet, ClipboardCheck, Moon } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter,
@@ -110,6 +110,11 @@ export function AppSidebar() {
     return () => { vivo = false; clearInterval(t); window.removeEventListener('pedidos-pendencias', doSino); };
   }, [user, pathname]);
   const visiblePedidoItems = pedidoItems.filter(i => veTela(i.guia) && (i.action ? can('pedidos_material', i.action) : can('pedidos_material', 'view') || aprovador));
+  const movimentacaoItems = can('movimentacao', 'view') ? [
+    { title: 'Movimentação Diária', guia: 'menu-movimentacao', url: '/movimentacao', icon: ClipboardCheck },
+    { title: 'Painel Gerencial', guia: 'menu-movimentacao-gerencial', url: '/movimentacao/gerencial', icon: Gauge },
+    { title: 'Plantão Noturno', guia: 'menu-movimentacao-plantao', url: '/movimentacao/plantao', icon: Moon },
+  ].filter(i => veTela(i.guia)) : [];
   const showAdminSection = isAdmin || visibleAdminItems.length > 0;
 
   return (
@@ -217,6 +222,26 @@ export function AppSidebar() {
                         {!collapsed && item.url === '/pedidos' && pendencias > 0 && (
                           <Badge className="ml-auto h-5 px-1.5 text-[11px]" title="Pedidos esperando a sua aprovação">{pendencias}</Badge>
                         )}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {movimentacaoItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Fiscalização</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {movimentacaoItems.map(item => (
+                  <SidebarMenuItem key={item.guia}>
+                    <SidebarMenuButton asChild isActive={isActive(item.url, true)} tooltip={item.title}>
+                      <NavLink to={item.url} end data-guia={item.guia} className="flex items-center gap-2.5">
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span className="text-sm">{item.title}</span>}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

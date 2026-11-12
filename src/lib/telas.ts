@@ -47,6 +47,10 @@ export const TELAS: TelaDef[] = [
   { id: 'menu-pedidos-gasto', label: 'Gasto Mensal', grupo: 'Pedidos de material', url: '/pedidos/gasto-mensal', modulo: 'pedidos_material' },
   { id: 'menu-pedidos-config', label: 'Config. de Pedidos', grupo: 'Pedidos de material', url: '/pedidos/configuracoes', modulo: 'pedidos_material' },
 
+  { id: 'menu-movimentacao', label: 'Movimentação Diária', grupo: 'Fiscalização', url: '/movimentacao', modulo: 'movimentacao' },
+  { id: 'menu-movimentacao-plantao', label: 'Plantão noturno', grupo: 'Fiscalização', url: '/movimentacao/plantao', modulo: 'movimentacao' },
+  { id: 'menu-movimentacao-gerencial', label: 'Painel Gerencial (movimentação)', grupo: 'Fiscalização', url: '/movimentacao/gerencial', modulo: 'movimentacao' },
+
   { id: 'menu-integracao', label: 'Integração', grupo: 'Administração', url: '/integracao', modulo: 'integracao' },
   { id: 'menu-estoque', label: 'Estoque', grupo: 'Administração', url: '/estoque', modulo: 'estoque' },
   { id: 'menu-funcoes', label: 'Funções', grupo: 'Administração', url: '/funcoes', modulo: 'funcoes' },
