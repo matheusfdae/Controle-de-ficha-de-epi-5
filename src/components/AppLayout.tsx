@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import InstallAppButton from '@/components/InstallAppButton';
 import ThemeToggle from '@/components/ThemeToggle';
 import ChatAjuda from '@/components/ChatAjuda';
+import RoboToggle from '@/components/RoboToggle';
 import SinoPedidos from '@/modules/pedidos/components/SinoPedidos';
 
 const titles: Record<string, string> = {
@@ -44,6 +45,7 @@ export default function AppLayout() {
             <h1 className="text-sm font-semibold text-foreground truncate">{title}</h1>
             <div className="ml-auto flex items-center gap-1">
               <SinoPedidos />
+              <RoboToggle />
               <ThemeToggle />
               <InstallAppButton />
             </div>

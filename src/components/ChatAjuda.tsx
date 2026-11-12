@@ -2,11 +2,12 @@ import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, MapPin, RotateCcw, Send, X } from 'lucide-react';
+import { BotOff, Loader2, MapPin, RotateCcw, Send, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { perguntarAjuda, type MensagemChat } from '@/services/ajudaService';
 import { useAuth } from '@/contexts/AuthContext';
 import GuiaRobo from '@/components/GuiaRobo';
+import { desligarRoboComAviso, useRoboAssistente } from '@/hooks/useRoboAssistente';
 import { separarGuia } from '../../supabase/functions/_shared/assistente';
 import robo from '@/assets/assistente/robo.png';
 import roboCabeca from '@/assets/assistente/robo-cabeca.png';
@@ -110,16 +111,18 @@ export default function ChatAjuda() {
   const fimGuia = useCallback(() => setGuia(null), []);
   const mostrar = useCallback((destino: string) => { setAberto(false); setGuia(destino); }, []);
   const [cumprimento, setCumprimento] = useState<string | null>(null);
+  // Desligado pelo botão do topo ou do chat: o robô some (inclusive o cumprimento).
+  const { ligado, definir } = useRoboAssistente();
 
   // Ao entrar no sistema: acena e cumprimenta uma vez por login (some sozinho em 12 s).
   useEffect(() => {
-    if (!user) return;
+    if (!user || !ligado) return;
     const chave = `chat-ajuda-saudou:${user.id}`;
     try { if (sessionStorage.getItem(chave)) return; sessionStorage.setItem(chave, '1'); } catch { /* sem armazenamento */ }
     setCumprimento(saudacao(user.nome));
     const t = setTimeout(() => setCumprimento(null), 12000);
     return () => clearTimeout(t);
-  }, [user]);
+  }, [user, ligado]);
 
   useEffect(() => {
     try { sessionStorage.setItem(GUARDAR, JSON.stringify(conversa)); } catch { /* sem armazenamento */ }
@@ -146,6 +149,7 @@ export default function ChatAjuda() {
     }
   }
 
+  if (!ligado) return null;
   if (guia) return <GuiaRobo alvo={guia} onFim={fimGuia} />;
 
   if (!aberto) {
@@ -189,6 +193,10 @@ export default function ChatAjuda() {
             <RotateCcw className="h-4 w-4" />
           </Button>
         )}
+        <Button variant="ghost" size="icon" className="h-8 w-8" title="Desligar o robô assistente"
+          onClick={() => { setAberto(false); desligarRoboComAviso(definir); }}>
+          <BotOff className="h-4 w-4" />
+        </Button>
         <Button variant="ghost" size="icon" className="h-8 w-8" title="Fechar" onClick={() => setAberto(false)}>
           <X className="h-4 w-4" />
         </Button>
