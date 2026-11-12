@@ -14,13 +14,20 @@ const MODOS: { v: ModoBusca; t: string; dica: string }[] = [
 
 /** Selo do colaborador que na Senior está num posto/local de RESERVA. */
 export const SeloReserva = ({ className }: { className?: string }) => (
-  <span className={cn('inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-900 dark:bg-blue-900/40 dark:text-blue-100', className)}>
+  <span className={cn('inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-900 dark:bg-red-900/40 dark:text-red-100', className)}>
     <Shuffle className="h-3 w-3" aria-hidden /> RESERVA
   </span>
 );
 
 /** Posto/local da Senior (o posto, se tiver; senão o local). */
 const ondeEsta = (c: ColaboradorSenior) => c.posto || c.local || '';
+
+/**
+ * Está na RESERVA? Usa o que o banco mandou; se o banco ainda não manda o campo,
+ * aplica a mesma regra (_mov_e_reserva) no posto/local: palavra "reserva".
+ */
+const ehReserva = (c: ColaboradorSenior) => c.reserva ?? /(^|[^a-z])reserva/.test(
+  `${c.local ?? ''} ${c.posto ?? ''}`.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase());
 
 /**
  * Escolhe um colaborador ativo da Senior buscando por nome, matrícula ou CPF.
@@ -59,8 +66,8 @@ export default function EscolherColaborador({ quem, valor, mudar, rotulo, exclui
     return (
       <div className="space-y-2">
         <div className={cn('flex items-center gap-3 rounded-md border px-3 py-2',
-          valor.reserva ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40' : 'border-primary/40 bg-primary/5')}>
-          <UserCheck className={cn('h-5 w-5 shrink-0', valor.reserva ? 'text-blue-700 dark:text-blue-300' : 'text-primary')} />
+          ehReserva(valor) ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/40' : 'border-primary/40 bg-primary/5')}>
+          <UserCheck className={cn('h-5 w-5 shrink-0', ehReserva(valor) ? 'text-red-700 dark:text-red-300' : 'text-primary')} />
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-sm leading-tight break-words">{valor.nome}</p>
             <p className="text-xs text-muted-foreground">Matrícula {valor.matricula}{valor.cargo ? ` · ${valor.cargo}` : ''}</p>
@@ -70,8 +77,8 @@ export default function EscolherColaborador({ quem, valor, mudar, rotulo, exclui
             <X className="h-4 w-4" /> Trocar
           </Button>
         </div>
-        {valor.reserva && (
-          <div role="note" className="flex items-start gap-2 rounded-md border border-blue-300 bg-blue-100/70 px-3 py-2 text-xs text-blue-950 dark:border-blue-800 dark:bg-blue-900/40 dark:text-blue-50">
+        {ehReserva(valor) && (
+          <div role="note" className="flex items-start gap-2 rounded-md border border-red-300 bg-red-100/70 px-3 py-2 text-xs text-red-950 dark:border-red-800 dark:bg-red-900/40 dark:text-red-50">
             <Shuffle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
             <p><strong>Colaborador da RESERVA.</strong> Na Senior ele está no posto {ondeEsta(valor) ? <strong>{ondeEsta(valor)}</strong> : 'de reserva'}.</p>
           </div>
@@ -107,10 +114,10 @@ export default function EscolherColaborador({ quem, valor, mudar, rotulo, exclui
           {lista.filter(c => c.id !== excluirId).map(c => (
             <button key={c.id} type="button" onClick={() => mudar(c)}
               className={cn('w-full text-left px-3 py-2 hover:bg-muted focus:bg-muted focus:outline-none',
-                c.reserva && 'border-l-4 border-l-blue-500 bg-blue-50/60 dark:bg-blue-950/30')}>
+                ehReserva(c) && 'border-l-4 border-l-red-500 bg-red-50/60 dark:bg-red-950/30')}>
               <div className="flex items-start justify-between gap-2">
                 <p className="text-sm font-medium break-words">{c.nome}</p>
-                {c.reserva && <SeloReserva className="shrink-0" />}
+                {ehReserva(c) && <SeloReserva className="shrink-0" />}
               </div>
               <p className="text-xs text-muted-foreground">Matrícula {c.matricula}{c.cargo ? ` · ${c.cargo}` : ''}{ondeEsta(c) ? ` · ${ondeEsta(c)}` : ''}</p>
             </button>

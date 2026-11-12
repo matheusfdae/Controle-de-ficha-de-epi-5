@@ -126,7 +126,7 @@ export async function pdfRelatorioDia(r: RelatorioDia, baixar = true): Promise<J
         const divergente = i === 2 && l.status === 'divergente';
         const reserva = (i === 5 && l.falta_reserva) || (i === 6 && l.cobertura_reserva);
         if (divergente) doc.setTextColor(180, 83, 9);
-        else if (reserva) doc.setTextColor(29, 78, 216);
+        else if (reserva) doc.setTextColor(185, 28, 28);
         doc.setFont('helvetica', i === 0 || divergente ? 'bold' : 'normal');
         doc.text(t, x + 1.5, y + 4.2);
         doc.setTextColor(0);
