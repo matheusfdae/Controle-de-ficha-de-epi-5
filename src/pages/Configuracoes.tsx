@@ -8,6 +8,7 @@ import { Building2, PenTool, Image as ImageIcon, Save, Trash2, Upload, Bell, Plu
 import EmailConvocacaoConfigCard from '@/components/EmailConvocacaoConfigCard';
 import EmailEstoqueConfigCard from '@/components/EmailEstoqueConfigCard';
 import EmailPendentesConfigCard from '@/components/EmailPendentesConfigCard';
+import EmailMovimentacaoConfigCard from '@/components/EmailMovimentacaoConfigCard';
 import ContaMicrosoftCard from '@/components/ContaMicrosoftCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppConfig, getConfig, loadConfig, saveConfig } from '@/services/configService';
@@ -166,6 +167,7 @@ export default function Configuracoes() {
               <EmailConvocacaoConfigCard podeEditar={can('configuracoes', 'edit')} />
               <EmailEstoqueConfigCard podeEditar={can('configuracoes', 'edit')} />
               <EmailPendentesConfigCard podeEditar={can('configuracoes', 'edit')} />
+              {can('movimentacao', 'view') && <EmailMovimentacaoConfigCard podeEditar={can('movimentacao', 'edit')} />}
             </div>
           </TabsContent>
 

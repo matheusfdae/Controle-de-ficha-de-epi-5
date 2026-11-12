@@ -57,6 +57,10 @@ const PedidosDoPosto      = lazy(() => import('./modules/pedidos/pages/PedidosDo
 const Master              = lazy(() => import('./modules/master/pages/Master'));
 const PedidosConfig       = lazy(() => import('./modules/pedidos/pages/ConfigPedidos'));
 const PedidosGastoMensal  = lazy(() => import('./modules/pedidos/pages/GastoMensal'));
+const MovimentacaoPublica = lazy(() => import('./modules/movimentacao/pages/MovimentacaoPublica'));
+const Movimentacoes       = lazy(() => import('./modules/movimentacao/pages/Movimentacoes'));
+const MovimentacaoPainel  = lazy(() => import('./modules/movimentacao/pages/PainelMovimentacao'));
+const MovimentacaoPlantao = lazy(() => import('./modules/movimentacao/pages/PlantaoNoturno'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -132,6 +136,7 @@ function AppRoutes() {
         <Route path="/assinar-termo-coletivo/:token" element={<AssinarTermoColetivo />} />
         <Route path="/crachas/solicitacao" element={<CrachasSolicitacaoPublica />} />
         <Route path="/pedido-material" element={<PedidoMaterialPublico />} />
+        <Route path="/movimentacao-diaria" element={<MovimentacaoPublica />} />
         <Route element={<ProtectedLayout />}>
           <Route path="/"             element={<Dashboard />} />
           <Route path="/nova-ficha"   element={<RequireNovaFicha><NovaFicha /></RequireNovaFicha>} />
@@ -171,6 +176,9 @@ function AppRoutes() {
           <Route path="/pedidos/gerencial"     element={<RequireModule module="pedidos_material"><PedidosGerencial /></RequireModule>} />
           <Route path="/pedidos/configuracoes" element={<RequireModule module="pedidos_material"><PedidosConfig /></RequireModule>} />
           <Route path="/pedidos/gasto-mensal"  element={<RequireModule module="pedidos_material"><PedidosGastoMensal /></RequireModule>} />
+          <Route path="/movimentacao"          element={<RequireModule module="movimentacao"><Movimentacoes /></RequireModule>} />
+          <Route path="/movimentacao/gerencial" element={<RequireModule module="movimentacao"><MovimentacaoPainel /></RequireModule>} />
+          <Route path="/movimentacao/plantao"  element={<RequireModule module="movimentacao"><MovimentacaoPlantao /></RequireModule>} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

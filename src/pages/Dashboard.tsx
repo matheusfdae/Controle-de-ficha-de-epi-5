@@ -14,6 +14,7 @@ import { getFichas, seedDemoData } from '@/services/fichaService';
 import { getConfig } from '@/services/configService';
 import { getItemValidade } from '@/lib/validade';
 import { useAuth } from '@/contexts/AuthContext';
+import MovimentacaoKpis from '@/modules/movimentacao/components/MovimentacaoKpis';
 
 interface VencimentoItem {
   fichaId: string;
@@ -146,6 +147,9 @@ export default function Dashboard() {
           <StatCard icon={Users} label="Colaboradores" value={colaboradoresUnicos} color="primary"
             to={can('colaboradores', 'view') ? '/colaboradores' : undefined} />
         </div>
+
+        {/* Movimentação diária (faltas e extras dos fiscais) */}
+        {can('movimentacao', 'view') && <MovimentacaoKpis />}
 
         {/* Teto de gasto dos postos (pedidos de material) */}
 
