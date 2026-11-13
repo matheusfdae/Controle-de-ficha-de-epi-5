@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowDown, Ban, Check, CheckCircle2, Info, Loader2, RotateCcw, Send, X, XCircle } from 'lucide-react';
+import { ArrowDown, Ban, Check, CheckCircle2, Info, Loader2, RefreshCw, RotateCcw, Send, X, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
-  acaoSenior, cancelarTroca, dataBr, dataHoraBr, decidirTroca, nomePosto, previaSenior, type TrocaPosto,
+  acaoSenior, cancelarTroca, conferirSenior, dataBr, dataHoraBr, decidirTroca, envioParado, nomePosto, previaSenior, type TrocaPosto,
 } from '../lib/trocaPostoService';
 import SeloStatusTroca from './SeloStatusTroca';
 import PadraoPostoCard from './PadraoPostoCard';
@@ -19,7 +19,7 @@ export default function DetalheTrocaDialog({ troca, fechar, mudou, podeAprovar, 
   podeAprovar: boolean; podeCriar: boolean; meuId: string | null; adminSenior: boolean;
 }) {
   const [obs, setObs] = useState('');
-  const [acao, setAcao] = useState<'aprovar' | 'recusar' | 'cancelar' | 'enviar' | 'desfazer' | null>(null);
+  const [acao, setAcao] = useState<'aprovar' | 'recusar' | 'cancelar' | 'enviar' | 'desfazer' | 'conferir' | null>(null);
   const [confirmando, setConfirmando] = useState<'enviar' | 'desfazer' | null>(null);
   const [atual, setAtual] = useState<TrocaPosto | null>(troca);
 
@@ -29,7 +29,8 @@ export default function DetalheTrocaDialog({ troca, fechar, mudou, podeAprovar, 
   const podeCancelar = pendente && (podeAprovar || (podeCriar && !!meuId && t.solicitante_id === meuId));
   const demo = /^TP-DEMO/i.test(t.codigo);
   const outraEstrutura = t.posto_atual_estrutura != null && t.posto_atual_estrutura !== t.posto_novo_estrutura;
-  const podeEnviar = adminSenior && !demo && !outraEstrutura && (t.status === 'aprovada' || t.status === 'erro_envio');
+  const podeEnviar = adminSenior && !demo && !outraEstrutura && (t.status === 'aprovada' || t.status === 'erro_envio' || envioParado(t));
+  const podeConferir = adminSenior && !demo && ['enviando', 'enviada', 'erro_envio', 'desfeita'].includes(t.status);
   const podeDesfazer = adminSenior && !demo && t.status === 'enviada';
   const jaVale = t.data_inicio <= hojeIso();
 
@@ -48,14 +49,38 @@ export default function DetalheTrocaDialog({ troca, fechar, mudou, podeAprovar, 
     try { await cancelarTroca(t.id); toast.success(`Troca ${t.codigo} cancelada.`); mudou(); fechar(); }
     catch (e) { toast.error((e as Error).message); } finally { setAcao(null); }
   };
+  // Relê na Senior e confirma (chamada separada: cada uma cabe no limite de 60 s do servidor).
+  const conferir = async (base: TrocaPosto, automatico = false) => {
+    setAcao('conferir');
+    try {
+      const novo = await conferirSenior(base);
+      setAtual(novo); mudou();
+      if (novo.status !== base.status) {
+        if (novo.status === 'enviada') toast.success(`Confirmado: a troca ${novo.codigo} está gravada na Senior.`);
+        else if (novo.status === 'desfeita') toast.success(`Confirmado: a troca ${novo.codigo} foi desfeita na Senior.`);
+        else if (novo.status === 'erro_envio') toast.error('A troca não apareceu na Senior. Pode tentar enviar de novo.', { duration: 12000 });
+      } else if (!automatico) toast.success('Conferido na Senior.');
+    } catch (e) {
+      toast.error(automatico ? `Não deu para conferir agora: ${(e as Error).message}` : (e as Error).message, { duration: 12000 });
+    } finally { setAcao(null); }
+  };
   const executarSenior = async (qual: 'enviar' | 'desfazer') => {
     setAcao(qual);
+    let depois: TrocaPosto | null = null;
     try {
       const r = await acaoSenior(t, qual);
       setAtual(r.troca); setConfirmando(null); mudou();
       if (r.erro) toast.error(`A Senior recusou: ${r.erro}`, { duration: 15000 });
-      else toast.success(qual === 'enviar' ? `Troca ${t.codigo} gravada na Senior.` : `Troca ${t.codigo} desfeita na Senior.`);
-    } catch (e) { toast.error((e as Error).message, { duration: 15000 }); } finally { setAcao(null); }
+      else {
+        if (r.pendente) toast.warning('A Senior não respondeu a tempo. Conferindo se gravou…', { duration: 10000 });
+        else toast.success(qual === 'enviar' ? `Troca ${t.codigo} gravada na Senior. Conferindo…` : `Troca ${t.codigo} desfeita na Senior. Conferindo…`);
+        depois = r.troca;
+      }
+    } catch (e) {
+      toast.error((e as Error).message, { duration: 15000 });
+      mudou();
+    } finally { setAcao(null); }
+    if (depois) await conferir(depois, true);
   };
 
   const Linha = ({ r, v }: { r: string; v: React.ReactNode }) => (
@@ -122,7 +147,7 @@ export default function DetalheTrocaDialog({ troca, fechar, mudou, podeAprovar, 
           </div>
         )}
 
-        <details className="rounded-md border p-3 text-sm" open={t.status === 'aprovada' || t.status === 'erro_envio'}>
+        <details className="rounded-md border p-3 text-sm" open={t.status === 'aprovada' || t.status === 'erro_envio' || t.status === 'enviando'}>
           <summary className="cursor-pointer font-medium">O que vai para a Senior (historicos · Posto_4)</summary>
           <table className="mt-2 w-full text-xs">
             <tbody>
@@ -159,13 +184,26 @@ export default function DetalheTrocaDialog({ troca, fechar, mudou, podeAprovar, 
           </p>
         )}
 
-        {/* Envio / desfazer na Senior (administrador) */}
-        {(podeEnviar || podeDesfazer) && (
+        {t.status === 'enviando' && (
+          <p className="text-xs rounded-md bg-sky-50 text-sky-900 dark:bg-sky-950/40 dark:text-sky-100 p-2">
+            Enviada à Senior{t.senior_envio_iniciado_em ? ` em ${dataHoraBr(t.senior_envio_iniciado_em)}` : ''}, sem confirmação ainda.
+            Clique em <strong>Conferir na Senior</strong>{envioParado(t) ? '. Se não gravou, envie de novo.' : ' (o reenvio fica liberado depois de 3 minutos).'}
+          </p>
+        )}
+
+        {/* Envio / desfazer / conferir na Senior (administrador) */}
+        {(podeEnviar || podeDesfazer || podeConferir) && (
           <div className="border-t pt-3 space-y-2">
+            {acao === 'conferir' && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Conferindo na Senior… pode levar até 1 minuto.</p>}
             {!confirmando ? (
               <div className="flex flex-wrap gap-2 justify-end">
-                {podeEnviar && <Button className="gap-1.5" onClick={() => setConfirmando('enviar')}><Send className="h-4 w-4" /> {t.status === 'erro_envio' ? 'Tentar enviar de novo' : 'Enviar à Senior'}</Button>}
-                {podeDesfazer && <Button variant="outline" className="gap-1.5 text-destructive" onClick={() => setConfirmando('desfazer')}><RotateCcw className="h-4 w-4" /> Desfazer na Senior</Button>}
+                {podeConferir && (
+                  <Button variant="outline" className="gap-1.5" disabled={!!acao} onClick={() => conferir(t)}>
+                    {acao === 'conferir' ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Conferir na Senior
+                  </Button>
+                )}
+                {podeEnviar && <Button className="gap-1.5" disabled={!!acao} onClick={() => setConfirmando('enviar')}><Send className="h-4 w-4" /> {t.status === 'aprovada' ? 'Enviar à Senior' : 'Tentar enviar de novo'}</Button>}
+                {podeDesfazer && <Button variant="outline" className="gap-1.5 text-destructive" disabled={!!acao} onClick={() => setConfirmando('desfazer')}><RotateCcw className="h-4 w-4" /> Desfazer na Senior</Button>}
               </div>
             ) : (
               <div className={cn('rounded-md border p-3 space-y-2', confirmando === 'desfazer' ? 'border-red-300 bg-red-50 dark:bg-red-950/30' : 'border-primary/40 bg-primary/5')}>
@@ -181,7 +219,7 @@ export default function DetalheTrocaDialog({ troca, fechar, mudou, podeAprovar, 
                   </Button>
                   <Button variant="outline" className="min-w-24" disabled={!!acao} onClick={() => setConfirmando(null)}>Não</Button>
                 </div>
-                {acao && <p className="text-xs text-muted-foreground">Falando com a Senior… pode levar até 1 minuto.</p>}
+                {(acao === 'enviar' || acao === 'desfazer') && <p className="text-xs text-muted-foreground">Falando com a Senior… pode levar até 1 minuto. Não feche esta janela.</p>}
               </div>
             )}
           </div>

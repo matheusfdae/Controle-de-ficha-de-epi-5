@@ -15,7 +15,7 @@ import NovaTrocaDialog from '../components/NovaTrocaDialog';
 import DetalheTrocaDialog from '../components/DetalheTrocaDialog';
 import SeloStatusTroca from '../components/SeloStatusTroca';
 
-const FILTROS: (StatusTroca | 'todas')[] = ['pendente', 'aprovada', 'enviada', 'erro_envio', 'recusada', 'cancelada', 'desfeita', 'todas'];
+const FILTROS: (StatusTroca | 'todas')[] = ['pendente', 'aprovada', 'enviando', 'enviada', 'erro_envio', 'recusada', 'cancelada', 'desfeita', 'todas'];
 
 /**
  * Troca de posto: pedido (quem tem "criar") e aprovação (quem tem "editar").
@@ -62,7 +62,7 @@ export default function TrocasPosto() {
 
       <div className="rounded-md border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/40 p-3 text-sm flex gap-2 text-blue-950 dark:text-blue-100">
         <Info className="h-4 w-4 shrink-0 mt-0.5" />
-        <p>Pedir e aprovar <strong>não grava na Senior</strong>. Depois de aprovada, um administrador abre a troca e clica em <strong>Enviar à Senior</strong> (com a prévia e a confirmação pela matrícula). A troca gravada pode ser desfeita.</p>
+        <p>Pedir e aprovar <strong>não grava na Senior</strong>. Depois de aprovada, um administrador abre a troca e clica em <strong>Enviar à Senior</strong> (com a prévia e a confirmação Sim/Não). A troca gravada pode ser desfeita.</p>
       </div>
 
       <div className="flex flex-wrap gap-2 items-center">

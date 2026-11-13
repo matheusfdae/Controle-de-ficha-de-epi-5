@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { filtrarTrocas, nomePosto, postoDaMesmaEmpresa, previaSenior, type TrocaPosto } from '@/modules/trocaPosto/lib/trocaPostoService';
-import { ehDemo, erroEstrutura, liberadaNoLocalhost, motivoSenior, parametrosDesfazer, parametrosEnvio } from '../../supabase/functions/_shared/trocaPostoSenior';
+import { envioParado, filtrarTrocas, nomePosto, postoDaMesmaEmpresa, previaSenior, type TrocaPosto } from '@/modules/trocaPosto/lib/trocaPostoService';
+import { LIMITE_SENIOR_MS, ehDemo, erroEstrutura, liberadaNoLocalhost, motivoSenior, parametrosDesfazer, parametrosEnvio, semResposta } from '../../supabase/functions/_shared/trocaPostoSenior';
 
 const t = {
   id: '1', codigo: 'TP-AB12CD34', created_at: '2026-11-13T12:00:00Z', status: 'pendente',
@@ -87,5 +87,25 @@ describe('só dentro da mesma empresa', () => {
     expect(erroEstrutura({ posto_atual_estrutura: 103, posto_novo_estrutura: 103 })).toBeNull();
     expect(erroEstrutura({ posto_atual_estrutura: 103, posto_novo_estrutura: 101, num_emp: 3 })).toContain('entre empresas');
     expect(erroEstrutura({ posto_atual_estrutura: null, posto_novo_estrutura: 101 })).toContain('sem posto');
+  });
+});
+
+describe('envio à Senior em passos curtos', () => {
+  it('cada chamada à Senior para antes do limite de 60 s das funções da VM', () => {
+    expect(LIMITE_SENIOR_MS).toBeLessThan(55000);
+  });
+
+  it('reconhece quando a Senior não respondeu (não dá para saber se gravou)', () => {
+    const tempo = new Error('The signal has been aborted'); tempo.name = 'TimeoutError';
+    expect(semResposta(tempo)).toBe(true);
+    expect(semResposta(new TypeError('fetch failed'))).toBe(true);
+    expect(semResposta(new Error('Senior: Não houve resultados'))).toBe(false);
+  });
+
+  it('"enviando" só libera reenvio depois de 3 minutos', () => {
+    const agora = Date.parse('2026-11-13T14:00:00Z');
+    expect(envioParado({ status: 'enviando', senior_envio_iniciado_em: '2026-11-13T13:58:30Z' }, agora)).toBe(false);
+    expect(envioParado({ status: 'enviando', senior_envio_iniciado_em: '2026-11-13T13:56:00Z' }, agora)).toBe(true);
+    expect(envioParado({ status: 'aprovada', senior_envio_iniciado_em: null }, agora)).toBe(false);
   });
 });
