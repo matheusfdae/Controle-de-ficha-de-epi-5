@@ -79,7 +79,7 @@ export default function DetalheTrocaDialog({ troca, fechar, mudou, podeAprovar, 
     } catch (e) {
       toast.error((e as Error).message, { duration: 15000 });
       mudou();
-    } finally { setAcao(null); }
+    } finally { setAcao(null); setConfirmando(null); }
     if (depois) await conferir(depois, true);
   };
 
