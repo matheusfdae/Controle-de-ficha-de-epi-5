@@ -11,11 +11,11 @@ import {
 export { MOTIVOS_SENIOR, motivoSenior };
 export type { PadraoPosto, SituacaoSenior };
 
-export type StatusTroca = 'pendente' | 'aprovada' | 'recusada' | 'cancelada' | 'enviada' | 'erro_envio' | 'desfeita';
+export type StatusTroca = 'pendente' | 'aprovada' | 'recusada' | 'cancelada' | 'enviando' | 'enviada' | 'erro_envio' | 'desfeita';
 
 export const STATUS_ROTULO: Record<StatusTroca, string> = {
   pendente: 'Pendente', aprovada: 'Aprovada', recusada: 'Recusada', cancelada: 'Cancelada',
-  enviada: 'Gravada na Senior', erro_envio: 'Erro no envio', desfeita: 'Desfeita na Senior',
+  enviando: 'Enviando à Senior', enviada: 'Gravada na Senior', erro_envio: 'Erro no envio', desfeita: 'Desfeita na Senior',
 };
 
 export const MOTIVOS = [
@@ -60,7 +60,7 @@ export interface TrocaPosto {
   senior_enviado_em: string | null; senior_resposta: string | null;
   motivo_senior: number | null; manter_cargo: boolean; cargo_atual_codigo: string | null;
   centro_custo_atual: string | null; padrao_posto: PadraoComNomes | null;
-  senior_enviado_por: string | null; senior_desfeito_em: string | null;
+  senior_enviado_por: string | null; senior_desfeito_em: string | null; senior_envio_iniciado_em?: string | null;
   senior_lido: (Partial<SituacaoSenior> & { erro_leitura?: string }) | null;
 }
 
@@ -114,6 +114,8 @@ export const fiscalSolicitarTroca = (s: Fiscal, d: DadosPedidoFiscal) =>
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const tabela = (nome: string) => (supabase as unknown as { from: (t: string) => any }).from(nome);
 
+const SEM_RESPOSTA = 'O servidor não recebeu resposta da Senior a tempo (ela pode estar lenta). Use "Conferir na Senior" antes de tentar de novo.';
+
 /** Chamada à Senior: no npm run dev sai do PC (vite); na produção, pela função troca-posto-senior. */
 async function senior<T>(corpo: Record<string, unknown>): Promise<T> {
   if (import.meta.env.DEV) {
@@ -123,7 +125,11 @@ async function senior<T>(corpo: Record<string, unknown>): Promise<T> {
     return r as T;
   }
   const { data, error } = await supabase.functions.invoke('troca-posto-senior', { body: corpo });
-  if (error) throw new Error((await error.context?.json?.().catch(() => null))?.error ?? error.message);
+  if (error) {
+    // Função cortada pelo limite de tempo da VM: a resposta não é JSON.
+    const corpoErro = await (error as { context?: Response }).context?.json?.().catch(() => null);
+    throw new Error(corpoErro?.error ?? SEM_RESPOSTA);
+  }
   if (data?.error) throw new Error(data.error);
   return data as T;
 }
@@ -138,16 +144,36 @@ export async function padraoDoPosto(estrutura: number, posto: string): Promise<P
   return { ...p, cargo_nome: p.cargo ? nomes?.cargos[p.cargo] ?? null : null, centro_custo_nome: p.centroCusto ? nomes?.centros[p.centroCusto] ?? null : null };
 }
 
-/** Envia (ou desfaz) a troca na Senior. Devolve a troca atualizada e o erro da Senior, se houver. */
-export async function acaoSenior(t: TrocaPosto, acao: 'enviar' | 'desfazer'): Promise<{ erro: string | null; troca: TrocaPosto }> {
+/**
+ * Envia (ou desfaz) a troca na Senior: UMA chamada à Senior. Devolve a troca
+ * atualizada, o erro da Senior (recusou) ou pendente = a Senior não respondeu a
+ * tempo (a troca fica "enviando"; confira com conferirSenior).
+ */
+export async function acaoSenior(t: TrocaPosto, acao: 'enviar' | 'desfazer'): Promise<{ erro: string | null; pendente: boolean; troca: TrocaPosto }> {
   if (import.meta.env.DEV) {
-    const r = await senior<{ erro: string | null; lido: unknown }>({ acao, troca: t });
-    const troca = await rpc<TrocaPosto>('troca_posto_registrar_senior', { _id: t.id, _acao: acao, _erro: r.erro, _lido: r.lido });
-    return { erro: r.erro, troca };
+    if (acao === 'enviar') await rpc<TrocaPosto>('troca_posto_marcar_enviando', { _id: t.id });
+    const r = await senior<{ erro: string | null; pendente?: boolean }>({ acao, troca: t });
+    const troca = await rpc<TrocaPosto>('troca_posto_registrar_senior', {
+      _id: t.id, _acao: r.pendente ? (acao === 'enviar' ? 'demorou' : 'desfazer_demorou') : acao, _erro: r.erro, _lido: null,
+    });
+    return { erro: r.erro, pendente: !!r.pendente, troca };
   }
-  const r = await senior<{ erro: string | null; troca: TrocaPosto }>({ acao, id: t.id });
-  return { erro: r.erro, troca: r.troca };
+  const r = await senior<{ erro: string | null; pendente?: boolean; troca: TrocaPosto }>({ acao, id: t.id });
+  return { erro: r.erro, pendente: !!r.pendente, troca: r.troca };
 }
+
+/** Relê o colaborador na Senior e confirma se a troca gravou (ou se desfez). */
+export async function conferirSenior(t: TrocaPosto): Promise<TrocaPosto> {
+  if (import.meta.env.DEV) {
+    const r = await senior<{ lido: unknown }>({ acao: 'conferir', troca: t });
+    return rpc<TrocaPosto>('troca_posto_registrar_senior', { _id: t.id, _acao: 'conferir', _erro: null, _lido: r.lido });
+  }
+  return (await senior<{ troca: TrocaPosto }>({ acao: 'conferir', id: t.id })).troca;
+}
+
+/** "Enviando" parado há mais de 3 min pode ser reenviado (o servidor também confere). */
+export const envioParado = (t: Pick<TrocaPosto, 'status' | 'senior_envio_iniciado_em'>, agora = Date.now()) =>
+  t.status === 'enviando' && (!t.senior_envio_iniciado_em || agora - new Date(t.senior_envio_iniciado_em).getTime() > 3 * 60 * 1000);
 
 export async function listarTrocas(): Promise<TrocaPosto[]> {
   const { data, error } = await tabela('trocas_posto').select('*').order('created_at', { ascending: false }).limit(1000);

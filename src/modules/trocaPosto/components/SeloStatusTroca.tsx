@@ -6,6 +6,7 @@ const COR: Record<StatusTroca, string> = {
   aprovada: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100',
   recusada: 'bg-red-100 text-red-900 dark:bg-red-900/40 dark:text-red-100',
   cancelada: 'bg-muted text-muted-foreground',
+  enviando: 'bg-sky-100 text-sky-900 dark:bg-sky-900/40 dark:text-sky-100 animate-pulse',
   enviada: 'bg-blue-100 text-blue-900 dark:bg-blue-900/40 dark:text-blue-100',
   erro_envio: 'bg-red-100 text-red-900 dark:bg-red-900/40 dark:text-red-100',
   desfeita: 'bg-muted text-muted-foreground line-through',

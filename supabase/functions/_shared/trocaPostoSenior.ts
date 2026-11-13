@@ -81,8 +81,18 @@ export function parametrosDesfazer(t: TrocaParaSenior): Record<string, string | 
   };
 }
 
+/**
+ * Tempo máximo de cada chamada à Senior: as Edge Functions da VM são cortadas
+ * em 60 s, então cada passo (gravar, conferir) faz UMA chamada e para antes.
+ */
+export const LIMITE_SENIOR_MS = 48000;
+
+/** A chamada passou do tempo (ou a conexão caiu): não dá para saber se a Senior gravou. */
+export const semResposta = (e: unknown) =>
+  e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError' || /timed out|aborted|network|fetch failed|connection/i.test(e.message));
+
 /** Chama o Posto_4. Devolve a mensagem de erro da Senior, ou null se gravou. */
-export async function chamarPosto4(cfg: SeniorConfig, params: Record<string, string | number>, timeoutMs = 150000): Promise<string | null> {
+export async function chamarPosto4(cfg: SeniorConfig, params: Record<string, string | number>, timeoutMs = LIMITE_SENIOR_MS): Promise<string | null> {
   const res = await fetch(seniorEndpoint(cfg, SERVICO_HISTORICOS), {
     method: 'POST', headers: { 'Content-Type': 'text/xml; charset=utf-8', SOAPAction: '""' },
     body: buildEnvelope('Posto_4', cfg, params), signal: AbortSignal.timeout(timeoutMs),
@@ -98,12 +108,12 @@ export async function chamarPosto4(cfg: SeniorConfig, params: Record<string, str
 export interface SituacaoSenior { posto: string | null; estrutura: number | null; cargo: string | null; local: string | null; centroCusto: string | null; escala: number | null }
 
 /** Situação atual do colaborador na Senior (R034FUN). */
-export async function lerSituacao(cfg: SeniorConfig, numEmp: number, numCad: number, tipCol = 1): Promise<SituacaoSenior | null> {
+export async function lerSituacao(cfg: SeniorConfig, numEmp: number, numCad: number, tipCol = 1, timeoutMs = LIMITE_SENIOR_MS): Promise<SituacaoSenior | null> {
   const [f] = await consultarTabela(cfg, 'R034FUN', ['ESTPOS', 'POSTRA', 'CODCAR', 'NUMLOC', 'CODCCU', 'CODESC'], [
     { campo: 'NUMEMP', condicao: '=', valor: String(numEmp) },
     { campo: 'TIPCOL', condicao: '=', valor: String(tipCol) },
     { campo: 'NUMCAD', condicao: '=', valor: String(numCad) },
-  ], 90000);
+  ], timeoutMs);
   if (!f) return null;
   return {
     posto: f.POSTRA?.trim() || null, estrutura: f.ESTPOS ? Number(f.ESTPOS) : null, cargo: f.CODCAR?.trim() || null,
@@ -119,7 +129,7 @@ export async function padraoDoPosto(cfg: SeniorConfig, estrutura: number, posto:
     const linhas = await consultarTabela(cfg, 'R017CAR', ['CODCAR', 'NUMLOC', 'CODCCU'], [
       { campo: 'ESTPOS', condicao: '=', valor: String(estrutura) },
       { campo: 'POSTRA', condicao: '=', valor: posto },
-    ], 90000);
+    ], LIMITE_SENIOR_MS);
     return linhas.map(l => ({ cargo: l.CODCAR?.trim() || null, local: l.NUMLOC?.trim() || null, centroCusto: l.CODCCU?.trim() || null }));
   } catch (e) {
     if (e instanceof SeniorError && /Não houve resultados/i.test(e.message)) return [];
