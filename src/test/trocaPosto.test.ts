@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { envioParado, filtrarTrocas, nomePosto, postoDaMesmaEmpresa, previaSenior, type TrocaPosto } from '@/modules/trocaPosto/lib/trocaPostoService';
-import { LIMITE_SENIOR_MS, ehDemo, erroEstrutura, liberadaNoLocalhost, motivoSenior, parametrosDesfazer, parametrosEnvio, semResposta } from '../../supabase/functions/_shared/trocaPostoSenior';
+import { LIMITE_LEITURA_MS, LIMITE_SENIOR_MS, ehDemo, erroEstrutura, liberadaNoLocalhost, motivoSenior, parametrosDesfazer, parametrosEnvio, semResposta } from '../../supabase/functions/_shared/trocaPostoSenior';
 
 const t = {
   id: '1', codigo: 'TP-AB12CD34', created_at: '2026-11-13T12:00:00Z', status: 'pendente',
@@ -26,6 +26,22 @@ describe('troca de posto', () => {
     expect(p.codCar).toBe('0148');
     expect(p.codEsc).toBe(8516);
     expect(parametrosEnvio({ ...t, manter_cargo: true, cargo_atual_codigo: null }).codCar).toBeUndefined();
+  });
+
+  it('escala Permanente: manda a escala e a turma atuais (recusa da Senior em 13/11)', () => {
+    expect(parametrosEnvio(t, { escala: 8516, turma: 1 })).toMatchObject({ codEsc: 8516, codTma: 1 });
+    expect(parametrosEnvio(t, { escala: 8516, turma: 3 }).codTma).toBe(3);
+    // escala nova: turma atual só vale para a mesma escala; senão turma 1
+    expect(parametrosEnvio({ ...t, escala_nova_codigo: 9000 }, { escala: 8516, turma: 3 })).toMatchObject({ codEsc: 9000, codTma: 1 });
+    expect(parametrosEnvio({ ...t, escala_nova_codigo: 8516 }, { escala: 8516, turma: 3 }).codTma).toBe(3);
+    // sem turma lida: 1; sem escala nenhuma: não manda
+    expect(parametrosEnvio(t, { escala: 8516, turma: null }).codTma).toBe(1);
+    expect(parametrosEnvio(t, { escala: null, turma: null })).not.toHaveProperty('codTma');
+    expect(parametrosEnvio(t)).not.toHaveProperty('codTma');
+  });
+
+  it('leitura da turma + gravação cabem no limite de 60 s da VM', () => {
+    expect(LIMITE_LEITURA_MS + Math.max(25000, LIMITE_SENIOR_MS - LIMITE_LEITURA_MS)).toBeLessThan(55000);
   });
 
   it('desfazer apaga com excHis', () => {

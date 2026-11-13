@@ -6,6 +6,8 @@
 //  * a Senior aplica junto o cargo, o local e o centro de custo do posto
 //    (tabela R017CAR); codCar no envio mantém o cargo informado;
 //  * desfazer = tipOpe "E" com excHis "S" (apaga também local/cargo/CC da data).
+//  * escala "Permanente" exige turma (codTma): o envio manda a escala e a turma
+//    atuais do colaborador (relidas na Senior na hora), ou a escala nova.
 // As regras puras (parâmetros) são testadas no vitest.
 
 import { allBlocks, buildEnvelope, consultarTabela, readFields, seniorEndpoint, SeniorError, type SeniorConfig } from './senior.ts';
@@ -58,8 +60,15 @@ export function erroEstrutura(t: { posto_atual_estrutura: number | null; posto_n
     : `Movimentação entre empresas não é permitida: o posto novo é de outra empresa (estrutura ${t.posto_novo_estrutura}; a do colaborador${t.num_emp ? `, empresa ${t.num_emp},` : ''} é ${t.posto_atual_estrutura}). Não enviado.`;
 }
 
-/** Parâmetros do Posto_4 para incluir a troca. */
-export function parametrosEnvio(t: TrocaParaSenior): Record<string, string | number> {
+/** Escala e turma do colaborador na Senior (R034FUN), lidas na hora do envio. */
+export interface EscalaTurma { escala: number | null; turma: number | null }
+
+/**
+ * Parâmetros do Posto_4 para incluir a troca. Com a escala/turma atuais, manda
+ * codEsc + codTma (a Senior recusa escala "Permanente" sem turma — 13/11/2026,
+ * TP-4C549AAE para o PO2035). Escala nova sem turma conhecida vai com a turma 1.
+ */
+export function parametrosEnvio(t: TrocaParaSenior, atual?: EscalaTurma | null): Record<string, string | number> {
   const p: Record<string, string | number> = {
     numEmp: t.num_emp, tipCol: t.tip_col, numCad: t.num_cad,
     iniAtu: dataSenior(t.data_inicio), posTra: t.posto_novo_codigo,
@@ -67,7 +76,9 @@ export function parametrosEnvio(t: TrocaParaSenior): Record<string, string | num
     obsPos: [`${t.codigo} - ${t.motivo}`, t.observacao?.trim()].filter(Boolean).join(' - ').slice(0, 250),
     tipOpe: 'I',
   };
-  if (t.escala_nova_codigo != null) p.codEsc = t.escala_nova_codigo;
+  const escala = t.escala_nova_codigo ?? atual?.escala ?? null;
+  if (escala != null) p.codEsc = escala;
+  if (escala != null && atual) p.codTma = (escala === atual.escala ? atual.turma : null) ?? 1;
   if (t.manter_cargo && t.cargo_atual_codigo) p.codCar = t.cargo_atual_codigo;
   return p;
 }
@@ -80,6 +91,9 @@ export function parametrosDesfazer(t: TrocaParaSenior): Record<string, string | 
     motPos: t.motivo_senior ?? motivoSenior(t.motivo), excHis: 'S', tipOpe: 'E',
   };
 }
+
+/** Leitura da escala/turma antes de gravar: curta, para sobrar tempo ao Posto_4 dentro dos 60 s. */
+export const LIMITE_LEITURA_MS = 15000;
 
 /**
  * Tempo máximo de cada chamada à Senior: as Edge Functions da VM são cortadas
@@ -105,11 +119,11 @@ export async function chamarPosto4(cfg: SeniorConfig, params: Record<string, str
   return readFields(r).erroExecucao?.trim() || null;
 }
 
-export interface SituacaoSenior { posto: string | null; estrutura: number | null; cargo: string | null; local: string | null; centroCusto: string | null; escala: number | null }
+export interface SituacaoSenior { posto: string | null; estrutura: number | null; cargo: string | null; local: string | null; centroCusto: string | null; escala: number | null; turma: number | null }
 
 /** Situação atual do colaborador na Senior (R034FUN). */
 export async function lerSituacao(cfg: SeniorConfig, numEmp: number, numCad: number, tipCol = 1, timeoutMs = LIMITE_SENIOR_MS): Promise<SituacaoSenior | null> {
-  const [f] = await consultarTabela(cfg, 'R034FUN', ['ESTPOS', 'POSTRA', 'CODCAR', 'NUMLOC', 'CODCCU', 'CODESC'], [
+  const [f] = await consultarTabela(cfg, 'R034FUN', ['ESTPOS', 'POSTRA', 'CODCAR', 'NUMLOC', 'CODCCU', 'CODESC', 'CODTMA'], [
     { campo: 'NUMEMP', condicao: '=', valor: String(numEmp) },
     { campo: 'TIPCOL', condicao: '=', valor: String(tipCol) },
     { campo: 'NUMCAD', condicao: '=', valor: String(numCad) },
@@ -118,6 +132,7 @@ export async function lerSituacao(cfg: SeniorConfig, numEmp: number, numCad: num
   return {
     posto: f.POSTRA?.trim() || null, estrutura: f.ESTPOS ? Number(f.ESTPOS) : null, cargo: f.CODCAR?.trim() || null,
     local: f.NUMLOC?.trim() || null, centroCusto: f.CODCCU?.trim() || null, escala: f.CODESC ? Number(f.CODESC) : null,
+    turma: f.CODTMA ? Number(f.CODTMA) : null,
   };
 }
 

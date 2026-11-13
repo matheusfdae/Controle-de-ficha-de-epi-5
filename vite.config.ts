@@ -9,7 +9,7 @@ import { calcularPendentes, montarEmailPendentes } from "./supabase/functions/_s
 import { calcularPainel, svgPainel } from "./supabase/functions/_shared/painelFichas";
 import { base64 } from "./supabase/functions/_shared/xlsx";
 import { initWasm, Resvg } from "@resvg/resvg-wasm";
-import { chamarPosto4, ehDemo, erroEstrutura, lerSituacao, liberadaNoLocalhost, padraoDoPosto, parametrosDesfazer, parametrosEnvio, semResposta } from "./supabase/functions/_shared/trocaPostoSenior";
+import { LIMITE_LEITURA_MS, chamarPosto4, ehDemo, erroEstrutura, lerSituacao, liberadaNoLocalhost, padraoDoPosto, parametrosDesfazer, parametrosEnvio, semResposta } from "./supabase/functions/_shared/trocaPostoSenior";
 import { montarEmailIntegracao, normalizarPessoas } from "./supabase/functions/_shared/emailIntegracao";
 import { limparEmails, montarEmailDivergencia } from "./supabase/functions/_shared/avisoMovimentacao";
 import { destinatariosPassagem, montarEmailPassagem } from "./supabase/functions/_shared/passagemPlantao";
@@ -369,8 +369,22 @@ function seniorLocal(env: Record<string, string>): Plugin {
               return res.end(JSON.stringify({ error: "A Senior está demorando para responder. Tente conferir de novo em alguns minutos." }));
             }
           }
+          let params = parametrosDesfazer(t);
+          if (acao === "enviar") {
+            // Igual à produção: lê escala/turma antes (escala "Permanente" exige turma).
+            let atual;
+            try {
+              atual = await lerSituacao(cfg, t.num_emp, t.num_cad, t.tip_col, LIMITE_LEITURA_MS);
+            } catch (e) {
+              return res.end(JSON.stringify({ erro: semResposta(e)
+                ? "A Senior não respondeu a tempo. Nada foi enviado: tente de novo em alguns minutos."
+                : `Não deu para ler a escala do colaborador na Senior (${e instanceof Error ? e.message : String(e)}). Nada foi enviado.` }));
+            }
+            if (!atual) return res.end(JSON.stringify({ erro: "Colaborador não encontrado na Senior. Nada foi enviado." }));
+            params = parametrosEnvio(t, atual);
+          }
           try {
-            const erro = await chamarPosto4(cfg, acao === "enviar" ? parametrosEnvio(t) : parametrosDesfazer(t));
+            const erro = await chamarPosto4(cfg, params);
             res.end(JSON.stringify({ erro }));
           } catch {
             res.end(JSON.stringify({ erro: null, pendente: true }));

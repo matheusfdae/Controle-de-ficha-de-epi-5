@@ -10,11 +10,14 @@
 // As Edge Functions da VM são cortadas em 60 s e a Senior às vezes demora mais
 // de um minuto: cada ação faz UMA chamada à Senior (até LIMITE_SENIOR_MS). Se a
 // Senior não responde a tempo, a troca fica "enviando" e a tela confere depois.
+// Antes de gravar, o envio lê a escala/turma atuais (até LIMITE_LEITURA_MS):
+// escala "Permanente" sem turma a Senior recusa.
 import { verifyCaller, serviceClient, json, corsHeaders } from '../_shared/clerk.ts';
 import { carregarSenior } from '../_shared/seniorConfig.ts';
 import { SeniorError } from '../_shared/senior.ts';
 import {
-  chamarPosto4, ehDemo, erroEstrutura, lerSituacao, padraoDoPosto, parametrosDesfazer, parametrosEnvio, semResposta,
+  LIMITE_LEITURA_MS, LIMITE_SENIOR_MS, chamarPosto4, ehDemo, erroEstrutura, lerSituacao, padraoDoPosto, parametrosDesfazer,
+  parametrosEnvio, semResposta,
 } from '../_shared/trocaPostoSenior.ts';
 
 Deno.serve(async (req) => {
@@ -67,9 +70,31 @@ Deno.serve(async (req) => {
       return json({ error: 'Só dá para desfazer troca já gravada na Senior' }, 409);
     }
 
+    let params = parametrosDesfazer(t);
+    let tempo = LIMITE_SENIOR_MS;
+    if (acao === 'enviar') {
+      // Escala e turma atuais (escala "Permanente" exige turma). Sem elas, nada é enviado.
+      const t0 = Date.now();
+      let atual;
+      try {
+        atual = await lerSituacao(cfg, t.num_emp, t.num_cad, t.tip_col, LIMITE_LEITURA_MS);
+      } catch (e) {
+        const msg = semResposta(e)
+          ? 'A Senior não respondeu a tempo. Nada foi enviado: tente de novo em alguns minutos.'
+          : `Não deu para ler a escala do colaborador na Senior (${e instanceof Error ? e.message : String(e)}). Nada foi enviado.`;
+        return json({ ok: false, erro: msg, troca: await registrar('enviar', msg, null) });
+      }
+      if (!atual) {
+        const msg = 'Colaborador não encontrado na Senior. Nada foi enviado.';
+        return json({ ok: false, erro: msg, troca: await registrar('enviar', msg, null) });
+      }
+      params = parametrosEnvio(t, atual);
+      tempo = Math.max(25000, LIMITE_SENIOR_MS - (Date.now() - t0));
+    }
+
     let erro: string | null;
     try {
-      erro = await chamarPosto4(cfg, acao === 'enviar' ? parametrosEnvio(t) : parametrosDesfazer(t));
+      erro = await chamarPosto4(cfg, params, tempo);
     } catch {
       // Sem resposta (tempo esgotado ou conexão caiu): não dá para saber se a
       // Senior gravou. Fica marcado e a tela confere.

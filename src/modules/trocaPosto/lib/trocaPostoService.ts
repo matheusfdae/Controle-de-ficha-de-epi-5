@@ -194,15 +194,19 @@ export const nomePosto = (descricao: string | null | undefined, estrutura: numbe
 const NOTAS: Record<string, string> = {
   numEmp: 'empresa', tipCol: 'tipo de colaborador', numCad: 'matrícula', iniAtu: 'início no posto novo',
   posTra: 'posto novo', motPos: 'motivo na Senior', obsPos: 'observação', codEsc: 'escala nova',
-  codCar: 'mantém o cargo', tipOpe: 'incluir',
+  codCar: 'mantém o cargo', tipOpe: 'incluir', codTma: 'turma da escala',
 };
 
 /** Exatamente o que vai para a Senior (serviço historicos, operação Posto_4). */
 export function previaSenior(t: Pick<TrocaPosto, 'codigo' | 'num_emp' | 'tip_col' | 'num_cad' | 'posto_novo_codigo' | 'data_inicio' | 'motivo'
   | 'observacao' | 'motivo_senior' | 'escala_nova_codigo' | 'manter_cargo' | 'cargo_atual_codigo'>) {
-  return Object.entries(parametrosEnvio(t)).map(([campo, v]) => ({
+  const linhas = Object.entries(parametrosEnvio(t)).map(([campo, v]) => ({
     campo, valor: campo === 'motPos' ? `${v} - ${MOTIVOS_SENIOR[Number(v)] ?? ''}` : String(v), nota: NOTAS[campo] ?? '',
   }));
+  // Escala/turma atuais só são lidas na Senior na hora do envio (escala "Permanente" exige turma).
+  if (t.escala_nova_codigo == null) linhas.push({ campo: 'codEsc', valor: 'a atual (lida na Senior no envio)', nota: 'escala' });
+  linhas.push({ campo: 'codTma', valor: t.escala_nova_codigo == null ? 'a atual (lida na Senior no envio)' : 'a atual, se a escala for a mesma; senão 1', nota: NOTAS.codTma });
+  return linhas;
 }
 
 /** Filtro da lista: status + texto (nome, matrícula, código, posto). */
