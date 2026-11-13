@@ -24,11 +24,12 @@ export const MOTIVOS_SENIOR: Record<number, string> = {
   998: 'Movimentação 5 Estrelas',
 };
 
-/** Motivo da tela -> código da Senior. */
-export function motivoSenior(motivo: string): number {
-  if (/abertura|encerramento/i.test(motivo)) return 4;
-  if (/promo/i.test(motivo)) return 2;
-  return 998;
+/** Motivo de alteração de posto na Senior: SEMPRE 998 ("Movimentação 5 Estrelas"), pedido do Matheus em 13/11/2026. */
+export const MOTIVO_SENIOR = 998;
+
+/** Motivo da tela -> código da Senior (sempre 998, qualquer que seja o motivo da tela). */
+export function motivoSenior(_motivo?: string): number {
+  return MOTIVO_SENIOR;
 }
 
 export interface TrocaParaSenior {
@@ -75,7 +76,7 @@ export function parametrosEnvio(t: TrocaParaSenior, atual?: EscalaTurma | null):
   const p: Record<string, string | number> = {
     numEmp: t.num_emp, tipCol: t.tip_col, numCad: t.num_cad,
     iniAtu: dataSenior(t.data_inicio), posTra: t.posto_novo_codigo,
-    motPos: t.motivo_senior ?? motivoSenior(t.motivo),
+    motPos: MOTIVO_SENIOR,
     obsPos: [`${t.codigo} - ${t.motivo}`, t.observacao?.trim()].filter(Boolean).join(' - ').slice(0, 250),
     tipOpe: 'I',
   };
@@ -90,7 +91,7 @@ export function parametrosDesfazer(t: TrocaParaSenior): Record<string, string | 
   return {
     numEmp: t.num_emp, tipCol: t.tip_col, numCad: t.num_cad,
     iniAtu: dataSenior(t.data_inicio), posTra: t.posto_novo_codigo,
-    motPos: t.motivo_senior ?? motivoSenior(t.motivo), excHis: 'S', tipOpe: 'E',
+    motPos: MOTIVO_SENIOR, excHis: 'S', tipOpe: 'E',
   };
 }
 
