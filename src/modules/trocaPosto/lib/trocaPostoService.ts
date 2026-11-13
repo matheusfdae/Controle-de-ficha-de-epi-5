@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import {
-  MOTIVOS_SENIOR, motivoSenior, parametrosEnvio, type PadraoPosto, type SituacaoSenior,
+  MOTIVOS_SENIOR, lidoRecente, motivoSenior, parametrosEnvio, type PadraoPosto, type SituacaoSenior,
 } from '../../../../supabase/functions/_shared/trocaPostoSenior';
 
 /**
@@ -8,7 +8,7 @@ import {
  * Senior pelo serviço historicos / Posto_4, com releitura e opção de desfazer.
  */
 
-export { MOTIVOS_SENIOR, motivoSenior };
+export { MOTIVOS_SENIOR, lidoRecente, motivoSenior };
 export type { PadraoPosto, SituacaoSenior };
 
 export type StatusTroca = 'pendente' | 'aprovada' | 'recusada' | 'cancelada' | 'enviando' | 'enviada' | 'erro_envio' | 'desfeita';
@@ -61,7 +61,7 @@ export interface TrocaPosto {
   motivo_senior: number | null; manter_cargo: boolean; cargo_atual_codigo: string | null;
   centro_custo_atual: string | null; padrao_posto: PadraoComNomes | null;
   senior_enviado_por: string | null; senior_desfeito_em: string | null; senior_envio_iniciado_em?: string | null;
-  senior_lido: (Partial<SituacaoSenior> & { erro_leitura?: string }) | null;
+  senior_lido: (Partial<SituacaoSenior> & { erro_leitura?: string; lido_em?: string }) | null;
 }
 
 /** O que a Senior aplica com o posto, com os nomes que conhecemos. */

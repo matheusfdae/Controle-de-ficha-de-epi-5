@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { envioParado, filtrarTrocas, nomePosto, postoDaMesmaEmpresa, previaSenior, type TrocaPosto } from '@/modules/trocaPosto/lib/trocaPostoService';
-import { LIMITE_LEITURA_MS, LIMITE_SENIOR_MS, ehDemo, erroEstrutura, jaNoPostoNovo, liberadaNoLocalhost, resumoEnvio, motivoSenior, parametrosDesfazer, parametrosEnvio, semResposta } from '../../supabase/functions/_shared/trocaPostoSenior';
+import { LIMITE_LEITURA_MS, LIMITE_SENIOR_MS, ehDemo, comHoraDaLeitura, erroEstrutura, jaNoPostoNovo, liberadaNoLocalhost, lidoRecente, resumoEnvio, motivoSenior, parametrosDesfazer, parametrosEnvio, semResposta } from '../../supabase/functions/_shared/trocaPostoSenior';
 
 const t = {
   id: '1', codigo: 'TP-AB12CD34', created_at: '2026-11-13T12:00:00Z', status: 'pendente',
@@ -46,6 +46,20 @@ describe('troca de posto', () => {
   it('recusa mostra o que foi enviado (sem a observação)', () => {
     expect(resumoEnvio(parametrosEnvio(t, { escala: 8516, turma: 1 })))
       .toBe('numEmp=3, tipCol=1, numCad=3008990, iniAtu=13/11/2026, posTra=PO2202, motPos=998, tipOpe=I, codTma=1');
+  });
+
+  it('leitura recente da conferência dispensa ler de novo no envio', () => {
+    const agora = Date.parse('2026-11-13T19:00:00Z');
+    const sit = { posto: 'PO0035', estrutura: 103, cargo: '0049', local: '13275', centroCusto: '2635', escala: 8516, turma: 1 };
+    const lido = comHoraDaLeitura(sit, new Date(agora - 60000));
+    expect(lidoRecente(lido, agora)).toEqual(sit);
+    expect(lidoRecente(comHoraDaLeitura(sit, new Date(agora - 11 * 60000)), agora)).toBeNull(); // velha
+    const { lido_em: _x, ...semHora } = lido!;
+    expect(lidoRecente(semHora, agora)).toBeNull();
+    const { turma: _t, ...semTurma } = lido!; // leitura de antes da turma
+    expect(lidoRecente(semTurma, agora)).toBeNull();
+    expect(lidoRecente({ erro_leitura: 'x', lido_em: lido!.lido_em }, agora)).toBeNull();
+    expect(lidoRecente(null, agora)).toBeNull();
   });
 
   it('já gravada na Senior: não reenvia', () => {
