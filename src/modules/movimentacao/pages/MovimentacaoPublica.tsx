@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardCheck, FileDown, Handshake, Loader2, LogOut, Moon, Send, UserCheck } from 'lucide-react';
+import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardCheck, FileDown, Handshake, Loader2, LogOut, Moon, Repeat, Send, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { cpfValido, formatarCpf, matriculaValida, soDigitos, type Solicitante } from '@/modules/crachas/lib/solicitacaoService';
@@ -17,6 +17,7 @@ import {
 import EscolherColaborador, { SeloReserva } from '../components/EscolherColaborador';
 import { pdfRelatorioDia } from '../lib/relatorioDiaPdf';
 import PassagemPlantaoCard from '../components/PassagemPlantaoCard';
+import TrocaPostoFiscal from '@/modules/trocaPosto/components/TrocaPostoFiscal';
 
 /**
  * Link público do Controle de Movimentação Diária (substitui o Microsoft Forms).
@@ -85,6 +86,8 @@ const MovimentacaoPublica = () => {
   const [quem, setQuem] = useState<Solicitante | null>(null);
   const [fiscal, setFiscal] = useState<FiscalIdentificado | null>(null);
   const [aba, setAba] = useState('novo');
+  // Diária = falta/extra do plantão; definitiva = troca de posto.
+  const [modo, setModo] = useState<'diaria' | 'definitiva'>('diaria');
   const [f, setF] = useState<Form>(vazio());
   const [resultado, setResultado] = useState<{ codigo: string; status: StatusMov; data: string; data_lancamento: string; ok_pelo_plantao?: boolean } | null>(null);
   const [carregando, setCarregando] = useState(false);
@@ -123,7 +126,7 @@ const MovimentacaoPublica = () => {
     } catch (err) { toast.error((err as Error).message); } finally { setGerandoPdf(false); }
   };
 
-  const sair = () => { setQuem(null); setFiscal(null); setSolCpf(''); setF(vazio()); setResultado(null); setAba('novo'); };
+  const sair = () => { setQuem(null); setFiscal(null); setSolCpf(''); setF(vazio()); setResultado(null); setAba('novo'); setModo('diaria'); };
 
   const escolherHorario = (h: string) => {
     setF(x => ({ ...x, horario: h, turno: h !== OUTRO ? (turnoDoHorario(h) ?? x.turno) : x.turno }));
@@ -181,9 +184,14 @@ const MovimentacaoPublica = () => {
       <div className="max-w-xl mx-auto space-y-4">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-foreground flex items-center justify-center gap-2">
-            <ClipboardCheck className="h-7 w-7 text-primary" /> Movimentação diária
+            {fiscal && modo === 'definitiva'
+              ? <><Repeat className="h-7 w-7 text-primary" /> Movimentação definitiva</>
+              : <><ClipboardCheck className="h-7 w-7 text-primary" /> Movimentação {fiscal ? 'diária' : ''}</>}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">Lançamento de falta e cobertura (extra) do plantão.</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {!fiscal ? 'Falta e extra do plantão (diária) ou troca de posto (definitiva).'
+              : modo === 'definitiva' ? 'Troca de posto do colaborador, com aprovação.' : 'Lançamento de falta e cobertura (extra) do plantão.'}
+          </p>
         </div>
 
         {!quem || !fiscal ? (
@@ -231,13 +239,32 @@ const MovimentacaoPublica = () => {
                   <p className="text-xs text-muted-foreground truncate">Matrícula {fiscal.matricula}{fiscal.cargo ? ` · ${fiscal.cargo}` : ''}</p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-1 shrink-0">
-                  <Button variant="outline" size="sm" className="gap-1" onClick={() => setAba('relatorio')}><Handshake className="h-4 w-4" /> Passar plantão</Button>
+                  <Button variant="outline" size="sm" className="gap-1" onClick={() => { setModo('diaria'); setAba('relatorio'); }}><Handshake className="h-4 w-4" /> Passar plantão</Button>
                   <Button variant="ghost" size="sm" className="gap-1" onClick={sair}><LogOut className="h-4 w-4" /> Sair</Button>
                 </div>
               </CardContent>
             </Card>
 
-            {resultado && (
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Tipo de movimentação">
+              {([
+                { v: 'diaria', icone: ClipboardCheck, t: 'Movimentação diária', d: 'Falta e extra do plantão' },
+                { v: 'definitiva', icone: Repeat, t: 'Movimentação definitiva', d: 'Troca de posto' },
+              ] as const).map(o => (
+                <button key={o.v} type="button" role="radio" aria-checked={modo === o.v} onClick={() => setModo(o.v)}
+                  className={cn('rounded-lg border p-3 text-left transition-colors flex gap-2.5 items-start',
+                    modo === o.v ? 'border-primary bg-primary text-primary-foreground shadow-sm' : 'bg-card hover:bg-muted')}>
+                  <o.icone className="h-5 w-5 shrink-0 mt-0.5" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold leading-tight">{o.t}</span>
+                    <span className={cn('block text-xs', modo === o.v ? 'text-primary-foreground/80' : 'text-muted-foreground')}>{o.d}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {modo === 'definitiva' && <TrocaPostoFiscal quem={quem} />}
+
+            {modo === 'diaria' && resultado && (
               <div role="status" className={cn('rounded-lg border p-4 flex gap-3',
                 resultado.status === 'ok' ? 'border-emerald-300 bg-emerald-50 dark:bg-emerald-950/40' : 'border-amber-300 bg-amber-50 dark:bg-amber-950/40')}>
                 {resultado.status === 'ok'
@@ -255,6 +282,7 @@ const MovimentacaoPublica = () => {
               </div>
             )}
 
+            {modo === 'diaria' && (
             <Tabs value={aba} onValueChange={setAba}>
               <TabsList className="grid grid-cols-3 w-full h-auto">
                 <TabsTrigger value="novo" className="whitespace-normal">Novo</TabsTrigger>
@@ -436,6 +464,7 @@ const MovimentacaoPublica = () => {
                 </Card>
               </TabsContent>
             </Tabs>
+            )}
           </>
         )}
       </div>
