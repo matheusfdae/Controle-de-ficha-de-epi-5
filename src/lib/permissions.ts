@@ -13,7 +13,8 @@ export type ModuleId =
   | 'colaboradores'
   | 'crachas'
   | 'pedidos_material'
-  | 'movimentacao';
+  | 'movimentacao'
+  | 'troca_posto';
 
 export type ActionId = 'view' | 'create' | 'edit' | 'delete';
 
@@ -40,6 +41,8 @@ export const MODULES: ModuleDef[] = [
   { id: 'pedidos_material', label: 'Pedidos de Material', actions: ['view', 'create', 'edit'] },
   // view = lista e Excel; edit = e-mails do aviso de divergência; delete = excluir lançamento.
   { id: 'movimentacao',     label: 'Movimentação Diária', actions: ['view', 'edit', 'delete'] },
+  // view = lista; create = pedir troca; edit = aprovar/recusar (nada vai à Senior por enquanto).
+  { id: 'troca_posto',      label: 'Troca de Posto',    actions: ['view', 'create', 'edit'] },
   { id: 'funcoes',          label: 'Funções',           actions: ['view', 'create', 'edit', 'delete'] },
   { id: 'configuracoes',    label: 'Configurações',     actions: ['view', 'edit'] },
 ];

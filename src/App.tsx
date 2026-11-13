@@ -61,6 +61,7 @@ const MovimentacaoPublica = lazy(() => import('./modules/movimentacao/pages/Movi
 const Movimentacoes       = lazy(() => import('./modules/movimentacao/pages/Movimentacoes'));
 const MovimentacaoPainel  = lazy(() => import('./modules/movimentacao/pages/PainelMovimentacao'));
 const MovimentacaoPlantao = lazy(() => import('./modules/movimentacao/pages/PlantaoNoturno'));
+const TrocasPosto         = lazy(() => import('./modules/trocaPosto/pages/TrocasPosto'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -179,6 +180,7 @@ function AppRoutes() {
           <Route path="/movimentacao"          element={<RequireModule module="movimentacao"><Movimentacoes /></RequireModule>} />
           <Route path="/movimentacao/gerencial" element={<RequireModule module="movimentacao"><MovimentacaoPainel /></RequireModule>} />
           <Route path="/movimentacao/plantao"  element={<RequireModule module="movimentacao"><MovimentacaoPlantao /></RequireModule>} />
+          <Route path="/troca-posto"           element={<RequireModule module="troca_posto"><TrocasPosto /></RequireModule>} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

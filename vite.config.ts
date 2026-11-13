@@ -9,6 +9,7 @@ import { calcularPendentes, montarEmailPendentes } from "./supabase/functions/_s
 import { calcularPainel, svgPainel } from "./supabase/functions/_shared/painelFichas";
 import { base64 } from "./supabase/functions/_shared/xlsx";
 import { initWasm, Resvg } from "@resvg/resvg-wasm";
+import { chamarPosto4, ehDemo, erroEstrutura, lerSituacao, liberadaNoLocalhost, padraoDoPosto, parametrosDesfazer, parametrosEnvio } from "./supabase/functions/_shared/trocaPostoSenior";
 import { montarEmailIntegracao, normalizarPessoas } from "./supabase/functions/_shared/emailIntegracao";
 import { limparEmails, montarEmailDivergencia } from "./supabase/functions/_shared/avisoMovimentacao";
 import { destinatariosPassagem, montarEmailPassagem } from "./supabase/functions/_shared/passagemPlantao";
@@ -329,6 +330,37 @@ function seniorLocal(env: Record<string, string>): Plugin {
         try {
           const cfg: SeniorConfig = { baseUrl, user, password, module: env.SENIOR_WS_MODULE || "rubi" };
           res.end(JSON.stringify(await buscarEtapa(cfg, JSON.parse(texto || "{}") as PedidoEtapa)));
+        } catch (e) {
+          res.statusCode = 502;
+          res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));
+        }
+      });
+      // Troca de posto (só no npm run dev): a tela manda a troca e registra o resultado
+      // no banco com o usuário logado (troca_posto_registrar_senior exige administrador).
+      server.middlewares.use("/__senior/troca-posto", async (req, res) => {
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        const { SENIOR_WS_URL: baseUrl, SENIOR_WS_USER: user, SENIOR_WS_PASSWORD: password } = env;
+        if (req.method !== "POST" || !baseUrl || !user || !password) {
+          res.statusCode = 503;
+          return res.end(JSON.stringify({ error: "Senior não configurada no .env.local" }));
+        }
+        let texto = "";
+        for await (const parte of req) texto += parte;
+        try {
+          const cfg: SeniorConfig = { baseUrl, user, password, module: env.SENIOR_WS_MODULE || "rubi" };
+          const { acao, troca: t, estrutura, posto } = JSON.parse(texto || "{}");
+          if (acao === "padrao") return res.end(JSON.stringify({ padrao: await padraoDoPosto(cfg, Number(estrutura), String(posto)) }));
+          if (acao !== "enviar" && acao !== "desfazer") { res.statusCode = 400; return res.end(JSON.stringify({ error: "Ação inválida" })); }
+          if (ehDemo(t)) { res.statusCode = 409; return res.end(JSON.stringify({ error: "Troca fictícia (TP-DEMO): não vai para a Senior." })); }
+          if (acao === "enviar" && erroEstrutura(t)) { res.statusCode = 409; return res.end(JSON.stringify({ error: erroEstrutura(t) })); }
+          const lista = env.TROCA_POSTO_MATRICULAS_TESTE || "3/3008990";
+          if (!liberadaNoLocalhost(t, lista)) {
+            res.statusCode = 403;
+            return res.end(JSON.stringify({ error: `No localhost só as matrículas de teste vão para a Senior (${lista}). Para liberar outra, ponha TROCA_POSTO_MATRICULAS_TESTE no .env.local.` }));
+          }
+          const erro = await chamarPosto4(cfg, acao === "enviar" ? parametrosEnvio(t) : parametrosDesfazer(t));
+          const lido = await lerSituacao(cfg, t.num_emp, t.num_cad, t.tip_col).catch(e => ({ erro_leitura: String(e?.message ?? e) }));
+          res.end(JSON.stringify({ erro, lido }));
         } catch (e) {
           res.statusCode = 502;
           res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));

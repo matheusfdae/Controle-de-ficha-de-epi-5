@@ -57,3 +57,6 @@ verify_jwt = false
 
 [functions.avisar-pedidos-material]
 verify_jwt = false
+
+[functions.troca-posto-senior]
+verify_jwt = false
