@@ -72,7 +72,8 @@ export default function DetalheTrocaDialog({ troca, fechar, mudou, podeAprovar, 
       setAtual(r.troca); setConfirmando(null); mudou();
       if (r.erro) toast.error(`A Senior recusou: ${r.erro}`, { duration: 15000 });
       else {
-        if (r.pendente) toast.warning('A Senior não respondeu a tempo. Conferindo se gravou…', { duration: 10000 });
+        if (r.ja) toast.success(`A troca ${t.codigo} já estava gravada na Senior: marcada sem reenviar.`);
+        else if (r.pendente) toast.warning('A Senior não respondeu a tempo. Conferindo se gravou…', { duration: 10000 });
         else toast.success(qual === 'enviar' ? `Troca ${t.codigo} gravada na Senior. Conferindo…` : `Troca ${t.codigo} desfeita na Senior. Conferindo…`);
         depois = r.troca;
       }

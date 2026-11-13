@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { envioParado, filtrarTrocas, nomePosto, postoDaMesmaEmpresa, previaSenior, type TrocaPosto } from '@/modules/trocaPosto/lib/trocaPostoService';
-import { LIMITE_LEITURA_MS, LIMITE_SENIOR_MS, ehDemo, erroEstrutura, liberadaNoLocalhost, motivoSenior, parametrosDesfazer, parametrosEnvio, semResposta } from '../../supabase/functions/_shared/trocaPostoSenior';
+import { LIMITE_LEITURA_MS, LIMITE_SENIOR_MS, ehDemo, erroEstrutura, jaNoPostoNovo, liberadaNoLocalhost, motivoSenior, parametrosDesfazer, parametrosEnvio, semResposta } from '../../supabase/functions/_shared/trocaPostoSenior';
 
 const t = {
   id: '1', codigo: 'TP-AB12CD34', created_at: '2026-11-13T12:00:00Z', status: 'pendente',
@@ -21,10 +21,10 @@ describe('troca de posto', () => {
     });
   });
 
-  it('manter cargo manda codCar; escala nova manda codEsc', () => {
+  it('manter cargo manda codCar; escala nunca vai (codEsc faz a Senior recusar o 998)', () => {
     const p = parametrosEnvio({ ...t, manter_cargo: true, escala_nova_codigo: 8516 });
     expect(p.codCar).toBe('0148');
-    expect(p.codEsc).toBe(8516);
+    expect(p).not.toHaveProperty('codEsc');
     expect(parametrosEnvio({ ...t, manter_cargo: true, cargo_atual_codigo: null }).codCar).toBeUndefined();
   });
 
@@ -34,12 +34,21 @@ describe('troca de posto', () => {
       obsPos: 'TP-AB12CD34 - Remanejamento operacional - a pedido do cliente', tipOpe: 'I', codTma: 1,
     });
     expect(parametrosEnvio(t, { escala: 8516, turma: 3 }).codTma).toBe(3);
-    // escala nova: turma atual só vale para a mesma escala; senão turma 1
-    expect(parametrosEnvio({ ...t, escala_nova_codigo: 9000 }, { escala: 8516, turma: 3 })).toMatchObject({ codEsc: 9000, codTma: 1 });
-    expect(parametrosEnvio({ ...t, escala_nova_codigo: 8516 }, { escala: 8516, turma: 3 }).codTma).toBe(3);
+    // troca antiga com escala nova salva: continua sem codEsc, com a turma atual
+    const p = parametrosEnvio({ ...t, escala_nova_codigo: 9000 }, { escala: 8516, turma: 3 });
+    expect(p).not.toHaveProperty('codEsc');
+    expect(p.codTma).toBe(3);
     // sem turma lida: 1; sem leitura: não manda
     expect(parametrosEnvio(t, { escala: 8516, turma: null }).codTma).toBe(1);
     expect(parametrosEnvio(t)).not.toHaveProperty('codTma');
+  });
+
+  it('já gravada na Senior: não reenvia', () => {
+    expect(jaNoPostoNovo(t, { posto: 'PO2202', estrutura: 103 })).toBe(true);
+    expect(jaNoPostoNovo(t, { posto: 'PO2202', estrutura: null })).toBe(true);
+    expect(jaNoPostoNovo(t, { posto: 'PO2178', estrutura: 103 })).toBe(false);
+    expect(jaNoPostoNovo(t, { posto: 'PO2202', estrutura: 101 })).toBe(false);
+    expect(jaNoPostoNovo(t, null)).toBe(false);
   });
 
   it('leitura da turma + gravação cabem no limite de 60 s da VM', () => {

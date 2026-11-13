@@ -232,15 +232,10 @@ export default function NovaTrocaDialog({ aberto, fechar, criada }: {
             </div>
             <div className="space-y-1.5">
               <Label>4. Escala</Label>
-              <Select value={escala} onValueChange={setEscala}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent className="max-h-72">
-                  <SelectItem value={MANTER}>Manter a atual{colab?.escala_nome ? ` (${colab.escala_nome})` : ''}</SelectItem>
-                  {escalas.filter(e => e.codigo !== colab?.escala_codigo).map(e => (
-                    <SelectItem key={e.codigo} value={String(e.codigo)}>{e.nome ?? 'Escala'} ({e.codigo})</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* A Senior aplica a escala do posto novo; mandar outra escala junto ela recusa (13/11/2026). */}
+              <p className="text-sm text-muted-foreground rounded-md border px-3 py-2">
+                A do posto novo (a Senior aplica sozinha), mantendo a turma atual{colab?.escala_nome ? `. Hoje: ${colab.escala_nome}` : ''}.
+              </p>
             </div>
             <div className="space-y-1.5 sm:col-span-2">
               <Label>5. Motivo</Label>

@@ -16,7 +16,7 @@ import { verifyCaller, serviceClient, json, corsHeaders } from '../_shared/clerk
 import { carregarSenior } from '../_shared/seniorConfig.ts';
 import { SeniorError } from '../_shared/senior.ts';
 import {
-  LIMITE_LEITURA_MS, LIMITE_SENIOR_MS, chamarPosto4, ehDemo, erroEstrutura, lerSituacao, padraoDoPosto, parametrosDesfazer,
+  LIMITE_LEITURA_MS, LIMITE_SENIOR_MS, chamarPosto4, ehDemo, erroEstrutura, jaNoPostoNovo, lerSituacao, padraoDoPosto, parametrosDesfazer,
   parametrosEnvio, semResposta,
 } from '../_shared/trocaPostoSenior.ts';
 
@@ -87,6 +87,10 @@ Deno.serve(async (req) => {
       if (!atual) {
         const msg = 'Colaborador não encontrado na Senior. Nada foi enviado.';
         return json({ ok: false, erro: msg, troca: await registrar('enviar', msg, null) });
+      }
+      if (jaNoPostoNovo(t, atual)) {
+        // Já está na Senior (envio anterior gravou): marca sem reenviar.
+        return json({ ok: true, erro: null, ja: true, troca: await registrar('conferir', null, atual) });
       }
       params = parametrosEnvio(t, atual);
       tempo = Math.max(25000, LIMITE_SENIOR_MS - (Date.now() - t0));
