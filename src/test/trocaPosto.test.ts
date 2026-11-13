@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { envioParado, filtrarTrocas, nomePosto, postoDaMesmaEmpresa, previaSenior, type TrocaPosto } from '@/modules/trocaPosto/lib/trocaPostoService';
-import { LIMITE_LEITURA_MS, LIMITE_SENIOR_MS, ehDemo, comHoraDaLeitura, erroEstrutura, jaNoPostoNovo, liberadaNoLocalhost, lidoRecente, resumoEnvio, motivoSenior, parametrosDesfazer, parametrosEnvio, semResposta } from '../../supabase/functions/_shared/trocaPostoSenior';
+import { LIMITE_LEITURA_MS, LIMITE_SENIOR_MS, ehDemo, comHoraDaLeitura, erroEstrutura, motivosParaTentar, recusouMotivo, tentarMotivos, jaNoPostoNovo, liberadaNoLocalhost, lidoRecente, resumoEnvio, motivoSenior, parametrosDesfazer, parametrosEnvio, semResposta } from '../../supabase/functions/_shared/trocaPostoSenior';
 
 const t = {
   id: '1', codigo: 'TP-AB12CD34', created_at: '2026-11-13T12:00:00Z', status: 'pendente',
@@ -60,6 +60,38 @@ describe('troca de posto', () => {
     expect(lidoRecente(semTurma, agora)).toBeNull();
     expect(lidoRecente({ erro_leitura: 'x', lido_em: lido!.lido_em }, agora)).toBeNull();
     expect(lidoRecente(null, agora)).toBeNull();
+  });
+
+  it('mudança de salário: 998 recusado no Mot. alt. -> tenta 002, depois 004', async () => {
+    const RECUSA = 'Não foi possível atribuir o valor "998" para o campo "Mot. alt." da tela "FRHISCOL"';
+    expect(recusouMotivo(RECUSA)).toBe(true);
+    expect(recusouMotivo('É obrigatório informar turma')).toBe(false);
+    expect(recusouMotivo(null)).toBe(false);
+    expect(motivosParaTentar()).toEqual([998, 2, 4]);
+    expect(motivosParaTentar(2)).toEqual([2, 998, 4]);   // desfazer: o que gravou primeiro
+    expect(motivosParaTentar(77)).toEqual([998, 2, 4]);  // código desconhecido sai
+
+    const chamados: number[] = [];
+    const senior = (aceita: number | null, outro?: string) => async (m: number) => {
+      chamados.push(m);
+      if (outro) return outro;
+      return m === aceita ? null : RECUSA.replace('998', String(m));
+    };
+    expect(await tentarMotivos(senior(998), [998, 2, 4], 48000)).toEqual({ erro: null, motivo: 998, tentados: [998] });
+    chamados.length = 0;
+    expect(await tentarMotivos(senior(2), [998, 2, 4], 48000)).toEqual({ erro: null, motivo: 2, tentados: [998, 2] });
+    expect(chamados).toEqual([998, 2]);
+    // recusa que não é do motivo: para na hora
+    const r = await tentarMotivos(senior(null, 'É obrigatório informar turma'), [998, 2, 4], 48000);
+    expect(r).toEqual({ erro: 'É obrigatório informar turma', motivo: 998, tentados: [998] });
+    // nenhum passa: diz quais tentou
+    const nenhum = await tentarMotivos(senior(null), [998, 2, 4], 48000);
+    expect(nenhum.tentados).toEqual([998, 2, 4]);
+    expect(nenhum.erro).toMatch(/motivos tentados: 998, 002, 004/);
+    // sem tempo para outra tentativa (limite de 60 s da VM)
+    let relogio = 0;
+    const lento = async (m: number) => { relogio += 45000; return RECUSA.replace('998', String(m)); };
+    expect((await tentarMotivos(lento, [998, 2, 4], 48000, () => relogio)).tentados).toEqual([998]);
   });
 
   it('já gravada na Senior: não reenvia', () => {

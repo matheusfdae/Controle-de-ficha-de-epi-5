@@ -16,7 +16,7 @@ import { verifyCaller, serviceClient, json, corsHeaders } from '../_shared/clerk
 import { carregarSenior } from '../_shared/seniorConfig.ts';
 import { SeniorError } from '../_shared/senior.ts';
 import {
-  LIMITE_LEITURA_MS, LIMITE_SENIOR_MS, chamarPosto4, ehDemo, erroEstrutura, comHoraDaLeitura, jaNoPostoNovo, lerSituacao, lidoRecente, resumoEnvio, padraoDoPosto, parametrosDesfazer,
+  LIMITE_LEITURA_MS, LIMITE_SENIOR_MS, chamarPosto4, ehDemo, erroEstrutura, MOTIVOS_SENIOR, MOTIVO_SENIOR, comHoraDaLeitura, jaNoPostoNovo, motivosParaTentar, tentarMotivos, lerSituacao, lidoRecente, resumoEnvio, padraoDoPosto, parametrosDesfazer,
   parametrosEnvio, semResposta,
 } from '../_shared/trocaPostoSenior.ts';
 
@@ -97,17 +97,27 @@ Deno.serve(async (req) => {
       tempo = Math.max(25000, LIMITE_SENIOR_MS - (Date.now() - t0));
     }
 
-    let erro: string | null;
+    // Tenta o 998; se a Senior recusar o motivo (troca com mudança de salário), tenta os de reserva.
+    let r;
     try {
-      erro = await chamarPosto4(cfg, params, tempo);
+      r = await tentarMotivos((m, ms) => chamarPosto4(cfg, { ...params, motPos: m }, ms),
+        motivosParaTentar(acao === 'desfazer' ? t.motivo_senior : null), tempo);
     } catch {
       // Sem resposta (tempo esgotado ou conexão caiu): não dá para saber se a
       // Senior gravou. Fica marcado e a tela confere.
       const troca = await registrar(acao === 'enviar' ? 'demorou' : 'desfazer_demorou', null, null);
       return json({ ok: false, pendente: true, erro: null, troca });
     }
-    if (erro) erro = `${erro} [enviado: ${resumoEnvio(params)}]`;
-    return json({ ok: !erro, erro, troca: await registrar(acao, erro, null) });
+    const erro = r.erro ? `${r.erro} [enviado: ${resumoEnvio({ ...params, motPos: r.motivo })}]` : null;
+    let troca = await registrar(acao, erro, null);
+    if (!erro && acao === 'enviar') {
+      // Guarda o motivo que passou (o desfazer usa o mesmo).
+      const nota = r.motivo === MOTIVO_SENIOR ? 'Gravada na Senior.'
+        : `Gravada na Senior com o motivo ${String(r.motivo).padStart(3, '0')} - ${MOTIVOS_SENIOR[r.motivo]} (a Senior não aceitou o 998: o posto muda o salário).`;
+      const { data } = await admin.from('trocas_posto').update({ motivo_senior: r.motivo, senior_resposta: nota }).eq('id', t.id).select('*').maybeSingle();
+      if (data) troca = data;
+    }
+    return json({ ok: !erro, erro, motivo: r.motivo, troca });
   } catch (e) {
     if (e instanceof SeniorError) return json({ error: e.message }, 502);
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
