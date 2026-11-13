@@ -87,6 +87,14 @@ export function parametrosEnvio(t: TrocaParaSenior, atual?: EscalaTurma | null):
   return p;
 }
 
+/**
+ * Resumo do que foi mandado ao Posto_4 (sem a observação), anexado à recusa da
+ * Senior: assim dá para ver na tela exatamente o que ela recebeu.
+ */
+export function resumoEnvio(p: Record<string, string | number>): string {
+  return Object.entries(p).filter(([k]) => k !== 'obsPos').map(([k, v]) => `${k}=${v}`).join(', ');
+}
+
 /** A Senior já mostra o colaborador no posto novo (troca já gravada): não reenviar. */
 export function jaNoPostoNovo(
   t: { posto_novo_codigo: string; posto_novo_estrutura: number },

@@ -9,7 +9,7 @@ import { calcularPendentes, montarEmailPendentes } from "./supabase/functions/_s
 import { calcularPainel, svgPainel } from "./supabase/functions/_shared/painelFichas";
 import { base64 } from "./supabase/functions/_shared/xlsx";
 import { initWasm, Resvg } from "@resvg/resvg-wasm";
-import { LIMITE_LEITURA_MS, chamarPosto4, ehDemo, erroEstrutura, jaNoPostoNovo, lerSituacao, liberadaNoLocalhost, padraoDoPosto, parametrosDesfazer, parametrosEnvio, semResposta } from "./supabase/functions/_shared/trocaPostoSenior";
+import { LIMITE_LEITURA_MS, chamarPosto4, ehDemo, erroEstrutura, jaNoPostoNovo, lerSituacao, resumoEnvio, liberadaNoLocalhost, padraoDoPosto, parametrosDesfazer, parametrosEnvio, semResposta } from "./supabase/functions/_shared/trocaPostoSenior";
 import { montarEmailIntegracao, normalizarPessoas } from "./supabase/functions/_shared/emailIntegracao";
 import { limparEmails, montarEmailDivergencia } from "./supabase/functions/_shared/avisoMovimentacao";
 import { destinatariosPassagem, montarEmailPassagem } from "./supabase/functions/_shared/passagemPlantao";
@@ -386,7 +386,7 @@ function seniorLocal(env: Record<string, string>): Plugin {
           }
           try {
             const erro = await chamarPosto4(cfg, params);
-            res.end(JSON.stringify({ erro }));
+            res.end(JSON.stringify({ erro: erro ? `${erro} [enviado: ${resumoEnvio(params)}]` : null }));
           } catch {
             res.end(JSON.stringify({ erro: null, pendente: true }));
           }
