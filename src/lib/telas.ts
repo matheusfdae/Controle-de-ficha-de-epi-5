@@ -49,6 +49,7 @@ export const TELAS: TelaDef[] = [
 
   { id: 'menu-movimentacao', label: 'Movimentação Diária', grupo: 'Fiscalização', url: '/movimentacao', modulo: 'movimentacao' },
   { id: 'menu-movimentacao-plantao', label: 'Plantão noturno', grupo: 'Fiscalização', url: '/movimentacao/plantao', modulo: 'movimentacao' },
+  { id: 'menu-troca-posto', label: 'Troca de posto', grupo: 'Fiscalização', url: '/troca-posto', modulo: 'troca_posto' },
   { id: 'menu-movimentacao-gerencial', label: 'Painel Gerencial (movimentação)', grupo: 'Fiscalização', url: '/movimentacao/gerencial', modulo: 'movimentacao' },
 
   { id: 'menu-integracao', label: 'Integração', grupo: 'Administração', url: '/integracao', modulo: 'integracao' },

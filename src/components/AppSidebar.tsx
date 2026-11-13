@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FilePlus2, Search, CalendarClock, Settings, ShieldCheck, LogOut, Users, Package, Briefcase, UserPlus, ClipboardSignature, HardHat, Shirt, FileSignature, MapPin, FileStack,
-  IdCard, Palette, Printer, History, BarChart3, Inbox, PenTool, ShoppingCart, ClipboardList, Gauge, Warehouse, ShieldAlert, Wallet, ClipboardCheck, Moon } from 'lucide-react';
+  IdCard, Palette, Printer, History, BarChart3, Inbox, PenTool, ShoppingCart, ClipboardList, Gauge, Warehouse, ShieldAlert, Wallet, ClipboardCheck, Moon, Shuffle } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter,
@@ -110,11 +110,14 @@ export function AppSidebar() {
     return () => { vivo = false; clearInterval(t); window.removeEventListener('pedidos-pendencias', doSino); };
   }, [user, pathname]);
   const visiblePedidoItems = pedidoItems.filter(i => veTela(i.guia) && (i.action ? can('pedidos_material', i.action) : can('pedidos_material', 'view') || aprovador));
-  const movimentacaoItems = can('movimentacao', 'view') ? [
-    { title: 'Movimentação Diária', guia: 'menu-movimentacao', url: '/movimentacao', icon: ClipboardCheck },
-    { title: 'Painel Gerencial', guia: 'menu-movimentacao-gerencial', url: '/movimentacao/gerencial', icon: Gauge },
-    { title: 'Plantão Noturno', guia: 'menu-movimentacao-plantao', url: '/movimentacao/plantao', icon: Moon },
-  ].filter(i => veTela(i.guia)) : [];
+  const movimentacaoItems = [
+    ...(can('movimentacao', 'view') ? [
+      { title: 'Movimentação Diária', guia: 'menu-movimentacao', url: '/movimentacao', icon: ClipboardCheck },
+      { title: 'Painel Gerencial', guia: 'menu-movimentacao-gerencial', url: '/movimentacao/gerencial', icon: Gauge },
+      { title: 'Plantão Noturno', guia: 'menu-movimentacao-plantao', url: '/movimentacao/plantao', icon: Moon },
+    ] : []),
+    ...(can('troca_posto', 'view') ? [{ title: 'Troca de Posto', guia: 'menu-troca-posto', url: '/troca-posto', icon: Shuffle }] : []),
+  ].filter(i => veTela(i.guia));
   const showAdminSection = isAdmin || visibleAdminItems.length > 0;
 
   return (
