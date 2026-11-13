@@ -51,11 +51,15 @@ describe('troca de posto', () => {
   });
 
   it('motivo da tela -> motivo da Senior', () => {
-    expect(motivoSenior('Encerramento do posto')).toBe(4);
-    expect(motivoSenior('Abertura de posto')).toBe(4);
-    expect(motivoSenior('Promoção / mudança de função')).toBe(2);
+    // sempre 998 (Movimentação 5 Estrelas), qualquer motivo da tela
+    expect(motivoSenior('Encerramento do posto')).toBe(998);
+    expect(motivoSenior('Abertura de posto')).toBe(998);
+    expect(motivoSenior('Promoção / mudança de função')).toBe(998);
     expect(motivoSenior('Pedido do cliente')).toBe(998);
-    expect(parametrosEnvio({ ...t, motivo_senior: null, motivo: 'Encerramento do posto' }).motPos).toBe(4);
+    // troca antiga gravada no banco com outro código também vai com 998
+    expect(parametrosEnvio({ ...t, motivo_senior: 4, motivo: 'Encerramento do posto' }).motPos).toBe(998);
+    expect(parametrosEnvio({ ...t, motivo_senior: 2 }).motPos).toBe(998);
+    expect(parametrosDesfazer({ ...t, motivo_senior: 10 }).motPos).toBe(998);
   });
 
   it('prévia mostra o motivo com o nome', () => {
