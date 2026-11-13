@@ -371,7 +371,7 @@ function seniorLocal(env: Record<string, string>): Plugin {
           }
           let params = parametrosDesfazer(t);
           if (acao === "enviar") {
-            // Igual à produção: lê escala/turma antes (escala "Permanente" exige turma).
+            // Igual à produção: lê a turma antes (escala "Permanente" exige turma).
             let atual;
             try {
               atual = await lerSituacao(cfg, t.num_emp, t.num_cad, t.tip_col, LIMITE_LEITURA_MS);

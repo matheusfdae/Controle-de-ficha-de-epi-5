@@ -6,8 +6,10 @@
 //  * a Senior aplica junto o cargo, o local e o centro de custo do posto
 //    (tabela R017CAR); codCar no envio mantém o cargo informado;
 //  * desfazer = tipOpe "E" com excHis "S" (apaga também local/cargo/CC da data).
-//  * escala "Permanente" exige turma (codTma): o envio manda a escala e a turma
-//    atuais do colaborador (relidas na Senior na hora), ou a escala nova.
+//  * o posto pode trazer a própria escala (PO2035 -> 8513) e escala "Permanente"
+//    exige turma: o envio manda codTma = turma atual do colaborador (relida na
+//    hora), SEM codEsc. Com codEsc a Senior trata como troca de escala e recusa
+//    o motPos 998 ("Mot. alt."). Testado em 13/11 (01/12/2026, gravou e desfez).
 // As regras puras (parâmetros) são testadas no vitest.
 
 import { allBlocks, buildEnvelope, consultarTabela, readFields, seniorEndpoint, SeniorError, type SeniorConfig } from './senior.ts';
@@ -64,9 +66,10 @@ export function erroEstrutura(t: { posto_atual_estrutura: number | null; posto_n
 export interface EscalaTurma { escala: number | null; turma: number | null }
 
 /**
- * Parâmetros do Posto_4 para incluir a troca. Com a escala/turma atuais, manda
- * codEsc + codTma (a Senior recusa escala "Permanente" sem turma — 13/11/2026,
- * TP-4C549AAE para o PO2035). Escala nova sem turma conhecida vai com a turma 1.
+ * Parâmetros do Posto_4 para incluir a troca. Com a situação atual, manda a
+ * turma (codTma): a Senior recusa escala "Permanente" sem turma (13/11/2026,
+ * TP-4C549AAE para o PO2035, que traz a escala 8513). Mantém a turma do
+ * colaborador; com escala nova diferente da atual, turma 1.
  */
 export function parametrosEnvio(t: TrocaParaSenior, atual?: EscalaTurma | null): Record<string, string | number> {
   const p: Record<string, string | number> = {
@@ -76,9 +79,8 @@ export function parametrosEnvio(t: TrocaParaSenior, atual?: EscalaTurma | null):
     obsPos: [`${t.codigo} - ${t.motivo}`, t.observacao?.trim()].filter(Boolean).join(' - ').slice(0, 250),
     tipOpe: 'I',
   };
-  const escala = t.escala_nova_codigo ?? atual?.escala ?? null;
-  if (escala != null) p.codEsc = escala;
-  if (escala != null && atual) p.codTma = (escala === atual.escala ? atual.turma : null) ?? 1;
+  if (t.escala_nova_codigo != null) p.codEsc = t.escala_nova_codigo;
+  if (atual) p.codTma = (t.escala_nova_codigo == null || t.escala_nova_codigo === atual.escala ? atual.turma : null) ?? 1;
   if (t.manter_cargo && t.cargo_atual_codigo) p.codCar = t.cargo_atual_codigo;
   return p;
 }

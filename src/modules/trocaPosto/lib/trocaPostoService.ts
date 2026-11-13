@@ -203,9 +203,8 @@ export function previaSenior(t: Pick<TrocaPosto, 'codigo' | 'num_emp' | 'tip_col
   const linhas = Object.entries(parametrosEnvio(t)).map(([campo, v]) => ({
     campo, valor: campo === 'motPos' ? `${v} - ${MOTIVOS_SENIOR[Number(v)] ?? ''}` : String(v), nota: NOTAS[campo] ?? '',
   }));
-  // Escala/turma atuais só são lidas na Senior na hora do envio (escala "Permanente" exige turma).
-  if (t.escala_nova_codigo == null) linhas.push({ campo: 'codEsc', valor: 'a atual (lida na Senior no envio)', nota: 'escala' });
-  linhas.push({ campo: 'codTma', valor: t.escala_nova_codigo == null ? 'a atual (lida na Senior no envio)' : 'a atual, se a escala for a mesma; senão 1', nota: NOTAS.codTma });
+  // A turma só é lida na Senior na hora do envio (escala "Permanente" exige turma).
+  linhas.push({ campo: 'codTma', valor: t.escala_nova_codigo == null ? 'a atual do colaborador (lida na Senior no envio)' : 'a atual, se a escala for a mesma; senão 1', nota: NOTAS.codTma });
   return linhas;
 }
 

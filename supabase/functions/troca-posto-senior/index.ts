@@ -10,7 +10,7 @@
 // As Edge Functions da VM são cortadas em 60 s e a Senior às vezes demora mais
 // de um minuto: cada ação faz UMA chamada à Senior (até LIMITE_SENIOR_MS). Se a
 // Senior não responde a tempo, a troca fica "enviando" e a tela confere depois.
-// Antes de gravar, o envio lê a escala/turma atuais (até LIMITE_LEITURA_MS):
+// Antes de gravar, o envio lê a turma atual (até LIMITE_LEITURA_MS):
 // escala "Permanente" sem turma a Senior recusa.
 import { verifyCaller, serviceClient, json, corsHeaders } from '../_shared/clerk.ts';
 import { carregarSenior } from '../_shared/seniorConfig.ts';
@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
     let params = parametrosDesfazer(t);
     let tempo = LIMITE_SENIOR_MS;
     if (acao === 'enviar') {
-      // Escala e turma atuais (escala "Permanente" exige turma). Sem elas, nada é enviado.
+      // Turma atual (o posto pode trazer escala "Permanente", que exige turma). Sem ela, nada é enviado.
       const t0 = Date.now();
       let atual;
       try {

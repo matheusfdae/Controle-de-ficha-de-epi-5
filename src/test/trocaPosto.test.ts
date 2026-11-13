@@ -28,15 +28,17 @@ describe('troca de posto', () => {
     expect(parametrosEnvio({ ...t, manter_cargo: true, cargo_atual_codigo: null }).codCar).toBeUndefined();
   });
 
-  it('escala Permanente: manda a escala e a turma atuais (recusa da Senior em 13/11)', () => {
-    expect(parametrosEnvio(t, { escala: 8516, turma: 1 })).toMatchObject({ codEsc: 8516, codTma: 1 });
+  it('escala Permanente: manda só a turma atual, sem codEsc (teste real de 13/11)', () => {
+    expect(parametrosEnvio(t, { escala: 8516, turma: 1 })).toEqual({
+      numEmp: 3, tipCol: 1, numCad: 3008990, iniAtu: '13/11/2026', posTra: 'PO2202', motPos: 998,
+      obsPos: 'TP-AB12CD34 - Remanejamento operacional - a pedido do cliente', tipOpe: 'I', codTma: 1,
+    });
     expect(parametrosEnvio(t, { escala: 8516, turma: 3 }).codTma).toBe(3);
     // escala nova: turma atual só vale para a mesma escala; senão turma 1
     expect(parametrosEnvio({ ...t, escala_nova_codigo: 9000 }, { escala: 8516, turma: 3 })).toMatchObject({ codEsc: 9000, codTma: 1 });
     expect(parametrosEnvio({ ...t, escala_nova_codigo: 8516 }, { escala: 8516, turma: 3 }).codTma).toBe(3);
-    // sem turma lida: 1; sem escala nenhuma: não manda
+    // sem turma lida: 1; sem leitura: não manda
     expect(parametrosEnvio(t, { escala: 8516, turma: null }).codTma).toBe(1);
-    expect(parametrosEnvio(t, { escala: null, turma: null })).not.toHaveProperty('codTma');
     expect(parametrosEnvio(t)).not.toHaveProperty('codTma');
   });
 
