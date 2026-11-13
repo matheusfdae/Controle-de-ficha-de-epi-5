@@ -16,7 +16,7 @@ import { verifyCaller, serviceClient, json, corsHeaders } from '../_shared/clerk
 import { carregarSenior } from '../_shared/seniorConfig.ts';
 import { SeniorError } from '../_shared/senior.ts';
 import {
-  LIMITE_LEITURA_MS, LIMITE_SENIOR_MS, chamarPosto4, ehDemo, erroEstrutura, jaNoPostoNovo, lerSituacao, padraoDoPosto, parametrosDesfazer,
+  LIMITE_LEITURA_MS, LIMITE_SENIOR_MS, chamarPosto4, ehDemo, erroEstrutura, jaNoPostoNovo, lerSituacao, resumoEnvio, padraoDoPosto, parametrosDesfazer,
   parametrosEnvio, semResposta,
 } from '../_shared/trocaPostoSenior.ts';
 
@@ -105,6 +105,7 @@ Deno.serve(async (req) => {
       const troca = await registrar(acao === 'enviar' ? 'demorou' : 'desfazer_demorou', null, null);
       return json({ ok: false, pendente: true, erro: null, troca });
     }
+    if (erro) erro = `${erro} [enviado: ${resumoEnvio(params)}]`;
     return json({ ok: !erro, erro, troca: await registrar(acao, erro, null) });
   } catch (e) {
     if (e instanceof SeniorError) return json({ error: e.message }, 502);
