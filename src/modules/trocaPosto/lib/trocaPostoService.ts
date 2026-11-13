@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import {
-  MOTIVOS_SENIOR, lidoRecente, motivoSenior, parametrosEnvio, type PadraoPosto, type SituacaoSenior,
+  MOTIVOS_RESERVA, MOTIVOS_SENIOR, lidoRecente, motivoSenior, parametrosEnvio, type PadraoPosto, type SituacaoSenior,
 } from '../../../../supabase/functions/_shared/trocaPostoSenior';
 
 /**
@@ -149,19 +149,19 @@ export async function padraoDoPosto(estrutura: number, posto: string): Promise<P
  * atualizada, o erro da Senior (recusou) ou pendente = a Senior não respondeu a
  * tempo (a troca fica "enviando"; confira com conferirSenior).
  */
-export async function acaoSenior(t: TrocaPosto, acao: 'enviar' | 'desfazer'): Promise<{ erro: string | null; pendente: boolean; ja: boolean; troca: TrocaPosto }> {
+export async function acaoSenior(t: TrocaPosto, acao: 'enviar' | 'desfazer'): Promise<{ erro: string | null; pendente: boolean; ja: boolean; motivo: number | null; troca: TrocaPosto }> {
   if (import.meta.env.DEV) {
     if (acao === 'enviar') await rpc<TrocaPosto>('troca_posto_marcar_enviando', { _id: t.id });
-    const r = await senior<{ erro: string | null; pendente?: boolean; ja?: boolean; lido?: unknown }>({ acao, troca: t });
+    const r = await senior<{ erro: string | null; pendente?: boolean; ja?: boolean; lido?: unknown; motivo?: number }>({ acao, troca: t });
     const troca = r.ja
       ? await rpc<TrocaPosto>('troca_posto_registrar_senior', { _id: t.id, _acao: 'conferir', _erro: null, _lido: r.lido })
       : await rpc<TrocaPosto>('troca_posto_registrar_senior', {
         _id: t.id, _acao: r.pendente ? (acao === 'enviar' ? 'demorou' : 'desfazer_demorou') : acao, _erro: r.erro, _lido: null,
       });
-    return { erro: r.erro, pendente: !!r.pendente, ja: !!r.ja, troca };
+    return { erro: r.erro, pendente: !!r.pendente, ja: !!r.ja, motivo: r.motivo ?? null, troca };
   }
-  const r = await senior<{ erro: string | null; pendente?: boolean; ja?: boolean; troca: TrocaPosto }>({ acao, id: t.id });
-  return { erro: r.erro, pendente: !!r.pendente, ja: !!r.ja, troca: r.troca };
+  const r = await senior<{ erro: string | null; pendente?: boolean; ja?: boolean; motivo?: number; troca: TrocaPosto }>({ acao, id: t.id });
+  return { erro: r.erro, pendente: !!r.pendente, ja: !!r.ja, motivo: r.motivo ?? null, troca: r.troca };
 }
 
 /** Relê o colaborador na Senior e confirma se a troca gravou (ou se desfez). */
@@ -197,6 +197,7 @@ const NOTAS: Record<string, string> = {
   numEmp: 'empresa', tipCol: 'tipo de colaborador', numCad: 'matrícula', iniAtu: 'início no posto novo',
   posTra: 'posto novo', motPos: 'motivo na Senior', obsPos: 'observação', codEsc: 'escala nova',
   codCar: 'mantém o cargo', tipOpe: 'incluir', codTma: 'turma da escala',
+  motPosReserva: 'se a Senior recusar o 998',
 };
 
 /** Exatamente o que vai para a Senior (serviço historicos, operação Posto_4). */
@@ -206,6 +207,7 @@ export function previaSenior(t: Pick<TrocaPosto, 'codigo' | 'num_emp' | 'tip_col
     campo, valor: campo === 'motPos' ? `${v} - ${MOTIVOS_SENIOR[Number(v)] ?? ''}` : String(v), nota: NOTAS[campo] ?? '',
   }));
   // A turma só é lida na Senior na hora do envio (escala "Permanente" exige turma).
+  linhas.push({ campo: 'motPos (reserva)', valor: `se recusar (muda o salário): ${MOTIVOS_RESERVA.map(m => `${String(m).padStart(3, '0')} - ${MOTIVOS_SENIOR[m]}`).join(', depois ')}`, nota: NOTAS.motPosReserva });
   linhas.push({ campo: 'codTma', valor: 'a atual do colaborador (lida na Senior no envio)', nota: NOTAS.codTma });
   return linhas;
 }

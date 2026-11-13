@@ -29,6 +29,48 @@ export const MOTIVOS_SENIOR: Record<number, string> = {
 /** Motivo de alteração de posto na Senior: SEMPRE 998 ("Movimentação 5 Estrelas"), pedido do Matheus em 13/11/2026. */
 export const MOTIVO_SENIOR = 998;
 
+/**
+ * Quando o posto novo muda o salário (ex.: PO2170, cargo 0049 -> 0132), a
+ * Senior recusa o 998 no "Mot. alt." (13/11/2026, TP-15E072B6). Pedido do
+ * Matheus: nesse caso usar um motivo que passe. A recusa não grava nada, então
+ * o envio tenta, nesta ordem, 998 e depois estes.
+ */
+export const MOTIVOS_RESERVA = [2, 4];
+
+/** A Senior recusou o motivo (campo "Mot. alt."), não a troca. */
+export const recusouMotivo = (erro: string | null) => !!erro && /Mot\.\s*alt/i.test(erro);
+
+/** Ordem dos motivos a tentar: o preferido (ex.: o que gravou, ao desfazer), 998, reservas. */
+export function motivosParaTentar(preferido?: number | null): number[] {
+  return [...new Set([preferido ?? MOTIVO_SENIOR, MOTIVO_SENIOR, ...MOTIVOS_RESERVA])].filter(m => m in MOTIVOS_SENIOR);
+}
+
+export interface ResultadoMotivos { erro: string | null; motivo: number; tentados: number[] }
+
+/**
+ * Chama a Senior com cada motivo até um passar (ou a recusa não ser do motivo).
+ * `chamar` recebe o motivo e o tempo que sobra; respeita o prazo total.
+ */
+export async function tentarMotivos(
+  chamar: (motivo: number, tempoMs: number) => Promise<string | null>, motivos: number[], tempoTotalMs: number, agora = () => Date.now(),
+): Promise<ResultadoMotivos> {
+  const fim = agora() + tempoTotalMs;
+  const tentados: number[] = [];
+  let ultimo: string | null = null;
+  for (const m of motivos) {
+    const resta = fim - agora();
+    if (tentados.length && resta < 8000) break;
+    tentados.push(m);
+    const erro = await chamar(m, Math.max(resta, 8000));
+    if (!recusouMotivo(erro)) return { erro, motivo: m, tentados };
+    ultimo = erro;
+  }
+  return {
+    erro: `${ultimo} (motivos tentados: ${tentados.map(m => String(m).padStart(3, '0')).join(', ')})`,
+    motivo: tentados[tentados.length - 1], tentados,
+  };
+}
+
 /** Motivo da tela -> código da Senior (sempre 998, qualquer que seja o motivo da tela). */
 export function motivoSenior(_motivo?: string): number {
   return MOTIVO_SENIOR;
