@@ -87,6 +87,29 @@ export const solicitarTroca = (d: DadosSolicitacao) => rpc<{ id: string; codigo:
 export const decidirTroca = (id: string, aprovar: boolean, obs: string) => rpc<void>('troca_posto_decidir', { _id: id, _aprovar: aprovar, _obs: obs });
 export const cancelarTroca = (id: string) => rpc<void>('troca_posto_cancelar', { _id: id });
 
+// ---------- Link do fiscal (/movimentacao-diaria, aba "Troca de posto") ----------
+/** Pedido feito pelo fiscal no link (o que ele vê na aba). */
+export interface TrocaDoFiscal {
+  codigo: string; criado_em: string; status: StatusTroca; colaborador_nome: string; matricula: number;
+  posto_atual: string | null; posto_atual_codigo: string | null; posto_novo: string | null; posto_novo_codigo: string;
+  data_inicio: string; motivo: string; decisao_obs: string | null;
+}
+export interface DadosPedidoFiscal {
+  colaborador_senior_id: string; posto_estrutura: number; posto_codigo: string;
+  data_inicio: string; motivo: string; observacao: string; motivo_senior: number;
+}
+type Fiscal = { matricula?: number; cpf?: string };
+async function publica<T>(fn: string, s: Fiscal, args: Record<string, unknown> = {}): Promise<T> {
+  const r = await rpc<(T & { erro?: string }) | null>(fn, { _sol_matricula: s.matricula ?? null, _sol_cpf: s.cpf ?? null, ...args });
+  if (r && typeof r === 'object' && !Array.isArray(r) && (r as { erro?: string }).erro) throw new Error((r as { erro: string }).erro);
+  return r as T;
+}
+export const fiscalBuscarColaborador = (s: Fiscal, busca: string) => publica<ColaboradorTroca[]>('movimentacao_troca_buscar', s, { _busca: busca });
+export const fiscalPostos = (s: Fiscal, colaboradorId: string) => publica<PostoSenior[]>('movimentacao_troca_postos', s, { _colaborador: colaboradorId });
+export const fiscalMinhasTrocas = (s: Fiscal) => publica<TrocaDoFiscal[]>('movimentacao_troca_minhas', s);
+export const fiscalSolicitarTroca = (s: Fiscal, d: DadosPedidoFiscal) =>
+  publica<{ ok: true; codigo: string; minhas: TrocaDoFiscal[] }>('movimentacao_troca_solicitar', s, { _dados: d });
+
 /** Tabela nova ainda fora do types.ts gerado. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const tabela = (nome: string) => (supabase as unknown as { from: (t: string) => any }).from(nome);

@@ -73,6 +73,7 @@ MIGRACOES=(
   "20261113120000_movimentacao_reserva_relatorio.sql|SELECT to_regprocedure('public.movimentacao_relatorio_dia(integer,text,date)') IS NOT NULL"
   "20261113130000_movimentacao_passagem_plantao.sql|SELECT to_regprocedure('public.movimentacao_passagens_pendentes()') IS NOT NULL"
   "20261113140000_troca_posto.sql|SELECT to_regprocedure('public.troca_posto_registrar_senior(uuid,text,text,jsonb,text)') IS NOT NULL"
+  "20261113150000_troca_posto_link_fiscal.sql|SELECT to_regprocedure('public.movimentacao_troca_solicitar(integer,text,jsonb)') IS NOT NULL"
 )
 # A ordem acima é a ordem em que as pendentes são aplicadas: sempre da mais antiga para a mais nova.
 PENDENTES=()
