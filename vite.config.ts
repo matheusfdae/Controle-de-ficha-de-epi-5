@@ -9,7 +9,7 @@ import { calcularPendentes, montarEmailPendentes } from "./supabase/functions/_s
 import { calcularPainel, svgPainel } from "./supabase/functions/_shared/painelFichas";
 import { base64 } from "./supabase/functions/_shared/xlsx";
 import { initWasm, Resvg } from "@resvg/resvg-wasm";
-import { LIMITE_LEITURA_MS, chamarPosto4, ehDemo, erroEstrutura, jaNoPostoNovo, lerSituacao, resumoEnvio, liberadaNoLocalhost, padraoDoPosto, parametrosDesfazer, parametrosEnvio, semResposta } from "./supabase/functions/_shared/trocaPostoSenior";
+import { LIMITE_LEITURA_MS, chamarPosto4, ehDemo, erroEstrutura, comHoraDaLeitura, jaNoPostoNovo, lerSituacao, lidoRecente, resumoEnvio, liberadaNoLocalhost, padraoDoPosto, parametrosDesfazer, parametrosEnvio, semResposta } from "./supabase/functions/_shared/trocaPostoSenior";
 import { montarEmailIntegracao, normalizarPessoas } from "./supabase/functions/_shared/emailIntegracao";
 import { limparEmails, montarEmailDivergencia } from "./supabase/functions/_shared/avisoMovimentacao";
 import { destinatariosPassagem, montarEmailPassagem } from "./supabase/functions/_shared/passagemPlantao";
@@ -361,7 +361,7 @@ function seniorLocal(env: Record<string, string>): Plugin {
           // Igual à produção: uma chamada à Senior por ação; conferir é separado.
           if (acao === "conferir") {
             try {
-              const lido = await lerSituacao(cfg, t.num_emp, t.num_cad, t.tip_col);
+              const lido = comHoraDaLeitura(await lerSituacao(cfg, t.num_emp, t.num_cad, t.tip_col));
               return res.end(JSON.stringify({ lido: lido ?? { erro_leitura: "Colaborador não encontrado na Senior" } }));
             } catch (e) {
               if (!semResposta(e)) throw e;
@@ -372,8 +372,8 @@ function seniorLocal(env: Record<string, string>): Plugin {
           let params = parametrosDesfazer(t);
           if (acao === "enviar") {
             // Igual à produção: lê a turma antes (escala "Permanente" exige turma).
-            let atual;
-            try {
+            let atual = lidoRecente(t.senior_lido);
+            if (!atual) try {
               atual = await lerSituacao(cfg, t.num_emp, t.num_cad, t.tip_col, LIMITE_LEITURA_MS);
             } catch (e) {
               return res.end(JSON.stringify({ erro: semResposta(e)

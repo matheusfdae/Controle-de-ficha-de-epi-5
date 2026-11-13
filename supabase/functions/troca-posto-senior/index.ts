@@ -16,7 +16,7 @@ import { verifyCaller, serviceClient, json, corsHeaders } from '../_shared/clerk
 import { carregarSenior } from '../_shared/seniorConfig.ts';
 import { SeniorError } from '../_shared/senior.ts';
 import {
-  LIMITE_LEITURA_MS, LIMITE_SENIOR_MS, chamarPosto4, ehDemo, erroEstrutura, jaNoPostoNovo, lerSituacao, resumoEnvio, padraoDoPosto, parametrosDesfazer,
+  LIMITE_LEITURA_MS, LIMITE_SENIOR_MS, chamarPosto4, ehDemo, erroEstrutura, comHoraDaLeitura, jaNoPostoNovo, lerSituacao, lidoRecente, resumoEnvio, padraoDoPosto, parametrosDesfazer,
   parametrosEnvio, semResposta,
 } from '../_shared/trocaPostoSenior.ts';
 
@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
 
     if (acao === 'conferir') {
       try {
-        const lido = await lerSituacao(cfg, t.num_emp, t.num_cad, t.tip_col);
+        const lido = comHoraDaLeitura(await lerSituacao(cfg, t.num_emp, t.num_cad, t.tip_col));
         return json({ ok: true, lido, troca: await registrar('conferir', null, lido ?? { erro_leitura: 'Colaborador não encontrado na Senior' }) });
       } catch (e) {
         if (semResposta(e)) return json({ error: 'A Senior está demorando para responder. Tente conferir de novo em alguns minutos.' }, 504);
@@ -74,9 +74,10 @@ Deno.serve(async (req) => {
     let tempo = LIMITE_SENIOR_MS;
     if (acao === 'enviar') {
       // Turma atual (o posto pode trazer escala "Permanente", que exige turma). Sem ela, nada é enviado.
+      // Usa a leitura da conferência feita logo antes pela tela (até 10 min); senão lê agora.
       const t0 = Date.now();
-      let atual;
-      try {
+      let atual = lidoRecente(t.senior_lido);
+      if (!atual) try {
         atual = await lerSituacao(cfg, t.num_emp, t.num_cad, t.tip_col, LIMITE_LEITURA_MS);
       } catch (e) {
         const msg = semResposta(e)

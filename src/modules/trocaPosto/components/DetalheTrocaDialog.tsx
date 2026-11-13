@@ -6,7 +6,7 @@ import { ArrowDown, Ban, Check, CheckCircle2, Info, Loader2, RefreshCw, RotateCc
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
-  acaoSenior, cancelarTroca, conferirSenior, dataBr, dataHoraBr, decidirTroca, envioParado, nomePosto, previaSenior, type TrocaPosto,
+  acaoSenior, cancelarTroca, conferirSenior, dataBr, dataHoraBr, decidirTroca, envioParado, lidoRecente, nomePosto, previaSenior, type TrocaPosto,
 } from '../lib/trocaPostoService';
 import SeloStatusTroca from './SeloStatusTroca';
 import PadraoPostoCard from './PadraoPostoCard';
@@ -68,7 +68,17 @@ export default function DetalheTrocaDialog({ troca, fechar, mudou, podeAprovar, 
     setAcao(qual);
     let depois: TrocaPosto | null = null;
     try {
-      const r = await acaoSenior(t, qual);
+      let base = t;
+      if (qual === 'enviar' && !lidoRecente(t.senior_lido)) {
+        // Confere antes: relê a turma e acorda a Senior (parada, a 1ª chamada leva ~1 min).
+        try { base = await conferirSenior(t); } catch { base = await conferirSenior(t); }
+        setAtual(base); mudou();
+        if (base.status === 'enviada') {
+          toast.success(`A troca ${t.codigo} já estava gravada na Senior: marcada sem reenviar.`);
+          return;
+        }
+      }
+      const r = await acaoSenior(base, qual);
       setAtual(r.troca); setConfirmando(null); mudou();
       if (r.erro) toast.error(`A Senior recusou: ${r.erro}`, { duration: 15000 });
       else {
@@ -220,7 +230,7 @@ export default function DetalheTrocaDialog({ troca, fechar, mudou, podeAprovar, 
                   </Button>
                   <Button variant="outline" className="min-w-24" disabled={!!acao} onClick={() => setConfirmando(null)}>Não</Button>
                 </div>
-                {(acao === 'enviar' || acao === 'desfazer') && <p className="text-xs text-muted-foreground">Falando com a Senior… pode levar até 1 minuto. Não feche esta janela.</p>}
+                {(acao === 'enviar' || acao === 'desfazer') && <p className="text-xs text-muted-foreground">Falando com a Senior… pode levar até 2 minutos (ela demora a responder na 1ª vez). Não feche esta janela.</p>}
               </div>
             )}
           </div>

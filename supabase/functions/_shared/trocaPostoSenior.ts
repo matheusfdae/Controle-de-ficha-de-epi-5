@@ -95,6 +95,30 @@ export function resumoEnvio(p: Record<string, string | number>): string {
   return Object.entries(p).filter(([k]) => k !== 'obsPos').map(([k, v]) => `${k}=${v}`).join(', ');
 }
 
+/**
+ * A Senior "dorme" parada: a 1ª chamada leva ~60 s, as seguintes 1–3 s
+ * (medido em 13/11/2026). Por isso o Enviar primeiro confere (relê e acorda a
+ * Senior) e o envio usa a turma dessa leitura, se tiver até LIDO_VALIDO_MS.
+ */
+export const LIDO_VALIDO_MS = 10 * 60 * 1000;
+
+/** Leitura guardada (senior_lido) ainda recente e com a turma; senão null. */
+export function lidoRecente(lido: unknown, agora = Date.now()): SituacaoSenior | null {
+  if (!lido || typeof lido !== 'object') return null;
+  const l = lido as Partial<SituacaoSenior> & { erro_leitura?: string; lido_em?: string };
+  if (l.erro_leitura || !l.lido_em || !('turma' in l) || !('posto' in l)) return null;
+  const em = Date.parse(l.lido_em);
+  if (!Number.isFinite(em) || agora - em > LIDO_VALIDO_MS || em - agora > 60000) return null;
+  return {
+    posto: l.posto ?? null, estrutura: l.estrutura ?? null, cargo: l.cargo ?? null, local: l.local ?? null,
+    centroCusto: l.centroCusto ?? null, escala: l.escala ?? null, turma: l.turma ?? null,
+  };
+}
+
+/** Marca a hora da leitura (para lidoRecente). */
+export const comHoraDaLeitura = (lido: SituacaoSenior | null, agora = new Date()) =>
+  lido ? { ...lido, lido_em: agora.toISOString() } : null;
+
 /** A Senior já mostra o colaborador no posto novo (troca já gravada): não reenviar. */
 export function jaNoPostoNovo(
   t: { posto_novo_codigo: string; posto_novo_estrutura: number },
